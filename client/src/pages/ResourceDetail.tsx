@@ -1,0 +1,206 @@
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  Eye, Download, Heart, Calendar, FileText, Tag, BookOpen, GraduationCap, Bookmark, Layers,
+} from "lucide-react";
+import { PageHeader, Card } from "../components/common/PageHeader";
+import { ErrorState } from "../components/common/States";
+import { Button } from "../components/common/Button";
+import { IconButton } from "../components/common/IconButton";
+import { Badge } from "../components/common/Badge";
+import { getResourceById, getSubjectById, getSemesterById } from "../data/selectors";
+import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
+import { cx, formatFileSize, formatDate } from "../lib/utils";
+import { useLibrary } from "../state/LibraryProvider";
+import { useToast } from "../state/ToastProvider";
+
+export default function ResourceDetail() {
+  const { resourceId } = useParams<{ resourceId: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, markOpened, getProgress } = useLibrary();
+
+  const resource = getResourceById(resourceId);
+
+  if (!resource) {
+    return (
+      <ErrorState
+        title="Resource not found"
+        message="This resource does not exist or has been removed."
+        onRetry={() => navigate(-1)}
+      />
+    );
+  }
+
+  const subject = getSubjectById(resource.subjectId);
+  const semester = getSemesterById(resource.semesterId);
+  const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
+  const TypeIcon = typeConfig.icon;
+  const favorite = isFavorite(resource.id);
+  const bookmarked = Boolean(getBookmark(resource.id));
+  const download = getDownload(resource.id);
+  const progress = getProgress(resource.id);
+
+  const openReader = () => {
+    markOpened(resource.id);
+    navigate(`/reader/${resource.id}`);
+  };
+
+  const handleFavorite = () => {
+    toggleFavorite(resource.id);
+    toast(favorite ? "Removed from favorites" : "Added to favorites");
+  };
+
+  const handleBookmark = () => {
+    if (bookmarked) {
+      toast("Already bookmarked — manage from Bookmarks page", "info");
+      return;
+    }
+    addBookmark(resource, progress?.lastPage ?? 1, "");
+    toast("Bookmark saved (mock)");
+  };
+
+  const handleDownload = () => {
+    if (download) {
+      toast("Already downloaded or downloading", "info");
+      return;
+    }
+    startDownload(resource);
+    toast("Download started (mock)");
+  };
+
+  return (
+    <div>
+      <PageHeader
+        title={resource.title}
+        subtitle={resource.description}
+        breadcrumbs={[
+          { label: "Semesters", to: "/semesters" },
+          ...(semester ? [{ label: semester.name, to: `/semesters/${semester.id}` }] : []),
+          ...(subject ? [{ label: subject.name, to: `/subjects/${subject.id}` }] : []),
+          { label: typeConfig.label },
+        ]}
+        actions={
+          <>
+            <IconButton
+              icon={Heart}
+              label={favorite ? "Remove from favorites" : "Add to favorites"}
+              variant={favorite ? "active" : "default"}
+              aria-pressed={favorite}
+              onClick={handleFavorite}
+            />
+            <IconButton
+              icon={Bookmark}
+              label={bookmarked ? "Bookmarked" : "Bookmark this resource"}
+              variant={bookmarked ? "active" : "default"}
+              aria-pressed={bookmarked}
+              onClick={handleBookmark}
+            />
+            <Button variant="outline" onClick={handleDownload}>
+              <Download className="size-4" aria-hidden="true" />
+              {download?.status === "completed" ? "Downloaded" : "Download"}
+            </Button>
+            <Button onClick={openReader}>
+              <Eye className="size-4" aria-hidden="true" />
+              {progress ? "Continue reading" : "Read now"}
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="p-6 lg:col-span-2">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Details</h2>
+          <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+            <div>
+              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <Layers className="size-3.5" aria-hidden="true" />
+                Type
+              </dt>
+              <dd className="mt-1">
+                <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", typeConfig.badgeClass)}>
+                  <TypeIcon className="size-3.5" aria-hidden="true" />
+                  {typeConfig.label}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <BookOpen className="size-3.5" aria-hidden="true" /> Subject
+              </dt>
+              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{subject?.name}</dd>
+            </div>
+            <div>
+              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <GraduationCap className="size-3.5" aria-hidden="true" /> Semester
+              </dt>
+              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{semester?.name}</dd>
+            </div>
+            <div>
+              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <FileText className="size-3.5" aria-hidden="true" /> Pages
+              </dt>
+              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{resource.pageCount}</dd>
+            </div>
+            <div>
+              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <FileText className="size-3.5" aria-hidden="true" /> File size
+              </dt>
+              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{formatFileSize(resource.fileSize)}</dd>
+            </div>
+            <div>
+              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <Calendar className="size-3.5" aria-hidden="true" /> Added
+              </dt>
+              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{formatDate(resource.uploadedAt)}</dd>
+            </div>
+          </dl>
+
+          {resource.tags.length > 0 && (
+            <div className="mt-6 border-t border-slate-100 pt-4 dark:border-slate-700/50">
+              <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+                <Tag className="size-3.5" aria-hidden="true" /> Tags
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {resource.tags.map((tag) => (
+                  <Badge key={tag}>{tag}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card className="h-fit p-5">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Quick info</h3>
+          <ul className="mt-3 space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-slate-500 dark:text-slate-400">File</span>
+              <span className="truncate font-mono text-xs">{resource.fileName}</span>
+            </li>
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-slate-500 dark:text-slate-400">Updated</span>
+              <span>{formatDate(resource.updatedAt)}</span>
+            </li>
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-slate-500 dark:text-slate-400">Status</span>
+              {download?.status === "completed" ? (
+                <Badge tone="emerald">Downloaded</Badge>
+              ) : (
+                <Badge tone="sky">Online</Badge>
+              )}
+            </li>
+            {progress && (
+              <li className="flex items-center justify-between gap-3">
+                <span className="text-slate-500 dark:text-slate-400">Progress</span>
+                <span>Page {progress.lastPage} / {resource.pageCount}</span>
+              </li>
+            )}
+          </ul>
+          <Button className="mt-5 w-full" onClick={openReader}>
+            <Eye className="size-4" aria-hidden="true" />
+            {progress ? "Continue reading" : "Read now"}
+          </Button>
+        </Card>
+      </div>
+    </div>
+  );
+}

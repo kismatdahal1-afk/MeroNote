@@ -1,0 +1,148 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Trash2, Eye, HardDrive, CheckCircle2, Loader2 } from "lucide-react";
+import { PageHeader, Card } from "../components/common/PageHeader";
+import { EmptyState } from "../components/common/States";
+import { IconButton } from "../components/common/IconButton";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
+import { ProgressBar } from "../components/common/ProgressBar";
+import { Badge } from "../components/common/Badge";
+import { getResourceById, getSubjectById } from "../data/selectors";
+import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
+import { cx, formatFileSize, formatRelativeTime } from "../lib/utils";
+import { useLibrary } from "../state/LibraryProvider";
+import { useToast } from "../state/ToastProvider";
+
+export default function Downloads() {
+  const { downloads, removeDownload, totalDownloadSize, markOpened } = useLibrary();
+  const { toast } = useToast();
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+
+  const completedCount = downloads.filter((d) => d.status === "completed").length;
+  const activeCount = downloads.filter((d) => d.status === "downloading").length;
+
+  return (
+    <div>
+      <PageHeader
+        title="Downloads"
+        subtitle="Files saved on this device for offline reading."
+      />
+
+      {/* Storage summary */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card className="flex items-center gap-4 p-5">
+          <div className="flex size-11 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+            <HardDrive className="size-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Total storage</p>
+            <p className="mt-0.5 text-xl font-bold text-slate-900 dark:text-white">{formatFileSize(totalDownloadSize)}</p>
+          </div>
+        </Card>
+        <Card className="flex items-center gap-4 p-5">
+          <div className="flex size-11 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-300">
+            <CheckCircle2 className="size-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Downloaded files</p>
+            <p className="mt-0.5 text-xl font-bold text-slate-900 dark:text-white">{completedCount}</p>
+          </div>
+        </Card>
+        <Card className="flex items-center gap-4 p-5">
+          <div className="flex size-11 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-300">
+            <Loader2 className="size-5" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">In progress</p>
+            <p className="mt-0.5 text-xl font-bold text-slate-900 dark:text-white">{activeCount}</p>
+          </div>
+        </Card>
+      </div>
+
+      {downloads.length === 0 ? (
+        <EmptyState
+          title="No downloads yet"
+          message="Press the download button on any resource to keep it available offline."
+        />
+      ) : (
+        <div className="space-y-3">
+          {downloads.map((dl) => {
+            const resource = getResourceById(dl.resourceId);
+            if (!resource) return null;
+            const subject = getSubjectById(resource.subjectId);
+            const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
+            const TypeIcon = typeConfig.icon;
+            return (
+              <Card key={dl.id} className="flex items-center gap-4 p-4">
+                <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
+                  <TypeIcon className="size-5" aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    to={`/resources/${resource.id}`}
+                    className="line-clamp-1 text-sm font-semibold text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400"
+                  >
+                    {resource.title}
+                  </Link>
+                  <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                    {subject?.name} · {formatFileSize(dl.sizeBytes)}
+                  </p>
+                  {dl.status === "downloading" && (
+                    <div className="mt-2 flex items-center gap-2.5">
+                      <ProgressBar value={dl.progress / 100} label={`Download progress ${dl.progress}%`} className="max-w-48" />
+                      <span className="text-xs font-medium text-sky-600 dark:text-sky-400">{dl.progress}%</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {dl.status === "completed" && (
+                    <>
+                      <Badge tone="emerald">
+                        <CheckCircle2 className="size-3" aria-hidden="true" />
+                        Saved
+                      </Badge>
+                      <span className="hidden text-xs text-slate-400 sm:block">
+                        {formatRelativeTime(dl.downloadedAt)}
+                      </span>
+                      <Link
+                        to={`/reader/${resource.id}`}
+                        onClick={() => markOpened(resource.id)}
+                        aria-label={`Open ${resource.title}`}
+                        className="flex size-9 items-center justify-center rounded-lg bg-indigo-600/10 text-indigo-600 hover:bg-indigo-600/20 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+                      >
+                        <Eye className="size-4" aria-hidden="true" />
+                      </Link>
+                    </>
+                  )}
+                  <IconButton
+                    icon={Trash2}
+                    label={`Delete ${resource.title} from downloads`}
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setPendingDelete(dl.id)}
+                  />
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Delete download"
+        message="This will remove the downloaded file from this device. You can download it again anytime."
+        confirmLabel="Delete"
+        danger
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) {
+            removeDownload(pendingDelete);
+            toast("Download deleted (mock)");
+          }
+          setPendingDelete(null);
+        }}
+      />
+    </div>
+  );
+}
