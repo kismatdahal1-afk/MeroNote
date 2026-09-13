@@ -1,6 +1,6 @@
 ﻿import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { NotebookPen, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useToast } from "../state/ToastProvider";
 
 export default function Login() {
@@ -32,9 +32,13 @@ export default function Login() {
     <div className="bg-hero-gradient flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
-            <NotebookPen className="size-6" aria-hidden="true" />
-          </span>
+          <img
+            src="/icon/icon.png"
+            alt="Mero Note"
+            width={48}
+            height={48}
+            className="size-12 shrink-0 rounded-2xl object-cover shadow-md"
+          />
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
             Welcome back
           </h1>
@@ -46,7 +50,7 @@ export default function Login() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-card"
+          className="card-glow space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-card"
         >
           <div className="space-y-1.5">
             <label htmlFor="login-email" className="block text-sm font-semibold text-foreground">

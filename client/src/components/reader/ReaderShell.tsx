@@ -1,13 +1,15 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
-  ArrowLeft, ChevronLeft, ChevronRight, Search, Bookmark,
+  ChevronLeft, ChevronRight, Search, Bookmark,
   Download, Maximize2, Minus, Plus, FileText,
 } from "lucide-react";
 import { getResourceById, getSubjectById } from "../../data/selectors";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 import { IconButton } from "../common/IconButton";
+import { BackButton } from "../common/BackButton";
+import { useCmsSync } from "../common/CmsSync";
 import { clamp } from "../../lib/utils";
 
 const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
@@ -19,9 +21,9 @@ const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
  * touching toolbar/layout code.
  */
 export function ReaderShell() {
+  useCmsSync();
   const { resourceId } = useParams<{ resourceId: string }>();
   const resource = getResourceById(resourceId);
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { getProgress, setReadingProgress, addBookmark, getBookmark, getDownload, startDownload, markOpened } = useLibrary();
 
@@ -36,13 +38,9 @@ export function ReaderShell() {
       <div className="reader-bar flex min-h-screen items-center justify-center bg-background p-6">
         <div className="text-center">
           <p className="text-lg font-bold text-foreground">Resource not found</p>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="mt-3 text-sm font-semibold text-primary hover:underline"
-          >
-            Go back
-          </button>
+          <div className="mt-3 flex justify-center">
+            <BackButton fallbackTo="/dashboard" label="Go back" />
+          </div>
         </div>
       </div>
     );
@@ -93,7 +91,12 @@ export function ReaderShell() {
     <div className="reader-bar flex min-h-screen flex-col bg-background">
       {/* Reader toolbar */}
       <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-border bg-surface/90 px-3 backdrop-blur-md lg:px-4">
-        <IconButton icon={ArrowLeft} label="Back to resource" variant="bar" onClick={() => navigate(`/resources/${resource.id}`)} />
+        <BackButton
+          iconOnly
+          fallbackTo={`/resources/${resource.id}`}
+          label="Back to resource"
+          className="text-foreground/75 hover:bg-surface-hover hover:text-foreground"
+        />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
           <p className="truncate text-xs font-medium text-muted-foreground">
@@ -137,7 +140,8 @@ export function ReaderShell() {
         <IconButton
           icon={Bookmark}
           label="Bookmark current page"
-          variant={bookmarked ? "active" : "bar"}
+          variant={bookmarked ? "bookmark" : "bar"}
+          filled={bookmarked}
           onClick={handleBookmark}
         />
         <IconButton icon={Download} label="Download resource" variant={download?.status === "completed" ? "active" : "bar"} onClick={handleDownload} />
@@ -171,7 +175,7 @@ export function ReaderShell() {
         <div
           aria-label="Document placeholder"
           style={{ width: `${clamp(zoom, 40, 220)}%`, maxWidth: "56rem" }}
-          className="flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface text-muted-foreground shadow-card transition-[width]"
+          className="card-glow flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface text-muted-foreground shadow-card transition-[width]"
         >
           <FileText className="size-12" aria-hidden="true" />
           <p className="text-sm font-semibold text-muted-foreground">PDF viewer placeholder</p>

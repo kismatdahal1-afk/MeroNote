@@ -6,14 +6,17 @@ import { PageHeader, Card } from "../components/common/PageHeader";
 import { ErrorState } from "../components/common/States";
 import { Button } from "../components/common/Button";
 import { IconButton } from "../components/common/IconButton";
+import { BackButton } from "../components/common/BackButton";
 import { Badge } from "../components/common/Badge";
 import { getResourceById, getSubjectById, getSemesterById } from "../data/selectors";
 import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
 import { cx, formatFileSize, formatDate } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
+import { useCmsSync } from "../components/common/CmsSync";
 
 export default function ResourceDetail() {
+  useCmsSync();
   const { resourceId } = useParams<{ resourceId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -70,6 +73,9 @@ export default function ResourceDetail() {
 
   return (
     <div>
+      <div className="mb-1 -ml-1 sm:-ml-1">
+        <BackButton label="Back" />
+      </div>
       <PageHeader
         title={resource.title}
         subtitle={resource.description}
@@ -84,14 +90,16 @@ export default function ResourceDetail() {
             <IconButton
               icon={Heart}
               label={favorite ? "Remove from favorites" : "Add to favorites"}
-              variant={favorite ? "active" : "default"}
+              variant={favorite ? "favorite" : "default"}
+              filled={favorite}
               aria-pressed={favorite}
               onClick={handleFavorite}
             />
             <IconButton
               icon={Bookmark}
               label={bookmarked ? "Bookmarked" : "Bookmark this resource"}
-              variant={bookmarked ? "active" : "default"}
+              variant={bookmarked ? "bookmark" : "default"}
+              filled={bookmarked}
               aria-pressed={bookmarked}
               onClick={handleBookmark}
             />
@@ -112,7 +120,7 @@ export default function ResourceDetail() {
           <h2 className="text-base font-bold text-foreground">Details</h2>
           <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <Layers className="size-3.5" aria-hidden="true" />
                 Type
               </dt>
@@ -124,31 +132,31 @@ export default function ResourceDetail() {
               </dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <BookOpen className="size-3.5" aria-hidden="true" /> Subject
               </dt>
               <dd className="mt-1 text-sm font-medium text-foreground">{subject?.name}</dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <GraduationCap className="size-3.5" aria-hidden="true" /> Semester
               </dt>
               <dd className="mt-1 text-sm font-medium text-foreground">{semester?.name}</dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <FileText className="size-3.5" aria-hidden="true" /> Pages
               </dt>
               <dd className="mt-1 text-sm font-medium text-foreground">{resource.pageCount}</dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <FileText className="size-3.5" aria-hidden="true" /> File size
               </dt>
               <dd className="mt-1 text-sm font-medium text-foreground">{formatFileSize(resource.fileSize)}</dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <Calendar className="size-3.5" aria-hidden="true" /> Added
               </dt>
               <dd className="mt-1 text-sm font-medium text-foreground">{formatDate(resource.uploadedAt)}</dd>

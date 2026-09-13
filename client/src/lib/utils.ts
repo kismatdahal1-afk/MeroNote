@@ -53,6 +53,16 @@ export function formatTimestamp(iso: string): string {
   return `${formatDate(iso)}, ${time}`;
 }
 
+/** Time-of-day greeting: Good morning / afternoon / evening / night. */
+export function getGreeting(date = new Date()): string {
+  const h = date.getHours();
+  if (h < 5) return "Good night";
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  if (h < 21) return "Good evening";
+  return "Good night";
+}
+
 /** Days remaining until an ISO date (rounded up, never negative). */
 export function daysUntil(iso: string): number {
   return Math.max(0, Math.ceil((+new Date(iso) - Date.now()) / 86400000));

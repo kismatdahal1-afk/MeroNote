@@ -18,19 +18,22 @@ export function RecentOpenedCard({ resource }: { resource: Resource }) {
   const pct = Math.round((progress?.progress ?? 0) * 100);
 
   return (
-    <Card interactive className="p-4">
-      <div className="flex items-start justify-between gap-3">
+    <Card interactive className="group relative p-4">
+      {/* Stretched link — makes the whole card clickable */}
+      <Link
+        to={`/resources/${resource.id}`}
+        onClick={() => markOpened(resource.id)}
+        aria-label={`Open ${resource.title}`}
+        className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      />
+      <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className={cx("inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold", typeConfig.badgeClass)}>
             {subject?.name}
           </p>
-          <Link
-            to={`/resources/${resource.id}`}
-            onClick={() => markOpened(resource.id)}
-            className="mt-1.5 line-clamp-1 block text-sm font-bold text-foreground hover:text-primary"
-          >
+          <p className="mt-1.5 line-clamp-1 text-sm font-bold text-foreground group-hover:text-primary">
             {resource.title}
-          </Link>
+          </p>
           <p className="mt-0.5 line-clamp-1 text-xs font-medium text-muted-foreground">
             {resource.description}
           </p>
@@ -38,7 +41,7 @@ export function RecentOpenedCard({ resource }: { resource: Resource }) {
         <Link
           to={`/reader/${resource.id}`}
           onClick={() => markOpened(resource.id)}
-          aria-label={`Open ${resource.title}`}
+          aria-label={`Open ${resource.title} in reader`}
           className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary hover:bg-primary-muted-hover"
         >
           <Play className="size-4 translate-x-px fill-current" aria-hidden="true" />
@@ -65,19 +68,22 @@ export function TrendingResourceCard({ resource }: { resource: Resource }) {
   const download = getDownload(resource.id);
 
   return (
-    <Card interactive className="p-4">
-      <div className="flex items-start gap-3">
+    <Card interactive className="group relative p-4">
+      {/* Stretched link — makes the whole card clickable */}
+      <Link
+        to={`/resources/${resource.id}`}
+        onClick={() => markOpened(resource.id)}
+        aria-label={`Open ${resource.title}`}
+        className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      />
+      <div className="relative z-10 flex items-start gap-3">
         <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
           <typeConfig.icon className="size-4.5" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
-          <Link
-            to={`/resources/${resource.id}`}
-            onClick={() => markOpened(resource.id)}
-            className="line-clamp-1 text-sm font-bold text-foreground hover:text-primary"
-          >
+          <p className="line-clamp-1 text-sm font-bold text-foreground group-hover:text-primary">
             {resource.title}
-          </Link>
+          </p>
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] font-medium text-muted-foreground">
             <span>PDF</span>
             <span aria-hidden="true">•</span>

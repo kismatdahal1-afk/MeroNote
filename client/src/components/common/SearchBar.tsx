@@ -8,10 +8,17 @@ interface SearchBarProps {
   placeholder?: string;
   className?: string;
   onSubmit: (query: string) => void;
+  /** Live per-keystroke search callback (optional). */
+  onChange?: (query: string) => void;
 }
 
-export function SearchBar({ initialValue = "", placeholder = "Search resources...", className, onSubmit }: SearchBarProps) {
+export function SearchBar({ initialValue = "", placeholder = "Search resources...", className, onSubmit, onChange }: SearchBarProps) {
   const [value, setValue] = useState(initialValue);
+
+  const update = (next: string) => {
+    setValue(next);
+    onChange?.(next);
+  };
 
   return (
     <form
@@ -29,7 +36,7 @@ export function SearchBar({ initialValue = "", placeholder = "Search resources..
       <input
         type="search"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => update(e.target.value)}
         placeholder={placeholder}
         aria-label="Search resources"
         className={cx(
@@ -43,7 +50,7 @@ export function SearchBar({ initialValue = "", placeholder = "Search resources..
           type="button"
           aria-label="Clear search"
           onClick={() => {
-            setValue("");
+            update("");
             onSubmit("");
           }}
           className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
@@ -55,7 +62,7 @@ export function SearchBar({ initialValue = "", placeholder = "Search resources..
   );
 }
 
-/** Compact search field used in the header — navigates to /search. */
+/** Compact search field used in the header — navigates to /resources?q=. */
 export function HeaderSearch() {
   const [value, setValue] = useState("");
   const navigate = useNavigate();
@@ -66,7 +73,7 @@ export function HeaderSearch() {
       className="relative hidden flex-1 md:block"
       onSubmit={(e) => {
         e.preventDefault();
-        navigate(`/search?q=${encodeURIComponent(value)}`);
+        navigate(`/resources?q=${encodeURIComponent(value)}`);
       }}
     >
       <Search className="pointer-events-none absolute left-4 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />

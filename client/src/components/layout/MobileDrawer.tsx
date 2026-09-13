@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { mockUser } from "../../data/mock";
+import { useUser } from "../../state/UserProvider";
 import { SidebarNav } from "./Sidebar";
 import { IconButton } from "../common/IconButton";
 
@@ -9,6 +9,9 @@ interface MobileDrawerProps {
 }
 
 export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
+  const { name, email } = useUser();
+  const initials = name.split(" ").map((p) => p[0]).slice(0, 2).join("");
+
   if (!open) return null;
 
   return (
@@ -22,13 +25,13 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-              AS
+              {initials}
             </span>
             <div className="flex flex-col">
               <span className="text-sm font-bold text-foreground">
-                {mockUser.name}
+                {name}
               </span>
-              <span className="text-xs font-medium text-muted-foreground">{mockUser.email}</span>
+              <span className="text-xs font-medium text-muted-foreground">{email}</span>
             </div>
           </div>
           <IconButton icon={X} label="Close navigation menu" onClick={onClose} />

@@ -3,8 +3,10 @@ import {
   BookOpen,
   FileText,
   Layers,
+  PenLine,
   HelpCircle,
   FileArchive,
+  Flame,
   Sparkles,
   FlaskConical,
   ClipboardList,
@@ -21,8 +23,8 @@ interface ResourceTypeConfig {
 
 /**
  * Type tints use semantic state tokens that adapt automatically to the
- * warm cream light theme and deep navy dark theme. Dark blue (primary/
- * secondary) dominates; state hues only mark resource categories.
+ * warm cream light theme and near-black monochrome dark theme. Dark
+ * neutral (primary/secondary) dominates; state hues only mark resource categories.
  */
 export const RESOURCE_TYPE_CONFIG: Record<ResourceType, ResourceTypeConfig> = {
   book: {
@@ -40,6 +42,11 @@ export const RESOURCE_TYPE_CONFIG: Record<ResourceType, ResourceTypeConfig> = {
     icon: Layers,
     badgeClass: "bg-accent/15 text-accent",
   },
+  handwritten_note: {
+    label: "Handwritten Note",
+    icon: PenLine,
+    badgeClass: "bg-accent/15 text-accent",
+  },
   questions: {
     label: "Questions",
     icon: HelpCircle,
@@ -48,6 +55,11 @@ export const RESOURCE_TYPE_CONFIG: Record<ResourceType, ResourceTypeConfig> = {
   past_paper: {
     label: "Past Paper",
     icon: FileArchive,
+    badgeClass: "bg-warning-muted text-warning",
+  },
+  hot_topic: {
+    label: "Hot Topic",
+    icon: Flame,
     badgeClass: "bg-warning-muted text-warning",
   },
   important_questions: {
@@ -72,15 +84,18 @@ export const RESOURCE_TYPE_CONFIG: Record<ResourceType, ResourceTypeConfig> = {
   },
 };
 
+/** Canonical display order for resource types. */
 export const ALL_RESOURCE_TYPES: ResourceType[] = [
   "book",
   "short_note",
+  "handwritten_note",
   "extra_note",
   "questions",
-  "past_paper",
   "important_questions",
-  "practical",
+  "hot_topic",
+  "past_paper",
   "revision_note",
+  "practical",
   "other",
 ];
 

@@ -66,7 +66,7 @@ export function Card({ children, className, interactive = false }: CardProps) {
   return (
     <div
       className={cx(
-        "rounded-xl border border-border bg-surface shadow-card",
+        "card-glow rounded-xl border border-border bg-surface shadow-card",
         interactive &&
           "transition-all hover:border-primary/40 hover:shadow-card-hover",
         className,

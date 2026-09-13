@@ -5,74 +5,154 @@
   ProgramInfo,
   RecentEntry,
   ReadingProgress,
-  Resource,
-  Semester,
+  ResourceType,
   Subject,
+  Topic,
 } from "../types";
 
 /**
- * Phase 2 mock data.
- * Structure mirrors the future API shape so it can be replaced
- * by real API data without changing consuming components.
+ * Phase 2 mock/seed data.
+ * Semesters/Subjects/Topics/Resources are SEED shapes only — the CMS store
+ * (state/cmsStore) upgrades them into full records with status/timestamps.
+ * Structure mirrors the future API shape so it can be replaced by real API
+ * data without changing consuming components.
  */
+
+/** Seed semester (pre-CMS upgrade). */
+export interface SeedSemester {
+  id: string;
+  number: number;
+  name: string;
+  description: string;
+  subjectCount: number;
+  resourceCount: number;
+  credits: number;
+  enrollment: "passed" | "active" | "upcoming";
+}
+
+/** Seed subject — a Subject minus the CMS-managed fields. */
+export type SeedSubject = Omit<Subject, "status" | "createdAt" | "updatedAt" | "deletedAt">;
+
+/** Seed topic — a Topic minus the CMS-managed fields. */
+export type SeedTopic = Omit<Topic, "status" | "createdAt" | "updatedAt" | "deletedAt">;
+
+export type SeedResource = {
+  id: string;
+  title: string;
+  description: string;
+  semesterId: string;
+  subjectId: string;
+  topicId?: string;
+  type: ResourceType;
+  fileName: string;
+  fileSize: number;
+  pageCount: number;
+  tags: string[];
+  uploadedAt: string;
+  updatedAt: string;
+};
 
 const iso = (daysAgo: number): string =>
   new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
 
-export const semesters: Semester[] = [
-  { id: "sem-1", number: 1, name: "Semester 1", description: "Foundations of programming, mathematics, and computing.", subjectCount: 4, resourceCount: 18, credits: 21, status: "passed", completion: 1 },
-  { id: "sem-2", number: 2, name: "Semester 2", description: "Digital logic, microprocessor fundamentals, and statistics.", subjectCount: 4, resourceCount: 15, credits: 21, status: "passed", completion: 1 },
-  { id: "sem-3", number: 3, name: "Semester 3", description: "Data structures, numerical methods, and theory of computation.", subjectCount: 5, resourceCount: 21, credits: 22, status: "passed", completion: 1 },
-  { id: "sem-4", number: 4, name: "Semester 4", description: "Algorithms, databases, operating systems fundamentals.", subjectCount: 5, resourceCount: 19, credits: 22, status: "active", completion: 0.45 },
-  { id: "sem-5", number: 5, name: "Semester 5", description: "Computer networks, simulation, and modelling.", subjectCount: 4, resourceCount: 16, credits: 21, status: "upcoming", completion: 0 },
-  { id: "sem-6", number: 6, name: "Semester 6", description: "Software engineering, AI foundations, and graphics.", subjectCount: 5, resourceCount: 20, credits: 22, status: "upcoming", completion: 0 },
-  { id: "sem-7", number: 7, name: "Semester 7", description: "Advanced electives: IoT, security, and distributed systems.", subjectCount: 4, resourceCount: 14, credits: 20, status: "upcoming", completion: 0 },
-  { id: "sem-8", number: 8, name: "Semester 8", description: "Final semester: project work and advanced electives.", subjectCount: 3, resourceCount: 10, credits: 16, status: "upcoming", completion: 0 },
+/**
+ * Real TU BSc CSIT semester structure (course slots / credit hours).
+ * Semesters I–IV: 5 slots, 15 credits each.
+ * Semesters V–VI: 6 slots, 18 credits each.
+ * Semesters VII: 5 slots, 15 credits. Semester VIII: 4 slots, 15 credits.
+ * `resourceCount` reflects seeded mock resources; subject slots are real.
+ */
+export const semesters: SeedSemester[] = [
+  { id: "sem-1", number: 1, name: "Semester 1", description: "Foundations of programming, mathematics, and computing.", subjectCount: 5, resourceCount: 18, credits: 15, enrollment: "passed" },
+  { id: "sem-2", number: 2, name: "Semester 2", description: "Digital logic, microprocessor fundamentals, and statistics.", subjectCount: 5, resourceCount: 15, credits: 15, enrollment: "passed" },
+  { id: "sem-3", number: 3, name: "Semester 3", description: "Data structures, numerical methods, and theory of computation.", subjectCount: 5, resourceCount: 21, credits: 15, enrollment: "passed" },
+  { id: "sem-4", number: 4, name: "Semester 4", description: "Algorithms, databases, operating systems fundamentals.", subjectCount: 5, resourceCount: 19, credits: 15, enrollment: "active" },
+  { id: "sem-5", number: 5, name: "Semester 5", description: "Computer networks, simulation, and modelling.", subjectCount: 6, resourceCount: 16, credits: 18, enrollment: "upcoming" },
+  { id: "sem-6", number: 6, name: "Semester 6", description: "Software engineering, AI foundations, and graphics.", subjectCount: 6, resourceCount: 20, credits: 18, enrollment: "upcoming" },
+  { id: "sem-7", number: 7, name: "Semester 7", description: "Advanced electives: IoT, security, and distributed systems.", subjectCount: 5, resourceCount: 14, credits: 15, enrollment: "upcoming" },
+  { id: "sem-8", number: 8, name: "Semester 8", description: "Final semester: project work and advanced electives.", subjectCount: 4, resourceCount: 10, credits: 15, enrollment: "upcoming" },
 ];
 
-export const subjects: Subject[] = [
-  // Semester 1
-  { id: "sub-csa", semesterId: "sem-1", name: "Computer System Architecture", code: "CSC101", description: "Number systems, logic gates, and basic computer organization.", category: "core", credits: 3, offlineSync: 1, hotTopics: ["Booth algorithm", "K-maps", "Addressing modes"] },
-  { id: "sub-cprog", semesterId: "sem-1", name: "C Programming", code: "CSC102", description: "Procedural programming fundamentals with the C language.", category: "core", credits: 4, offlineSync: 1, hotTopics: ["Pointers", "File handling", "Structures"] },
-  { id: "sub-math1", semesterId: "sem-1", name: "Mathematics I", code: "MTH103", description: "Calculus, algebra, and analytical geometry.", category: "core", credits: 4, offlineSync: 0.8, hotTopics: ["Taylor series", "L'Hopital", "Matrices"] },
-  { id: "sub-phy", semesterId: "sem-1", name: "Physics", code: "PHY104", description: "Mechanics, waves, and modern physics basics.", category: "core", credits: 3, offlineSync: 1, hotTopics: ["Interference", "Photoelectric effect"] },
+export const subjects: SeedSubject[] = [  // Semester 1
+  { id: "sub-csa", semesterId: "sem-1", name: "Computer System Architecture", code: "CSC101", description: "Number systems, logic gates, and basic computer organization.", category: "core", credits: 3, offlineSync: 1, hotTopics: ["Booth algorithm", "K-maps", "Addressing modes"], fullMarks: 60 },
+  { id: "sub-cprog", semesterId: "sem-1", name: "C Programming", code: "CSC102", description: "Procedural programming fundamentals with the C language.", category: "core", credits: 3, offlineSync: 1, hotTopics: ["Pointers", "File handling", "Structures"], fullMarks: 60 },
+  { id: "sub-math1", semesterId: "sem-1", name: "Mathematics I", code: "MTH103", description: "Calculus, algebra, and analytical geometry.", category: "core", credits: 3, offlineSync: 0.8, hotTopics: ["Taylor series", "L'Hopital", "Matrices"], fullMarks: 60 },
+  { id: "sub-phy", semesterId: "sem-1", name: "Physics", code: "PHY104", description: "Mechanics, waves, and modern physics basics.", category: "core", credits: 3, offlineSync: 1, hotTopics: ["Interference", "Photoelectric effect"], fullMarks: 60 },
+  { id: "sub-soc1", semesterId: "sem-1", name: "Society & Technology", code: "SOC105", description: "Technology, ethics, and their interplay with society.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Tech ethics", "Digital divide"], fullMarks: 60 },
   // Semester 2
-  { id: "sub-dlogic", semesterId: "sem-2", name: "Digital Logic", code: "CSC201", description: "Combinational and sequential circuit design.", category: "core", credits: 3, offlineSync: 1, hotTopics: ["K-maps", "Flip-flops", "Counters"] },
-  { id: "sub-micro", semesterId: "sem-2", name: "Microprocessor", code: "CSC202", description: "8085/8086 architecture, assembly programming.", category: "core", credits: 3, offlineSync: 0.6, hotTopics: ["8085 interrupts", "Timing diagrams"] },
-  { id: "sub-math2", semesterId: "sem-2", name: "Mathematics II", description: "Differential equations and linear algebra.", code: "MTH203", category: "core", credits: 4, offlineSync: 0.4, hotTopics: ["Laplace transforms", "Eigenvalues"] },
-  { id: "sub-stat", semesterId: "sem-2", name: "Statistics I", code: "STA204", description: "Descriptive statistics and probability.", category: "core", credits: 3, offlineSync: 1, hotTopics: ["Bayes theorem", "Distributions"] },
+  { id: "sub-dlogic", semesterId: "sem-2", name: "Digital Logic", code: "CSC201", description: "Combinational and sequential circuit design.", category: "core", credits: 3, offlineSync: 1, hotTopics: ["K-maps", "Flip-flops", "Counters"], fullMarks: 60 },
+  { id: "sub-micro", semesterId: "sem-2", name: "Microprocessor", code: "CSC202", description: "8085/8086 architecture, assembly programming.", category: "core", credits: 3, offlineSync: 0.6, hotTopics: ["8085 interrupts", "Timing diagrams"], fullMarks: 60 },
+  { id: "sub-math2", semesterId: "sem-2", name: "Mathematics II", description: "Differential equations and linear algebra.", code: "MTH203", category: "core", credits: 4, offlineSync: 0.4, hotTopics: ["Laplace transforms", "Eigenvalues"], fullMarks: 60 },
+  { id: "sub-stat", semesterId: "sem-2", name: "Statistics I", code: "STA204", description: "Descriptive statistics and probability.", category: "core", credits: 3, offlineSync: 1, hotTopics: ["Bayes theorem", "Distributions"], fullMarks: 60 },
+  { id: "sub-lib2", semesterId: "sem-2", name: "Library & Information Services", code: "LIB205", description: "Research methods, referencing, and academic writing.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Citation styles", "Research process"], fullMarks: 60 },
   // Semester 3
-  { id: "sub-dsa", semesterId: "sem-3", name: "Data Structures & Algorithms", code: "CSC301", description: "Lists, trees, graphs, and core algorithms.", category: "core", credits: 4, offlineSync: 1, hotTopics: ["AVL rotations", "Graph traversals", "Hashing"] },
-  { id: "sub-oorad", semesterId: "sem-3", name: "OOP with C++", code: "CSC302", description: "Object-oriented design and C++ implementation.", category: "core", credits: 3, offlineSync: 0.9, hotTopics: ["Virtual functions", "Operator overloading", "STL"] },
-  { id: "sub-num", semesterId: "sem-3", name: "Numerical Methods", code: "CSC303", description: "Numerical computation and approximation techniques.", category: "core", credits: 3, offlineSync: 0.5, hotTopics: ["Newton-Raphson", "Lagrange interpolation"] },
-  { id: "sub-toc", semesterId: "sem-3", name: "Theory of Computation", code: "CSC304", description: "Automata, formal languages, and computability.", category: "core", credits: 3, offlineSync: 0.7, hotTopics: ["Turing machines", "Pumping lemma", "DFA/NFA"] },
-  { id: "sub-ai", semesterId: "sem-3", name: "AI Foundations", code: "CSC305", description: "Search, knowledge representation, and reasoning.", category: "elective", credits: 3, offlineSync: 0.3, hotTopics: ["A* search", "Knowledge representation"] },
+  { id: "sub-dsa", semesterId: "sem-3", name: "Data Structures & Algorithms", code: "CSC301", description: "Lists, trees, graphs, and core algorithms.", category: "core", credits: 4, offlineSync: 1, hotTopics: ["AVL rotations", "Graph traversals", "Hashing"], fullMarks: 60 },
+  { id: "sub-oorad", semesterId: "sem-3", name: "OOP with C++", code: "CSC302", description: "Object-oriented design and C++ implementation.", category: "core", credits: 3, offlineSync: 0.9, hotTopics: ["Virtual functions", "Operator overloading", "STL"], fullMarks: 60 },
+  { id: "sub-num", semesterId: "sem-3", name: "Numerical Methods", code: "CSC303", description: "Numerical computation and approximation techniques.", category: "core", credits: 3, offlineSync: 0.5, hotTopics: ["Newton-Raphson", "Lagrange interpolation"], fullMarks: 60 },
+  { id: "sub-toc", semesterId: "sem-3", name: "Theory of Computation", code: "CSC304", description: "Automata, formal languages, and computability.", category: "core", credits: 3, offlineSync: 0.7, hotTopics: ["Turing machines", "Pumping lemma", "DFA/NFA"], fullMarks: 60 },
+  { id: "sub-ai", semesterId: "sem-3", name: "AI Foundations", code: "CSC305", description: "Search, knowledge representation, and reasoning.", category: "elective", credits: 3, offlineSync: 0.3, hotTopics: ["A* search", "Knowledge representation"], fullMarks: 60 },
   // Semester 4
-  { id: "sub-algo", semesterId: "sem-4", name: "Design & Analysis of Algorithms", code: "CSC401", description: "Algorithm design paradigms and complexity.", category: "core", credits: 4, offlineSync: 0.64, hotTopics: ["Master theorem", "Dijkstra", "NP-completeness"] },
-  { id: "sub-dbms", semesterId: "sem-4", name: "Database Management System", code: "CSC402", description: "Relational model, SQL, normalization, transactions.", category: "core", credits: 4, offlineSync: 0.64, hotTopics: ["Normalization", "Joins", "Transactions"] },
-  { id: "sub-os", semesterId: "sem-4", name: "Operating Systems", code: "CSC403", description: "Processes, scheduling, memory, and file systems.", category: "core", credits: 4, offlineSync: 0.64, hotTopics: ["Deadlocks", "Page replacement", "CPU scheduling"] },
-  { id: "sub-coa", semesterId: "sem-4", name: "Computer Organization", code: "CSC404", description: "Instruction sets, pipelining, and memory hierarchy.", category: "core", credits: 3, offlineSync: 0.2, hotTopics: ["Pipelining", "Cache mapping"] },
-  { id: "sub-stat2", semesterId: "sem-4", name: "Statistics II", code: "STA405", description: "Inference, regression, and statistical computing.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Regression", "Hypothesis testing"] },
+  { id: "sub-algo", semesterId: "sem-4", name: "Design & Analysis of Algorithms", code: "CSC401", description: "Algorithm design paradigms and complexity.", category: "core", credits: 4, offlineSync: 0.64, hotTopics: ["Master theorem", "Dijkstra", "NP-completeness"], fullMarks: 60 },
+  { id: "sub-dbms", semesterId: "sem-4", name: "Database Management System", code: "CSC402", description: "Relational model, SQL, normalization, transactions.", category: "core", credits: 4, offlineSync: 0.64, hotTopics: ["Normalization", "Joins", "Transactions"], fullMarks: 60 },
+  { id: "sub-os", semesterId: "sem-4", name: "Operating Systems", code: "CSC403", description: "Processes, scheduling, memory, and file systems.", category: "core", credits: 4, offlineSync: 0.64, hotTopics: ["Deadlocks", "Page replacement", "CPU scheduling"], fullMarks: 60 },
+  { id: "sub-coa", semesterId: "sem-4", name: "Computer Organization", code: "CSC404", description: "Instruction sets, pipelining, and memory hierarchy.", category: "core", credits: 3, offlineSync: 0.2, hotTopics: ["Pipelining", "Cache mapping"], fullMarks: 60 },
+  { id: "sub-stat2", semesterId: "sem-4", name: "Statistics II", code: "STA405", description: "Inference, regression, and statistical computing.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Regression", "Hypothesis testing"], fullMarks: 60 },
   // Semester 5
-  { id: "sub-cnet", semesterId: "sem-5", name: "Computer Networks", code: "CSC501", description: "OSI/TCP-IP layers, protocols, and network programming.", category: "core", credits: 4, offlineSync: 0, hotTopics: ["OSI layers", "TCP congestion", "Subnetting"] },
-  { id: "sub-sim", semesterId: "sem-5", name: "Simulation & Modelling", code: "CSC502", description: "Discrete-event simulation and stochastic models.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Monte Carlo", "Queueing models"] },
-  { id: "sub-web", semesterId: "sem-5", name: "Web Technologies", code: "CSC503", description: "HTML, CSS, JavaScript, and modern web development.", category: "elective", credits: 3, offlineSync: 0.1, hotTopics: ["DOM", "Promises", "Flexbox"] },
-  { id: "sub-mm", semesterId: "sem-5", name: "Multimedia Computing", code: "CSC504", description: "Audio, image, and video processing fundamentals.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["JPEG compression", "Color models"] },
+  { id: "sub-cnet", semesterId: "sem-5", name: "Computer Networks", code: "CSC501", description: "OSI/TCP-IP layers, protocols, and network programming.", category: "core", credits: 4, offlineSync: 0, hotTopics: ["OSI layers", "TCP congestion", "Subnetting"], fullMarks: 60 },
+  { id: "sub-sim", semesterId: "sem-5", name: "Simulation & Modelling", code: "CSC502", description: "Discrete-event simulation and stochastic models.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Monte Carlo", "Queueing models"], fullMarks: 60 },
+  { id: "sub-web", semesterId: "sem-5", name: "Web Technologies", code: "CSC503", description: "HTML, CSS, JavaScript, and modern web development.", category: "elective", credits: 3, offlineSync: 0.1, hotTopics: ["DOM", "Promises", "Flexbox"], fullMarks: 60 },
+  { id: "sub-mm", semesterId: "sem-5", name: "Multimedia Computing", code: "CSC504", description: "Audio, image, and video processing fundamentals.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["JPEG compression", "Color models"], fullMarks: 60 },
+  { id: "sub-cyber5", semesterId: "sem-5", name: "Cyber Law & Ethics", code: "LAW505", description: "Legal frameworks, policies, and professional ethics in computing.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["IT Act", "Privacy law"], fullMarks: 60 },
+  { id: "sub-tech5", semesterId: "sem-5", name: "Technical Writing", code: "CSC506", description: "Documentation, reports, and professional communication.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Report structure", "API docs"], fullMarks: 60 },
   // Semester 6
-  { id: "sub-se", semesterId: "sem-6", name: "Software Engineering", code: "CSC601", description: "Process models, requirements, design, and testing.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["COCOMO", "Testing levels", "UML"] },
-  { id: "sub-ai2", semesterId: "sem-6", name: "Artificial Intelligence", code: "CSC602", description: "Machine learning, planning, and neural networks.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Minimax", "Bayesian nets", "Neural nets"] },
-  { id: "sub-cg", semesterId: "sem-6", name: "Computer Graphics", code: "CSC603", description: "Raster graphics, transformations, and rendering.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Bresenham", "Clipping", "Transformations"] },
-  { id: "sub-bi", semesterId: "sem-6", name: "Business Intelligence", code: "CSC604", description: "Data warehousing, OLAP, and analytics.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["OLAP", "Star schema"] },
-  { id: "sub-ml", semesterId: "sem-6", name: "Machine Learning", code: "CSC605", description: "Supervised and unsupervised learning techniques.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["SVM", "Overfitting", "Gradient descent"] },
+  { id: "sub-se", semesterId: "sem-6", name: "Software Engineering", code: "CSC601", description: "Process models, requirements, design, and testing.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["COCOMO", "Testing levels", "UML"], fullMarks: 60 },
+  { id: "sub-ai2", semesterId: "sem-6", name: "Artificial Intelligence", code: "CSC602", description: "Machine learning, planning, and neural networks.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Minimax", "Bayesian nets", "Neural nets"], fullMarks: 60 },
+  { id: "sub-cg", semesterId: "sem-6", name: "Computer Graphics", code: "CSC603", description: "Raster graphics, transformations, and rendering.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["Bresenham", "Clipping", "Transformations"], fullMarks: 60 },
+  { id: "sub-bi", semesterId: "sem-6", name: "Business Intelligence", code: "CSC604", description: "Data warehousing, OLAP, and analytics.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["OLAP", "Star schema"], fullMarks: 60 },
+  { id: "sub-ml", semesterId: "sem-6", name: "Machine Learning", code: "CSC605", description: "Supervised and unsupervised learning techniques.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["SVM", "Overfitting", "Gradient descent"], fullMarks: 60 },
+  { id: "sub-ml2", semesterId: "sem-6", name: "Deep Learning", code: "CSC606", description: "Neural architectures, training, and modern practice.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["Backpropagation", "CNNs", "Attention"], fullMarks: 60 },
   // Semester 7
-  { id: "sub-distributed", semesterId: "sem-7", name: "Distributed Systems", code: "CSC701", description: "Distribution, consensus, and cloud fundamentals.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["CAP theorem", "Raft", "Vector clocks"] },
-  { id: "sub-sec", semesterId: "sem-7", name: "Information Security", code: "CSC702", description: "Cryptography, security protocols, and ethics.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["AES", "RSA", "Digital signatures"] },
-  { id: "sub-iot", semesterId: "sem-7", name: "IoT & Embedded Systems", code: "CSC703", description: "Sensors, actuators, and connected devices.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["MQTT", "Edge computing"] },
-  { id: "sub-cloud", semesterId: "sem-7", name: "Cloud Computing", code: "CSC704", description: "Virtualization, services, and deployment models.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["IaaS/PaaS", "Virtualization"] },
+  { id: "sub-distributed", semesterId: "sem-7", name: "Distributed Systems", code: "CSC701", description: "Distribution, consensus, and cloud fundamentals.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["CAP theorem", "Raft", "Vector clocks"], fullMarks: 60 },
+  { id: "sub-sec", semesterId: "sem-7", name: "Information Security", code: "CSC702", description: "Cryptography, security protocols, and ethics.", category: "core", credits: 3, offlineSync: 0, hotTopics: ["AES", "RSA", "Digital signatures"], fullMarks: 60 },
+  { id: "sub-iot", semesterId: "sem-7", name: "IoT & Embedded Systems", code: "CSC703", description: "Sensors, actuators, and connected devices.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["MQTT", "Edge computing"], fullMarks: 60 },
+  { id: "sub-cloud", semesterId: "sem-7", name: "Cloud Computing", code: "CSC704", description: "Virtualization, services, and deployment models.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["IaaS/PaaS", "Virtualization"], fullMarks: 60 },
+  { id: "sub-adv7", semesterId: "sem-7", name: "Advanced Elective", code: "CSC705", description: "Advanced specialization elective chosen with the department.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["Seminar", "Case study"], fullMarks: 60 },
   // Semester 8
-  { id: "sub-project", semesterId: "sem-8", name: "Project Work", code: "CSC801", description: "Final-year capstone project development.", category: "core", credits: 6, offlineSync: 0, hotTopics: ["Report format", "Viva prep"] },
-  { id: "sub-nlp", semesterId: "sem-8", name: "Natural Language Processing", code: "CSC802", description: "Text processing, embeddings, and language models.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["Tokenization", "Embeddings"] },
-  { id: "sub-blockchain", semesterId: "sem-8", name: "Blockchain Technology", code: "CSC803", description: "Distributed ledgers, consensus, and smart contracts.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["Consensus", "Smart contracts"] },
+  { id: "sub-project", semesterId: "sem-8", name: "Project Work", code: "CSC801", description: "Final-year capstone project development.", category: "core", credits: 6, offlineSync: 0, hotTopics: ["Report format", "Viva prep"], fullMarks: 100 },
+  { id: "sub-nlp", semesterId: "sem-8", name: "Natural Language Processing", code: "CSC802", description: "Text processing, embeddings, and language models.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["Tokenization", "Embeddings"], fullMarks: 60 },
+  { id: "sub-blockchain", semesterId: "sem-8", name: "Blockchain Technology", code: "CSC803", description: "Distributed ledgers, consensus, and smart contracts.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["Consensus", "Smart contracts"], fullMarks: 60 },
+  { id: "sub-adv8", semesterId: "sem-8", name: "Advanced Elective", code: "CSC804", description: "Advanced specialization elective chosen with the department.", category: "elective", credits: 3, offlineSync: 0, hotTopics: ["Proposal writing", "Literature review"], fullMarks: 60 },
+];
+
+/**
+ * Admin-managed syllabus topics per subject. Topics own their resources
+ * through Resource.topicId — the Subject → Topic → Resource hierarchy.
+ */
+export const topics: SeedTopic[] = [
+  // Computer System Architecture (Sem 1)
+  { id: "top-csa-1", subjectId: "sub-csa", title: "Number Systems", description: "Binary, octal, decimal and hexadecimal representations, conversions and arithmetic.", order: 1, published: true },
+  { id: "top-csa-2", subjectId: "sub-csa", title: "Logic Gates", description: "Basic and universal gates, truth tables and gate-level design.", order: 2, published: true },
+  { id: "top-csa-3", subjectId: "sub-csa", title: "Boolean Algebra", description: "Laws, simplification and canonical forms.", order: 3, published: true },
+  { id: "top-csa-4", subjectId: "sub-csa", title: "K-Maps", description: "Karnaugh map minimization up to four variables.", order: 4, published: true },
+  { id: "top-csa-5", subjectId: "sub-csa", title: "Computer Organization", description: "CPU components, registers, buses and instruction cycles.", order: 5, published: true },
+  { id: "top-csa-6", subjectId: "sub-csa", title: "Memory Organization", description: "Memory hierarchy, cache and virtual memory basics.", order: 6, published: true },
+  // C Programming (Sem 1)
+  { id: "top-cprog-1", subjectId: "sub-cprog", title: "Fundamentals & Control Flow", description: "Structure of a C program, operators, loops and branching.", order: 1, published: true },
+  { id: "top-cprog-2", subjectId: "sub-cprog", title: "Arrays & Strings", order: 2, published: true },
+  { id: "top-cprog-3", subjectId: "sub-cprog", title: "Pointers & Memory", description: "Pointer arithmetic, dynamic memory and addressing.", order: 3, published: true },
+  { id: "top-cprog-4", subjectId: "sub-cprog", title: "Structures & File Handling", order: 4, published: true },
+  // Data Structures & Algorithms (Sem 3)
+  { id: "top-dsa-1", subjectId: "sub-dsa", title: "Arrays & Linked Lists", order: 1, published: true },
+  { id: "top-dsa-2", subjectId: "sub-dsa", title: "Stacks & Queues", order: 2, published: true },
+  { id: "top-dsa-3", subjectId: "sub-dsa", title: "Trees & BST", description: "Binary trees, traversals and balanced trees.", order: 3, published: true },
+  { id: "top-dsa-4", subjectId: "sub-dsa", title: "Graphs", description: "Representations, BFS/DFS and shortest paths.", order: 4, published: true },
+  { id: "top-dsa-5", subjectId: "sub-dsa", title: "Sorting & Searching", order: 5, published: true },
+  { id: "top-dsa-6", subjectId: "sub-dsa", title: "Hashing", description: "Hash tables, collision resolution strategies.", order: 6, published: true },
+  // Database Management System (Sem 4)
+  { id: "top-dbms-1", subjectId: "sub-dbms", title: "ER Model & Relational Algebra", order: 1, published: true },
+  { id: "top-dbms-2", subjectId: "sub-dbms", title: "SQL", description: "DDL, DML and query formulation.", order: 2, published: true },
+  { id: "top-dbms-3", subjectId: "sub-dbms", title: "Normalization", order: 3, published: true },
+  { id: "top-dbms-4", subjectId: "sub-dbms", title: "Transactions & Concurrency", order: 4, published: true },
 ];
 
 interface ResourceSeed {
@@ -80,7 +160,9 @@ interface ResourceSeed {
   title: string;
   description: string;
   subjectId: string;
-  type: Resource["type"];
+  /** Optional topic link — resources may belong to a syllabus topic. */
+  topicId?: string;
+  type: ResourceType;
   fileSizeMB: number;
   pageCount: number;
   tags: string[];
@@ -88,10 +170,14 @@ interface ResourceSeed {
 }
 
 const resourceSeeds: ResourceSeed[] = [
-  // CSA
-  { id: "res-csa-book", title: "Computer System Architecture â€” Complete Textbook", description: "Comprehensive textbook covering number systems, boolean algebra, logic gates, and CPU organization with solved examples.", subjectId: "sub-csa", type: "book", fileSizeMB: 48.2, pageCount: 890, tags: ["textbook", "morris-mano", "cpu"], uploadedDaysAgo: 220 },
-  { id: "res-csa-notes", title: "CSA Short Notes â€” All Units", description: "Condensed unit-wise notes for last-minute revision before exams.", subjectId: "sub-csa", type: "short_note", fileSizeMB: 2.1, pageCount: 64, tags: ["notes", "revision"], uploadedDaysAgo: 95 },
-  { id: "res-csa-paper", title: "CSA Past Papers â€” 2018-2024 Collection", description: "Seven years of solved and unsolved question papers with marking scheme hints.", subjectId: "sub-csa", type: "past_paper", fileSizeMB: 12.8, pageCount: 210, tags: ["past-papers", "exam"], uploadedDaysAgo: 42 },
+  // CSA — primary textbook covers the whole subject (no topicId).
+  { id: "res-csa-book", title: "Computer System Architecture — Complete Textbook", description: "Comprehensive textbook covering number systems, boolean algebra, logic gates, and CPU organization with solved examples.", subjectId: "sub-csa", type: "book", fileSizeMB: 48.2, pageCount: 890, tags: ["textbook", "morris-mano", "cpu"], uploadedDaysAgo: 220 },
+  { id: "res-csa-notes", title: "CSA Short Notes — All Units", description: "Condensed unit-wise notes for last-minute revision.", subjectId: "sub-csa", topicId: "top-csa-1", type: "short_note", fileSizeMB: 2.1, pageCount: 64, tags: ["notes", "revision"], uploadedDaysAgo: 95 },
+  { id: "res-csa-num-hw", title: "Number Systems — Handwritten Note", description: "Handwritten class note with conversion shortcuts and worked examples.", subjectId: "sub-csa", topicId: "top-csa-1", type: "handwritten_note", fileSizeMB: 1.2, pageCount: 8, tags: ["handwritten", "number-systems"], uploadedDaysAgo: 88 },
+  { id: "res-csa-num-paper", title: "Number Systems — Past Questions", description: "Repeated TU board questions on number systems with solutions.", subjectId: "sub-csa", topicId: "top-csa-1", type: "past_paper", fileSizeMB: 0.9, pageCount: 12, tags: ["past-papers", "exam"], uploadedDaysAgo: 40 },
+  { id: "res-csa-gates-note", title: "Logic Gates — Short Note", description: "Gate symbols, truth tables and universal gate design patterns.", subjectId: "sub-csa", topicId: "top-csa-2", type: "short_note", fileSizeMB: 0.8, pageCount: 9, tags: ["notes", "gates"], uploadedDaysAgo: 74 },
+  { id: "res-csa-kmap-rev", title: "K-Maps — Revision Note", description: "Pair/quads grouping rules with solved minimization examples.", subjectId: "sub-csa", topicId: "top-csa-4", type: "revision_note", fileSizeMB: 0.6, pageCount: 5, tags: ["revision", "k-map"], uploadedDaysAgo: 18 },
+  { id: "res-csa-paper", title: "CSA Past Papers — 2018-2024 Collection", description: "Seven years of solved and unsolved question papers with marking scheme hints.", subjectId: "sub-csa", topicId: "top-csa-5", type: "past_paper", fileSizeMB: 12.8, pageCount: 210, tags: ["past-papers", "exam"], uploadedDaysAgo: 42 },
   // C Programming
   { id: "res-cprog-book", title: "Let Us C â€” Reference Book", description: "Classic C programming reference covering pointers, arrays, file handling, and structures.", subjectId: "sub-cprog", type: "book", fileSizeMB: 31.5, pageCount: 640, tags: ["textbook", "c", "beginner"], uploadedDaysAgo: 310 },
   { id: "res-cprog-lab", title: "C Programming Lab Manual", description: "Complete lab exercises with solutions: loops, arrays, pointers, and file I/O.", subjectId: "sub-cprog", type: "practical", fileSizeMB: 4.4, pageCount: 120, tags: ["lab", "practical", "solutions"], uploadedDaysAgo: 150 },
@@ -178,12 +264,13 @@ function semesterOfSubject(subjectId: string): string {
   return subject.semesterId;
 }
 
-export const resources: Resource[] = resourceSeeds.map((seed) => ({
+export const resources: SeedResource[] = resourceSeeds.map((seed) => ({
   id: seed.id,
   title: seed.title,
   description: seed.description,
   semesterId: semesterOfSubject(seed.subjectId),
   subjectId: seed.subjectId,
+  topicId: seed.topicId,
   type: seed.type,
   fileName: `${seed.id}.pdf`,
   fileSize: Math.round(seed.fileSizeMB * 1024 * 1024),

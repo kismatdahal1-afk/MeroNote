@@ -1,23 +1,120 @@
-﻿import { Link } from "react-router-dom";
-import { Bookmark as BookmarkIcon, Trash2, Play, HardDrive, WifiOff } from "lucide-react";
-import { PageHeader, Card } from "../components/common/PageHeader";
+﻿import { useMemo, useState } from "react";
+import { PageHeader } from "../components/common/PageHeader";
+import { BookmarkCard } from "../components/cards/BookmarkCard";
+import { SubjectCard } from "../components/cards/SubjectCard";
 import { EmptyState } from "../components/common/States";
-import { IconButton } from "../components/common/IconButton";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
-import { Badge } from "../components/common/Badge";
-import { useState } from "react";
-import { getResourceById, getSubjectById } from "../data/selectors";
-import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
-import { cx, formatDate } from "../lib/utils";
+import { Select } from "../components/common/Field";
+import { SearchBar } from "../components/common/SearchBar";
+import { FilterChips } from "../components/resources/FilterChips";
+import { getAllSemesters, getResourceById, getSubjectById, getAllSubjects } from "../data/selectors";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
+import type { ResourceType } from "../types";
+import { useCmsSync } from "../components/common/CmsSync";
 
-const SAVE_CHIPS = ["Books", "Past Papers", "Lab Code", "Cheatsheets"];
+type SortKey = "recent" | "title" | "pages";
+
+/** True when the text matches any of the fields (case-insensitive). */
+function matches(text: string, query: string): boolean {
+  return text.toLowerCase().includes(query.trim().toLowerCase());
+}
 
 export default function Bookmarks() {
-  const { bookmarks, removeBookmark, markOpened, totalDownloadSize } = useLibrary();
+  useCmsSync();
+  const { bookmarks, removeBookmark, bookmarkedSubjects } = useLibrary();
   const { toast } = useToast();
+  const semesters = getAllSemesters();
+  const allSubjects = getAllSubjects();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+
+  const [query, setQuery] = useState("");
+  const [semesterId, setSemesterId] = useState("");
+  const [subjectId, setSubjectId] = useState("");
+  const [type, setType] = useState<ResourceType | "all">("all");
+  const [sort, setSort] = useState<SortKey>("recent");
+
+  const allSavedSubjects = useMemo(
+    () =>
+      bookmarkedSubjects
+        .map((id) => getSubjectById(id))
+        .filter((s): s is NonNullable<typeof s> => Boolean(s)),
+    [bookmarkedSubjects],
+  );
+
+  const entries = useMemo(
+    () =>
+      bookmarks
+        .map((bm) => ({ bm, resource: getResourceById(bm.resourceId) }))
+        .filter((e): e is { bm: (typeof bookmarks)[number]; resource: NonNullable<ReturnType<typeof getResourceById>> } =>
+          Boolean(e.resource),
+        ),
+    [bookmarks],
+  );
+
+  const searchedSubjects = useMemo(() => {
+    const q = query.trim();
+    if (!q) return allSavedSubjects;
+    return allSavedSubjects.filter(
+      (s) =>
+        matches(s.name, q) ||
+        matches(s.code, q) ||
+        matches(s.description, q) ||
+        s.hotTopics.some((t) => matches(t, q)),
+    );
+  }, [allSavedSubjects, query]);
+
+  const searchedEntries = useMemo(() => {
+    const q = query.trim();
+    if (!q) return entries;
+    return entries.filter(
+      ({ bm, resource }) =>
+        matches(resource.title, q) ||
+        matches(resource.description, q) ||
+        resource.tags.some((t) => matches(t, q)) ||
+        matches(bm.note, q),
+    );
+  }, [entries, query]);
+
+  const subjects = useMemo(
+    () => searchedSubjects.filter((s) => !semesterId || s.semesterId === semesterId),
+    [searchedSubjects, semesterId],
+  );
+
+  const subjectOptions = useMemo(
+    () =>
+      semesterId
+        ? allSubjects.filter((s) => s.semesterId === semesterId)
+        : allSubjects,
+    [semesterId],
+  );
+
+  const filtered = useMemo(() => {
+    let list = searchedEntries;
+    if (semesterId) list = list.filter((e) => e.resource.semesterId === semesterId);
+    if (subjectId) list = list.filter((e) => e.resource.subjectId === subjectId);
+    if (type !== "all") list = list.filter((e) => e.resource.type === type);
+    const sorted = [...list];
+    if (sort === "title")
+      sorted.sort((a, b) => a.resource.title.localeCompare(b.resource.title));
+    if (sort === "pages")
+      sorted.sort((a, b) => b.resource.pageCount - a.resource.pageCount);
+    if (sort === "recent")
+      sorted.sort((a, b) => +new Date(b.bm.createdAt) - +new Date(a.bm.createdAt));
+    return sorted;
+  }, [searchedEntries, semesterId, subjectId, type, sort]);
+
+  const counts = useMemo(() => {
+    let base = searchedEntries;
+    if (semesterId) base = base.filter((e) => e.resource.semesterId === semesterId);
+    if (subjectId) base = base.filter((e) => e.resource.subjectId === subjectId);
+    const map: Partial<Record<ResourceType, number>> = {};
+    for (const e of base) map[e.resource.type] = (map[e.resource.type] ?? 0) + 1;
+    return map;
+  }, [searchedEntries, semesterId, subjectId]);
+
+  const isEmpty = bookmarkedSubjects.length === 0 && entries.length === 0;
+  const noMatches = !isEmpty && subjects.length === 0 && filtered.length === 0;
 
   return (
     <div>
@@ -26,105 +123,108 @@ export default function Bookmarks() {
         subtitle="Pages you saved while reading — available offline."
       />
 
-      {/* Offline storage indicator */}
-      <Card className="mb-6 flex items-center gap-4 p-5">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-muted text-primary">
-          <HardDrive className="size-5" aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-foreground">
-            {formatBytes(totalDownloadSize)} used
-          </p>
-          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <WifiOff className="size-3.5" aria-hidden="true" />
-            100% Offline Accessible
-          </p>
-        </div>
-        <Badge tone="success">Synced</Badge>
-      </Card>
-
-      {/* Filter chips */}
-      <div
-        role="group"
-        aria-label="Filter saved resources"
-        className="mb-5 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {SAVE_CHIPS.map((chip, i) => (
-          <button
-            key={chip}
-            type="button"
-            aria-pressed={i === 0}
-            className={cx(
-              "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-              i === 0
-                ? "bg-primary text-primary-foreground"
-                : "border border-border-strong bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground",
-            )}
-          >
-            {chip}
-          </button>
-        ))}
-      </div>
-
-      {bookmarks.length === 0 ? (
+      {isEmpty ? (
         <EmptyState
           title="No bookmarks yet"
-          message="While reading, tap the bookmark icon to save a page for later."
+          message="While reading, tap the bookmark icon to save a page or subject for later."
         />
       ) : (
-        <div className="space-y-3">
-          {bookmarks.map((bm) => {
-            const resource = getResourceById(bm.resourceId);
-            if (!resource) return null;
-            const subject = getSubjectById(resource.subjectId);
-            const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
-            const TypeIcon = typeConfig.icon;
-            return (
-              <Card key={bm.id} className="flex items-center gap-4 p-4">
-                <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
-                  <TypeIcon className="size-5" aria-hidden="true" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <Link
-                    to={`/reader/${resource.id}`}
-                    onClick={() => markOpened(resource.id)}
-                    className="line-clamp-1 text-sm font-bold text-foreground hover:text-primary"
+        <>
+          <SearchBar
+            initialValue={query}
+            className="mb-5 max-w-xl"
+            placeholder="Search your saved bookmarks..."
+            onSubmit={setQuery}
+            onChange={setQuery}
+          />
+
+          <div className="mb-5 grid grid-cols-2 gap-3 sm:flex sm:flex-nowrap">
+            <Select
+              id="bookmarks-semester"
+              label=""
+              value={semesterId}
+              onChange={(e) => {
+                setSemesterId(e.target.value);
+                setSubjectId("");
+              }}
+              className="w-full sm:w-48"
+              aria-label="Filter by semester"
+              options={[
+                { value: "", label: "All semesters" },
+                ...semesters.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+            <Select
+              id="bookmarks-sort"
+              label=""
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="w-full sm:w-48 sm:order-last"
+              aria-label="Sort bookmarks"
+              options={[
+                { value: "recent", label: "Sort by newest" },
+                { value: "title", label: "Sort by title" },
+                { value: "pages", label: "Sort by page count" },
+              ]}
+            />
+            <Select
+              id="bookmarks-subject"
+              label=""
+              value={subjectId}
+              onChange={(e) => setSubjectId(e.target.value)}
+              className="col-span-2 w-full sm:col-span-1 sm:w-56"
+              aria-label="Filter by subject"
+              options={[
+                { value: "", label: "All subjects" },
+                ...subjectOptions.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+          </div>
+
+          <div className="mb-5">
+            <FilterChips selected={type} counts={counts} onChange={setType} />
+          </div>
+
+          {noMatches ? (
+            <EmptyState
+              title="No bookmarks found"
+              message="No bookmarks match your search or the current filters."
+            />
+          ) : (
+            <>
+              {subjects.length > 0 && (
+                <section className="mb-8" aria-labelledby="bm-subjects-heading">
+                  <h2
+                    id="bm-subjects-heading"
+                    className="mb-3 text-base font-bold text-foreground"
                   >
-                    {resource.title}
-                  </Link>
-                  <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-                    {subject?.name} · saved {formatDate(bm.createdAt)}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Badge tone="primary">
-                    <BookmarkIcon className="size-3" aria-hidden="true" />
-                    Page {bm.page}
-                  </Badge>
-                  {bm.note && (
-                    <Badge className="hidden sm:inline-flex">{bm.note}</Badge>
-                  )}
-                  <Link
-                    to={`/reader/${resource.id}`}
-                    onClick={() => markOpened(resource.id)}
-                    aria-label={`Open ${resource.title} at page ${bm.page}`}
-                    className="flex size-9 items-center justify-center rounded-lg bg-primary-muted text-primary hover:bg-primary-muted-hover"
+                    Subjects ({subjects.length})
+                  </h2>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {subjects.map((s) => (
+                      <SubjectCard key={s.id} subject={s} />
+                    ))}
+                  </div>
+                </section>
+              )}
+              {filtered.length > 0 && (
+                <section aria-labelledby="bm-pages-heading">
+                  <h2
+                    id="bm-pages-heading"
+                    className="mb-3 text-base font-bold text-foreground"
                   >
-                    <Play className="size-4" aria-hidden="true" />
-                  </Link>
-                  <IconButton
-                    icon={Trash2}
-                    label={`Remove bookmark for ${resource.title}`}
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setPendingDelete(bm.id)}
-                  />
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                    Saved Pages ({filtered.length})
+                  </h2>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {filtered.map(({ bm, resource }) => (
+                      <BookmarkCard key={bm.id} bookmark={bm} resource={resource} onRemove={setPendingDelete} />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+        </>
       )}
 
       <ConfirmDialog
@@ -144,9 +244,4 @@ export default function Bookmarks() {
       />
     </div>
   );
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
 }

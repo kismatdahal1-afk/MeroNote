@@ -1,22 +1,77 @@
-﻿import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Trash2, Eye, HardDrive, CheckCircle2, Loader2 } from "lucide-react";
+﻿import { useMemo, useState } from "react";
+import { HardDrive } from "lucide-react";
 import { PageHeader, Card } from "../components/common/PageHeader";
+import { DownloadCard } from "../components/cards/DownloadCard";
 import { EmptyState } from "../components/common/States";
-import { IconButton } from "../components/common/IconButton";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { ProgressBar } from "../components/common/ProgressBar";
-import { Badge } from "../components/common/Badge";
-import { getResourceById, getSubjectById } from "../data/selectors";
-import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
-import { cx, formatFileSize, formatRelativeTime } from "../lib/utils";
+import { Select } from "../components/common/Field";
+import { FilterChips } from "../components/resources/FilterChips";
+import { getAllSemesters, getResourceById, getAllSubjects } from "../data/selectors";
+import { formatFileSize } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
+import type { ResourceType } from "../types";
+import { useCmsSync } from "../components/common/CmsSync";
+
+type SortKey = "recent" | "oldest" | "title" | "size";
 
 export default function Downloads() {
-  const { downloads, removeDownload, totalDownloadSize, markOpened } = useLibrary();
+  useCmsSync();
+  const { downloads, removeDownload, totalDownloadSize } = useLibrary();
   const { toast } = useToast();
+  const semesters = getAllSemesters();
+  const allSubjects = getAllSubjects();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+
+  const [semesterId, setSemesterId] = useState("");
+  const [subjectId, setSubjectId] = useState("");
+  const [type, setType] = useState<ResourceType | "all">("all");
+  const [sort, setSort] = useState<SortKey>("recent");
+
+  const entries = useMemo(
+    () =>
+      downloads
+        .map((dl) => ({ dl, resource: getResourceById(dl.resourceId) }))
+        .filter((e): e is { dl: (typeof downloads)[number]; resource: NonNullable<ReturnType<typeof getResourceById>> } =>
+          Boolean(e.resource),
+        ),
+    [downloads],
+  );
+
+  const subjectOptions = useMemo(
+    () =>
+      semesterId
+        ? allSubjects.filter((s) => s.semesterId === semesterId)
+        : allSubjects,
+    [semesterId],
+  );
+
+  const filtered = useMemo(() => {
+    let list = entries;
+    if (semesterId) list = list.filter((e) => e.resource.semesterId === semesterId);
+    if (subjectId) list = list.filter((e) => e.resource.subjectId === subjectId);
+    if (type !== "all") list = list.filter((e) => e.resource.type === type);
+    const sorted = [...list];
+    if (sort === "title")
+      sorted.sort((a, b) => a.resource.title.localeCompare(b.resource.title));
+    if (sort === "size")
+      sorted.sort((a, b) => b.dl.sizeBytes - a.dl.sizeBytes);
+    if (sort === "recent")
+      sorted.sort((a, b) => +new Date(b.dl.downloadedAt) - +new Date(a.dl.downloadedAt));
+    if (sort === "oldest")
+      sorted.sort((a, b) => +new Date(a.dl.downloadedAt) - +new Date(b.dl.downloadedAt));
+    return sorted;
+  }, [entries, semesterId, subjectId, type, sort]);
+
+  const counts = useMemo(() => {
+    let base = entries;
+    if (semesterId) base = base.filter((e) => e.resource.semesterId === semesterId);
+    if (subjectId) base = base.filter((e) => e.resource.subjectId === subjectId);
+    const map: Partial<Record<ResourceType, number>> = {};
+    for (const e of base) map[e.resource.type] = (map[e.resource.type] ?? 0) + 1;
+    return map;
+  }, [entries, semesterId, subjectId]);
 
   const completedCount = downloads.filter((d) => d.status === "completed").length;
   const activeCount = downloads.filter((d) => d.status === "downloading").length;
@@ -28,36 +83,62 @@ export default function Downloads() {
         subtitle="Files saved on this device for offline reading."
       />
 
-      {/* Storage summary */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="flex items-center gap-4 p-5">
-          <div className="flex size-11 items-center justify-center rounded-lg bg-success-muted text-success">
-            <HardDrive className="size-5" aria-hidden="true" />
+      {/* Storage Overview — prominent */}
+      <Card className="bg-hero-gradient mb-4 p-5 sm:p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-8">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-muted text-primary">
+                <HardDrive className="size-5" aria-hidden="true" />
+              </span>
+              <h2 className="text-base font-bold text-foreground">Storage Overview</h2>
+            </div>
+            <p className="mt-3 text-3xl font-bold tracking-tight text-foreground">
+              {formatFileSize(totalDownloadSize)}
+              <span className="ml-2 text-sm font-semibold text-muted-foreground">
+                of downloads stored
+              </span>
+            </p>
+            <div className="mt-3">
+              <ProgressBar
+                value={entries.length > 0 ? completedCount / entries.length : 0}
+                label="Completed downloads"
+                className="h-2"
+              />
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs font-medium text-muted-foreground">
+                <span>
+                  <span className="font-bold text-foreground">{completedCount}</span> files
+                  downloaded
+                </span>
+                {activeCount > 0 && (
+                  <span>
+                    <span className="font-bold text-foreground">{activeCount}</span> in progress
+                  </span>
+                )}
+                <span>
+                  Temporary cache <span className="font-bold text-foreground">0 B</span>
+                </span>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total storage</p>
-            <p className="mt-0.5 text-xl font-bold text-foreground">{formatFileSize(totalDownloadSize)}</p>
+          <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-2 lg:w-72 lg:grid-cols-2">
+            <div className="card-glow rounded-xl border border-border bg-surface p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Downloaded
+              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">{completedCount}</p>
+              <p className="text-xs font-medium text-muted-foreground">files on device</p>
+            </div>
+            <div className="card-glow rounded-xl border border-border bg-surface p-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Cache
+              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">0 B</p>
+              <p className="text-xs font-medium text-muted-foreground">temporary</p>
+            </div>
           </div>
-        </Card>
-        <Card className="flex items-center gap-4 p-5">
-          <div className="flex size-11 items-center justify-center rounded-lg bg-primary-muted text-primary">
-            <CheckCircle2 className="size-5" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Downloaded files</p>
-            <p className="mt-0.5 text-xl font-bold text-foreground">{completedCount}</p>
-          </div>
-        </Card>
-        <Card className="flex items-center gap-4 p-5">
-          <div className="flex size-11 items-center justify-center rounded-lg bg-primary-muted text-primary">
-            <Loader2 className="size-5" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">In progress</p>
-            <p className="mt-0.5 text-xl font-bold text-foreground">{activeCount}</p>
-          </div>
-        </Card>
-      </div>
+        </div>
+      </Card>
 
       {downloads.length === 0 ? (
         <EmptyState
@@ -65,67 +146,68 @@ export default function Downloads() {
           message="Press the download button on any resource to keep it available offline."
         />
       ) : (
-        <div className="space-y-3">
-          {downloads.map((dl) => {
-            const resource = getResourceById(dl.resourceId);
-            if (!resource) return null;
-            const subject = getSubjectById(resource.subjectId);
-            const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
-            const TypeIcon = typeConfig.icon;
-            return (
-              <Card key={dl.id} className="flex items-center gap-4 p-4">
-                <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
-                  <TypeIcon className="size-5" aria-hidden="true" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <Link
-                    to={`/resources/${resource.id}`}
-                    className="line-clamp-1 text-sm font-semibold text-foreground hover:text-primary"
-                  >
-                    {resource.title}
-                  </Link>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {subject?.name} Â· {formatFileSize(dl.sizeBytes)}
-                  </p>
-                  {dl.status === "downloading" && (
-                    <div className="mt-2 flex items-center gap-2.5">
-                      <ProgressBar value={dl.progress / 100} label={`Download progress ${dl.progress}%`} className="max-w-48" />
-                      <span className="text-xs font-medium text-primary">{dl.progress}%</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {dl.status === "completed" && (
-                    <>
-                      <Badge tone="success">
-                        <CheckCircle2 className="size-3" aria-hidden="true" />
-                        Saved
-                      </Badge>
-                      <span className="hidden text-xs text-muted-foreground/70 sm:block">
-                        {formatRelativeTime(dl.downloadedAt)}
-                      </span>
-                      <Link
-                        to={`/reader/${resource.id}`}
-                        onClick={() => markOpened(resource.id)}
-                        aria-label={`Open ${resource.title}`}
-                        className="flex size-9 items-center justify-center rounded-lg bg-primary-muted text-primary hover:bg-primary-muted-hover"
-                      >
-                        <Eye className="size-4" aria-hidden="true" />
-                      </Link>
-                    </>
-                  )}
-                  <IconButton
-                    icon={Trash2}
-                    label={`Delete ${resource.title} from downloads`}
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setPendingDelete(dl.id)}
-                  />
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+        <>
+          <div className="mb-5 grid grid-cols-2 gap-3 sm:flex sm:flex-nowrap">
+            <Select
+              id="downloads-semester"
+              label=""
+              value={semesterId}
+              onChange={(e) => {
+                setSemesterId(e.target.value);
+                setSubjectId("");
+              }}
+              className="w-full sm:w-48"
+              aria-label="Filter by semester"
+              options={[
+                { value: "", label: "All semesters" },
+                ...semesters.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+            <Select
+              id="downloads-sort"
+              label=""
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className="w-full sm:w-48 sm:order-last"
+              aria-label="Sort downloads"
+              options={[
+                { value: "recent", label: "Sort by newest" },
+                { value: "oldest", label: "Sort by oldest" },
+                { value: "title", label: "Sort by title" },
+                { value: "size", label: "Sort by file size" },
+              ]}
+            />
+            <Select
+              id="downloads-subject"
+              label=""
+              value={subjectId}
+              onChange={(e) => setSubjectId(e.target.value)}
+              className="col-span-2 w-full sm:col-span-1 sm:w-56"
+              aria-label="Filter by subject"
+              options={[
+                { value: "", label: "All subjects" },
+                ...subjectOptions.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+            />
+          </div>
+
+          <div className="mb-5">
+            <FilterChips selected={type} counts={counts} onChange={setType} />
+          </div>
+
+          {filtered.length === 0 ? (
+            <EmptyState
+              title="No downloads found"
+              message="No downloads match the current filters."
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {filtered.map(({ dl, resource }) => (
+                <DownloadCard key={dl.id} download={dl} resource={resource} onRemove={setPendingDelete} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <ConfirmDialog

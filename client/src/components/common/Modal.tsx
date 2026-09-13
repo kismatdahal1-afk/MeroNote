@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
       />
       <div
         className={cx(
-          "relative w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl",
+          "card-glow relative w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl",
           className,
         )}
       >

@@ -2,12 +2,26 @@ export type ResourceType =
   | "book"
   | "short_note"
   | "extra_note"
+  | "handwritten_note"
   | "questions"
   | "past_paper"
+  | "hot_topic"
   | "important_questions"
   | "practical"
   | "revision_note"
   | "other";
+
+/** CMS publish status shared by all admin-managed entities. */
+export type PublishStatus = "draft" | "published" | "hidden";
+
+/** Entities that support soft delete + restore in the CMS trash. */
+export type CmsEntity =
+  | "semester"
+  | "subject"
+  | "topic"
+  | "resource"
+  | "notice"
+  | "book";
 
 export interface Semester {
   id: string;
@@ -18,10 +32,18 @@ export interface Semester {
   resourceCount: number;
   /** total credit hours for the semester */
   credits: number;
-  status: "passed" | "active" | "upcoming";
-  /** 0..1 study completion for active semester */
-  completion: number;
+  /** Seed/default enrollment state (user status lives in SemesterStatusProvider). */
+  enrollment: "passed" | "active" | "upcoming";
+  /** Display order in the semester library. */
+  order: number;
+  status: PublishStatus;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
 }
+
+/** User-selectable enrollment status (persisted per semester, frontend-only). */
+export type SemesterUserStatus = "passed" | "ongoing" | "upcoming";
 
 export interface Subject {
   id: string;
@@ -36,6 +58,29 @@ export interface Subject {
   offlineSync: number;
   /** frequently repeated board-exam topics */
   hotTopics: string[];
+  /** Exam total marks (TU board). Optional — admin-managed. */
+  fullMarks?: number;
+  status: PublishStatus;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+/** A syllabus topic inside a subject (admin-managed). */
+export interface Topic {
+  id: string;
+  subjectId: string;
+  title: string;
+  /** Optional short description. */
+  description?: string;
+  /** Display order within the subject. */
+  order: number;
+  /** Publish status — hidden topics are not shown to students. */
+  published: boolean;
+  status: PublishStatus;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
 }
 
 /** Program-level info shown on the dashboard greeting banner. */
@@ -60,6 +105,8 @@ export interface Resource {
   description: string;
   semesterId: string;
   subjectId: string;
+  /** Optional topic link — a resource may belong to a syllabus topic. */
+  topicId?: string;
   type: ResourceType;
   fileName: string;
   fileSize: number;
@@ -67,6 +114,78 @@ export interface Resource {
   tags: string[];
   uploadedAt: string;
   updatedAt: string;
+  /** Optional linked book (books reuse the reader/download system). */
+  bookId?: string;
+  /** Featured resources appear on the admin Featured board. */
+  featured: boolean;
+  /** Past-paper specific metadata (optional). */
+  paperYear?: number;
+  paperFullMarks?: number;
+  paperDurationMinutes?: number;
+  /** CMS publish status — drafts/hidden resources are not shown to students. */
+  status: PublishStatus;
+  deletedAt?: string;
+}
+
+/** Admin-managed book. Lives under Semester + Subject and can be linked
+ *  to resources; reading/downloading reuses the resource system. */
+export interface Book {
+  id: string;
+  title: string;
+  author: string;
+  description: string;
+  edition: string;
+  semesterId: string;
+  subjectId: string;
+  /** Optional resource carrying the actual PDF/file. */
+  resourceId?: string;
+  pageCount: number;
+  /** File size in bytes (for display). */
+  fileSize: number;
+  status: PublishStatus;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+/** Dashboard notice/reminder created by the admin. */
+export type NoticeType =
+  | "exam"
+  | "deadline"
+  | "announcement"
+  | "reminder"
+  | "general";
+
+export type NoticePriority = "low" | "normal" | "high";
+
+export interface Notice {
+  id: string;
+  heading: string;
+  subtext: string;
+  type: NoticeType;
+  /** ISO date the notice refers to (exam day, deadline, event…). */
+  date: string;
+  semesterId?: string;
+  subjectId?: string;
+  priority: NoticePriority;
+  status: PublishStatus;
+  /** Show on the student dashboard. */
+  showOnDashboard: boolean;
+  /** Pinned notices stay at the top of the dashboard list. */
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+/** Activity log entry shown on the Admin Dashboard. */
+export interface ActivityEntry {
+  id: string;
+  entity: CmsEntity;
+  action: "create" | "update" | "delete" | "restore" | "publish" | "unpublish";
+  /** Human label of the affected item, e.g. "DSA Short Notes". */
+  label: string;
+  at: string;
 }
 
 export interface ReadingProgress {
@@ -104,4 +223,14 @@ export interface MockUser {
   name: string;
   email: string;
   role: "USER" | "ADMIN";
+}
+
+/** Computed day-state of a notice: future → "X Days Remaining",
+ *  today → "Today", past → "Completed/Past". */
+export type NoticeDayState = "upcoming" | "today" | "past";
+
+export interface NoticeWithState extends Notice {
+  /** Remaining days (upcoming) or elapsed days (past); 0 for today. */
+  dayCount: number;
+  dayState: NoticeDayState;
 }

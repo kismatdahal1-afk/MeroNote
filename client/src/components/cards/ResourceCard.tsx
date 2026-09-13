@@ -3,6 +3,7 @@ import { Heart, Bookmark, Download, Eye, Check } from "lucide-react";
 import type { Resource } from "../../types";
 import { Card } from "../common/PageHeader";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
+import { ProgressBar } from "../common/ProgressBar";
 import { cx, formatFileSize } from "../../lib/utils";
 import { getSubjectById, getSemesterById } from "../../data/selectors";
 import { useLibrary } from "../../state/LibraryProvider";
@@ -16,7 +17,7 @@ interface ResourceCardProps {
 }
 
 export function ResourceCard({ resource, showContext = true }: ResourceCardProps) {
-  const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload } = useLibrary();
+  const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, getProgress } = useLibrary();
   const { toast } = useToast();
 
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
@@ -26,6 +27,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
   const favorite = isFavorite(resource.id);
   const bookmarked = Boolean(getBookmark(resource.id));
   const download = getDownload(resource.id);
+  const progress = getProgress(resource.id);
 
   const handleFavorite = () => {
     toggleFavorite(resource.id);
@@ -51,25 +53,29 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
   };
 
   return (
-    <Card interactive className="flex h-full flex-col p-5">
-      <div className="flex items-start justify-between gap-3">
-        <Link
-          to={`/resources/${resource.id}`}
-          className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
+    <Card interactive className="group relative flex h-full flex-col p-5">
+      {/* Stretched link — makes the whole card clickable */}
+      <Link
+        to={`/resources/${resource.id}`}
+        aria-label={`Open ${resource.title}`}
+        className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      />
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
             <TypeIcon className="size-5" aria-hidden="true" />
           </div>
           <span className={cx("inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold", typeConfig.badgeClass)}>
             {typeConfig.label}
           </span>
-        </Link>
+        </div>
         <div className="flex items-center gap-0.5">
           <IconButton
             icon={Heart}
             label={favorite ? "Remove from favorites" : "Add to favorites"}
             size="sm"
-            variant={favorite ? "active" : "default"}
+            variant={favorite ? "favorite" : "default"}
+            filled={favorite}
             aria-pressed={favorite}
             onClick={handleFavorite}
           />
@@ -77,39 +83,54 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
             icon={Bookmark}
             label={bookmarked ? "Bookmarked" : "Bookmark first page"}
             size="sm"
-            variant={bookmarked ? "active" : "default"}
+            variant={bookmarked ? "bookmark" : "default"}
+            filled={bookmarked}
             aria-pressed={bookmarked}
             onClick={handleBookmark}
           />
         </div>
       </div>
 
-      <Link
-        to={`/resources/${resource.id}`}
-        className="mt-3 flex min-w-0 flex-1 flex-col rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-      >
-        <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground hover:text-primary">
+      <div className="mt-3 flex min-w-0 flex-1 flex-col">
+        <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground group-hover:text-primary">
           {resource.title}
         </h3>
         {showContext && (subject || semester) && (
           <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
-            {[subject?.name, semester?.name].filter(Boolean).join(" · ")}
+            {[subject?.name, semester?.name].filter(Boolean).join(" · ")
+            }
           </p>
         )}
-      </Link>
+      </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
         {resource.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
-            className="rounded-md bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+            className="rounded-md px-2 py-0.5 text-[11px] font-semibold text-[#1e3a8a] dark:text-[#00FFF5]"
           >
             {tag}
           </span>
         ))}
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs font-medium text-muted-foreground">
+      {/* Reading progress where available */}
+      {progress && (
+        <div className="mt-3">
+          <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold">
+            <span className="text-muted-foreground">
+              Page {progress.lastPage} of {resource.pageCount}
+            </span>
+            <span className="text-primary">{Math.round(progress.progress * 100)}%</span>
+          </div>
+          <ProgressBar
+            value={progress.progress}
+            label={`Reading progress for ${resource.title}`}
+          />
+        </div>
+      )}
+
+      <div className="relative z-10 mt-4 flex items-center justify-between border-t border-border pt-3 text-xs font-medium text-muted-foreground">
         <span>
           {resource.pageCount} pages · {formatFileSize(resource.fileSize)}
         </span>

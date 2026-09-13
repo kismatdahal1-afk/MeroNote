@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, GraduationCap, Search, Download, Bookmark } from "lucide-react";
+import { Home, GraduationCap, FileStack, Download, Bookmark } from "lucide-react";
 import { cx } from "../../lib/utils";
 import { useLibrary } from "../../state/LibraryProvider";
 
@@ -11,7 +11,7 @@ export function MobileNav() {
   const items = [
     { to: "/dashboard", label: "Home", icon: Home, badge: 0 },
     { to: "/semesters", label: "Semesters", icon: GraduationCap, badge: 0 },
-    { to: "/search", label: "Search", icon: Search, badge: 0 },
+    { to: "/resources", label: "Resources", icon: FileStack, badge: 0 },
     { to: "/downloads", label: "Downloads", icon: Download, badge: completedDownloads },
     { to: "/bookmarks", label: "Saved", icon: Bookmark, badge: bookmarks.length },
   ];

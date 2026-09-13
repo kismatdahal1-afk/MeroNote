@@ -1,7 +1,6 @@
 ﻿import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
 import {
-  GraduationCap, BookOpen, FileStack, HardDriveDownload, Search as SearchIcon, SlidersHorizontal, BadgeCheck, Wifi, WifiOff,
+  GraduationCap, BookOpen, FileStack, HardDriveDownload, Search as SearchIcon, SlidersHorizontal, BadgeCheck,
 } from "lucide-react";
 import { Card } from "../components/common/PageHeader";
 import { ExamCard } from "../components/dashboard/ExamCard";
@@ -10,34 +9,26 @@ import { ContinueReadingSection, DashboardSectionHeader } from "../components/da
 import { QuickNavigation, defaultQuickNav } from "../components/dashboard/QuickNavigation";
 import { RecentOpenedCard, TrendingResourceCard, TrendingTitle } from "../components/dashboard/TrendingResourceCard";
 import { Badge } from "../components/common/Badge";
-import { mockUser, programInfo } from "../data/mock";
+import { programInfo } from "../data/mock";
+import { useUser } from "../state/UserProvider";
 import {
   getAllSemesters,
   getResourceById,
   countCoreSubjects,
   getTrendingExamResources,
+  getAllResources,
 } from "../data/selectors";
 import { useLibrary } from "../state/LibraryProvider";
-import { formatTimestamp } from "../lib/utils";
+import { getDashboardNotices } from "../state/cmsStore";
+import { NoticesBoard } from "../components/dashboard/NoticesBoard";
+import { useCmsSync } from "../components/common/CmsSync";
+import { formatTimestamp, getGreeting } from "../lib/utils";
 
 export default function Dashboard() {
+  useCmsSync();
   const { favorites, bookmarks, downloads, recent, progress } = useLibrary();
+  const { name } = useUser();
   const navigate = useNavigate();
-
-  const [online, setOnline] = useState<boolean>(
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
-
-  useEffect(() => {
-    const goOnline = () => setOnline(true);
-    const goOffline = () => setOnline(false);
-    window.addEventListener("online", goOnline);
-    window.addEventListener("offline", goOffline);
-    return () => {
-      window.removeEventListener("online", goOnline);
-      window.removeEventListener("offline", goOffline);
-    };
-  }, []);
 
   const hero =
     progress
@@ -54,11 +45,14 @@ export default function Dashboard() {
   const trending = getTrendingExamResources().slice(0, 3);
   const completedDownloads = downloads.filter((d) => d.status === "completed").length;
   const semesters = getAllSemesters();
+  /** Real CMS stats — no hardcoded counts. */
+  const totalResources = getAllResources().length;
+  const notices = getDashboardNotices();
 
   const stats = [
     { label: "Semesters", value: semesters.length, hint: "Syllabus & Past Qs", icon: GraduationCap },
     { label: "Curriculum", value: countCoreSubjects(), hint: "Theory & Practicals", icon: BookOpen },
-    { label: "Archived", value: "420+", hint: "Handwritten & Slides", icon: FileStack },
+    { label: "Archived", value: totalResources, hint: "Notes & Papers", icon: FileStack },
     { label: "Saved", value: completedDownloads, hint: "Offline Ready", icon: HardDriveDownload },
   ];
 
@@ -67,38 +61,34 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Compact greeting header */}
-      <header className="mb-5 flex items-center justify-between gap-3">
+      {/* Compact greeting header — the character is absolutely positioned
+          so growing it never pushes or squeezes the greeting text. */}
+      <header className="relative mb-5 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-1.5 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Good morning, {mockUser.name.split(" ")[0]} 👋
+          <p className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            {getGreeting()},
+          </p>
+          <p className="font-display mt-0.5 text-2xl font-bold tracking-tight text-primary sm:text-3xl">
+            {name.split(" ")[0]}
           </p>
           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-sm font-medium text-muted-foreground">
-            <span>{programInfo.university}</span>
+            <span aria-hidden="true" className="sm:hidden">TU</span>
+            <span className="hidden sm:inline">{programInfo.university}</span>
             <span aria-hidden="true">•</span>
             <span>{programInfo.program}</span>
             <span aria-hidden="true">•</span>
             <span>{programInfo.batch}</span>
           </p>
         </div>
-        <div className="flex shrink-0 items-center">
-          <span
-            role="status"
-            aria-live="polite"
-            className={
-              online
-                ? "inline-flex items-center gap-1.5 rounded-full bg-success-muted px-2.5 py-1 text-xs font-bold text-success"
-                : "inline-flex items-center gap-1.5 rounded-full bg-warning-muted px-2.5 py-1 text-xs font-bold text-warning"
-            }
-          >
-            {online ? (
-              <Wifi className="size-3.5" aria-hidden="true" />
-            ) : (
-              <WifiOff className="size-3.5" aria-hidden="true" />
-            )}
-            {online ? "Online" : "Offline"}
-          </span>
-        </div>
+        {/* Waving character illustration — pinned right, overlaps the gap
+            below the header without affecting the text flow. */}
+        <img
+          src="/images/higesture.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-4 right-0 h-[9.45rem] w-auto select-none object-contain drop-shadow-md sm:top-0 sm:h-[12.5rem] lg:right-12 lg:h-[15.25rem]"
+          loading="eager"
+        />
       </header>
 
       {/* Exam countdown */}
@@ -106,19 +96,27 @@ export default function Dashboard() {
         <ExamCard />
       </div>
 
-      {/* Compact search */}
+      {/* Notices & reminders — admin-managed, loaded from the CMS store */}
+      <div className="mb-3.5">
+        <NoticesBoard notices={notices} />
+      </div>
+
+      {/* Compact search — redirects to Resources page on Enter */}
       <form
         role="search"
         className="mb-6 flex gap-2.5"
         onSubmit={(e) => {
           e.preventDefault();
-          navigate("/search");
+          const q = new FormData(e.currentTarget).get("q");
+          const query = typeof q === "string" ? q.trim() : "";
+          navigate(query ? `/resources?q=${encodeURIComponent(query)}` : "/resources");
         }}
       >
         <div className="relative flex-1">
           <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <input
             type="search"
+            name="q"
             placeholder="Search notes, past questions, algorithms..."
             aria-label="Search resources"
             className="h-10 w-full rounded-xl border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
@@ -157,7 +155,7 @@ export default function Dashboard() {
         <DashboardSectionHeader
           title={<span id="recent-heading">Recently Opened</span>}
           actionLabel="See all"
-          actionTo="/recent"
+          actionTo="/resources"
         />
         {recentResources.length > 0 ? (
           <div className="grid gap-3 lg:grid-cols-2">
@@ -181,7 +179,7 @@ export default function Dashboard() {
             </span>
           }
           actionLabel="See all"
-          actionTo="/search?q=exam"
+          actionTo="/resources?q=exam"
           meta={undefined}
         />
         <div className="mb-3 flex justify-end">

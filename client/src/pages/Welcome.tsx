@@ -1,5 +1,5 @@
 ﻿import { Link } from "react-router-dom";
-import { BookOpen, Search, Download, GraduationCap, NotebookPen, ArrowRight } from "lucide-react";
+import { BookOpen, Search, Download, GraduationCap, ArrowRight } from "lucide-react";
 
 const FEATURES = [
   {
@@ -29,9 +29,13 @@ export default function Welcome() {
     <div className="bg-hero-gradient flex min-h-screen flex-col">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
         <div className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <NotebookPen className="size-5" aria-hidden="true" />
-          </span>
+          <img
+            src="/icon/icon.png"
+            alt="Mero Note"
+            width={36}
+            height={36}
+            className="size-9 shrink-0 rounded-xl object-cover"
+          />
           <span className="text-lg font-bold tracking-tight text-foreground">Mero Note</span>
         </div>
         <Link
@@ -77,7 +81,7 @@ export default function Welcome() {
           {FEATURES.map(({ icon: Icon, title, text }) => (
             <div
               key={title}
-              className="rounded-xl border border-border bg-surface p-5 shadow-card"
+              className="card-glow rounded-xl border border-border bg-surface p-5 shadow-card"
             >
               <div className="flex size-10 items-center justify-center rounded-lg bg-primary-muted text-primary">
                 <Icon className="size-5" aria-hidden="true" />

@@ -37,10 +37,20 @@ interface LibraryContextValue {
   isFavorite: (resourceId: string) => boolean;
   toggleFavorite: (resourceId: string) => void;
 
+  /** subject-level favorites (separate from resource favorites) */
+  favoriteSubjects: string[];
+  isFavoriteSubject: (subjectId: string) => boolean;
+  toggleFavoriteSubject: (subjectId: string) => void;
+
   bookmarks: Bookmark[];
   getBookmark: (resourceId: string) => Bookmark | undefined;
   addBookmark: (resource: Resource, page: number, note?: string) => void;
   removeBookmark: (bookmarkId: string) => void;
+
+  /** subject-level bookmarks (separate from resource bookmarks) */
+  bookmarkedSubjects: string[];
+  isSubjectBookmarked: (subjectId: string) => boolean;
+  toggleBookmarkSubject: (subjectId: string) => void;
 
   downloads: DownloadItem[];
   getDownload: (resourceId: string) => DownloadItem | undefined;
@@ -60,7 +70,9 @@ const LibraryContext = createContext<LibraryContextValue | null>(null);
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const [favorites, setFavorites] = useState<string[]>(seedFavorites);
+  const [favoriteSubjects, setFavoriteSubjects] = useState<string[]>([]);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(seedBookmarks);
+  const [bookmarkedSubjects, setBookmarkedSubjects] = useState<string[]>([]);
   const [downloads, setDownloads] = useState<DownloadItem[]>(seedDownloads);
   const [recent, setRecent] = useState<RecentEntry[]>(seedRecent);
   const [progress, setProgress] = useState<ReadingProgress[]>(seedProgress);
@@ -76,6 +88,32 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       prev.includes(resourceId)
         ? prev.filter((id) => id !== resourceId)
         : [...prev, resourceId],
+    );
+  }, []);
+
+  const isFavoriteSubject = useCallback(
+    (subjectId: string) => favoriteSubjects.includes(subjectId),
+    [favoriteSubjects],
+  );
+
+  const toggleFavoriteSubject = useCallback((subjectId: string) => {
+    setFavoriteSubjects((prev) =>
+      prev.includes(subjectId)
+        ? prev.filter((id) => id !== subjectId)
+        : [...prev, subjectId],
+    );
+  }, []);
+
+  const isSubjectBookmarked = useCallback(
+    (subjectId: string) => bookmarkedSubjects.includes(subjectId),
+    [bookmarkedSubjects],
+  );
+
+  const toggleBookmarkSubject = useCallback((subjectId: string) => {
+    setBookmarkedSubjects((prev) =>
+      prev.includes(subjectId)
+        ? prev.filter((id) => id !== subjectId)
+        : [...prev, subjectId],
     );
   }, []);
 
@@ -199,10 +237,16 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       favorites,
       isFavorite,
       toggleFavorite,
+      favoriteSubjects,
+      isFavoriteSubject,
+      toggleFavoriteSubject,
       bookmarks,
       getBookmark,
       addBookmark,
       removeBookmark,
+      bookmarkedSubjects,
+      isSubjectBookmarked,
+      toggleBookmarkSubject,
       downloads,
       getDownload,
       startDownload,
@@ -218,10 +262,16 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       favorites,
       isFavorite,
       toggleFavorite,
+      favoriteSubjects,
+      isFavoriteSubject,
+      toggleFavoriteSubject,
       bookmarks,
       getBookmark,
       addBookmark,
       removeBookmark,
+      bookmarkedSubjects,
+      isSubjectBookmarked,
+      toggleBookmarkSubject,
       downloads,
       getDownload,
       startDownload,

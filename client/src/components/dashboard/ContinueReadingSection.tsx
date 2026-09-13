@@ -31,13 +31,20 @@ export function ContinueReadingSection({ resource }: { resource: Resource | null
   const pct = Math.round(ratio * 100);
 
   return (
-    <Card interactive className="p-5">
-      <div className="flex items-start justify-between gap-3">
+    <Card interactive className="group relative p-5">
+      {/* Stretched link — makes the whole card clickable (opens the reader) */}
+      <Link
+        to={`/reader/${resource.id}`}
+        onClick={() => markOpened(resource.id)}
+        aria-label={`Resume ${resource.title} at page ${lastPage}`}
+        className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      />
+      <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-wide text-primary">
             {typeConfig.label}
           </p>
-          <h3 className="mt-1 line-clamp-1 text-base font-bold leading-tight text-foreground">
+          <h3 className="mt-1 line-clamp-1 text-base font-bold leading-tight text-foreground group-hover:text-primary">
             {resource.title}
           </h3>
           <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
@@ -63,7 +70,7 @@ export function ContinueReadingSection({ resource }: { resource: Resource | null
         <ProgressBar value={ratio} label={`Reading progress ${pct}%`} className="mt-1.5" />
       </div>
 
-      <div className="mt-4 flex items-center gap-2.5">
+      <div className="relative z-10 mt-4 flex items-center gap-2.5">
         <Link
           to={`/reader/${resource.id}`}
           onClick={() => markOpened(resource.id)}

@@ -1,0 +1,24 @@
+{
+  "name": "Mero Note",
+  "short_name": "Mero Note",
+  "description": "Personal-first CSIT study library — books, notes, past papers and lab materials organized by semester and subject.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/icon/icon.png",
+      "sizes": "640x650",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon/icon.png",
+      "sizes": "640x650",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
