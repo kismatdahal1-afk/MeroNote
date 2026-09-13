@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
 import { cx } from "../../lib/utils";
 import { ALL_RESOURCE_TYPES, RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import type { ResourceType } from "../../types";
@@ -35,11 +34,11 @@ export function FilterChips({ selected, counts, onChange }: FilterChipsProps) {
             aria-pressed={isActive}
             onClick={() => onChange(chip)}
             className={cx(
-              "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500",
+              "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
+              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
               isActive
-                ? "bg-indigo-600 text-white dark:bg-indigo-500"
-                : "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
+                ? "bg-primary text-primary-foreground"
+                : "border border-border-strong bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground",
             )}
           >
             {label}
@@ -48,21 +47,4 @@ export function FilterChips({ selected, counts, onChange }: FilterChipsProps) {
       })}
     </div>
   );
-}
-
-/** Reads/writes a `type` search param for filter chips. */
-export function useTypeFilter(): [ResourceType | "all", (t: ResourceType | "all") => void] {
-  const [params, setParams] = useSearchParams();
-  const raw = params.get("type");
-  const value: ResourceType | "all" =
-    raw && (ALL_RESOURCE_TYPES as string[]).includes(raw) ? (raw as ResourceType) : "all";
-
-  const setFilter = (t: ResourceType | "all") => {
-    setParams(
-      t === "all" ? (prev) => { const p = new URLSearchParams(prev); p.delete("type"); return p; } : (prev) => { const p = new URLSearchParams(prev); p.set("type", t); return p; },
-      { replace: true },
-    );
-  };
-
-  return [value, setFilter];
 }

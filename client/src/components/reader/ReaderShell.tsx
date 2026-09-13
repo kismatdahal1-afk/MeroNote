@@ -33,13 +33,13 @@ export function ReaderShell() {
 
   if (!resource) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="reader-bar flex min-h-screen items-center justify-center bg-background p-6">
         <div className="text-center">
-          <p className="text-lg font-semibold text-slate-900 dark:text-white">Resource not found</p>
+          <p className="text-lg font-bold text-foreground">Resource not found</p>
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="mt-3 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+            className="mt-3 text-sm font-semibold text-primary hover:underline"
           >
             Go back
           </button>
@@ -90,20 +90,20 @@ export function ReaderShell() {
   const zoomIndex = ZOOM_LEVELS.indexOf(zoom);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-100 dark:bg-slate-950">
+    <div className="reader-bar flex min-h-screen flex-col bg-background">
       {/* Reader toolbar */}
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-slate-200 bg-white/90 px-3 backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/90 lg:px-4">
-        <IconButton icon={ArrowLeft} label="Back to resource" onClick={() => navigate(`/resources/${resource.id}`)} />
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-border bg-surface/90 px-3 backdrop-blur-md lg:px-4">
+        <IconButton icon={ArrowLeft} label="Back to resource" variant="bar" onClick={() => navigate(`/resources/${resource.id}`)} />
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-sm font-semibold text-slate-900 dark:text-white">{resource.title}</h1>
-          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+          <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
+          <p className="truncate text-xs font-medium text-muted-foreground">
             {subject?.name} · {resource.pageCount} pages
           </p>
         </div>
 
         <div className="hidden items-center gap-1 md:flex">
-          <IconButton icon={ChevronLeft} label="Previous page" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
-          <div className="flex h-9 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 dark:border-slate-600 dark:bg-slate-800">
+          <IconButton icon={ChevronLeft} label="Previous page" variant="bar" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
+          <div className="flex h-9 items-center gap-1 rounded-lg border border-border-strong bg-surface-muted px-2">
             <input
               type="number"
               value={page}
@@ -114,39 +114,39 @@ export function ReaderShell() {
                 if (v >= 1 && v <= totalPages) goToPage(v);
               }}
               aria-label="Page number"
-              className="w-12 bg-transparent text-center text-sm text-slate-900 focus:outline-none dark:text-white"
+              className="w-12 bg-transparent text-center text-sm font-semibold text-foreground focus:outline-none"
             />
-            <span className="text-xs whitespace-nowrap text-slate-400">/ {totalPages}</span>
+            <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">/ {totalPages}</span>
           </div>
-          <IconButton icon={ChevronRight} label="Next page" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
+          <IconButton icon={ChevronRight} label="Next page" variant="bar" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
         </div>
 
         <div className="hidden items-center gap-0.5 lg:flex">
-          <IconButton icon={Minus} label="Zoom out" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex - 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex <= 0} />
-          <span className="w-11 text-center text-xs font-medium text-slate-600 dark:text-slate-300">{zoom}%</span>
-          <IconButton icon={Plus} label="Zoom in" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex + 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex >= ZOOM_LEVELS.length - 1} />
+          <IconButton icon={Minus} label="Zoom out" variant="bar" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex - 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex <= 0} />
+          <span className="w-11 text-center text-xs font-bold text-muted-foreground">{zoom}%</span>
+          <IconButton icon={Plus} label="Zoom in" variant="bar" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex + 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex >= ZOOM_LEVELS.length - 1} />
         </div>
 
         <IconButton
           icon={Search}
           label={searchOpen ? "Close search" : "Search in document"}
-          variant={searchOpen ? "active" : "default"}
+          variant={searchOpen ? "active" : "bar"}
           onClick={() => setSearchOpen((s) => !s)}
         />
 
         <IconButton
           icon={Bookmark}
           label="Bookmark current page"
-          variant={bookmarked ? "active" : "default"}
+          variant={bookmarked ? "active" : "bar"}
           onClick={handleBookmark}
         />
-        <IconButton icon={Download} label="Download resource" variant={download?.status === "completed" ? "active" : "default"} onClick={handleDownload} />
-        <IconButton icon={Maximize2} label="Toggle fullscreen" onClick={handleFullscreen} />
+        <IconButton icon={Download} label="Download resource" variant={download?.status === "completed" ? "active" : "bar"} onClick={handleDownload} />
+        <IconButton icon={Maximize2} label="Toggle fullscreen" variant="bar" onClick={handleFullscreen} />
       </header>
 
       {/* In-document search bar */}
       {searchOpen && (
-        <div className="sticky top-16 z-20 border-b border-slate-200 bg-white px-4 py-2.5 dark:border-slate-700/60 dark:bg-slate-900">
+        <div className="sticky top-16 z-20 border-b border-border bg-surface px-4 py-2.5">
           <form
             className="mx-auto flex max-w-xl items-center gap-2"
             onSubmit={(e) => {
@@ -160,27 +160,27 @@ export function ReaderShell() {
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search in document..."
               aria-label="Search in document"
-              className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              className="h-9 w-full rounded-lg border border-border-strong bg-surface-muted px-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
             />
           </form>
         </div>
       )}
 
       {/* Document area — PDF.js replaces this placeholder in Phase 6 */}
-      <main className="flex flex-1 justify-center px-4 py-6 lg:py-10">
+      <main className="flex flex-1 justify-center bg-background px-4 py-6 lg:py-10">
         <div
           aria-label="Document placeholder"
           style={{ width: `${clamp(zoom, 40, 220)}%`, maxWidth: "56rem" }}
-          className="flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-xl border border-slate-300 bg-white text-slate-300 shadow-sm transition-[width] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500"
+          className="flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-surface text-muted-foreground shadow-card transition-[width]"
         >
           <FileText className="size-12" aria-hidden="true" />
-          <p className="text-sm font-medium">PDF viewer placeholder</p>
-          <p className="px-6 text-center text-xs">
+          <p className="text-sm font-semibold text-muted-foreground">PDF viewer placeholder</p>
+          <p className="px-6 text-center text-xs font-medium text-muted-foreground/80">
             {resource.title} — page {page} of {totalPages}. PDF.js integration arrives in Phase 6.
           </p>
           <Link
             to={`/resources/${resource.id}`}
-            className="text-xs font-medium text-indigo-500 hover:underline"
+            className="text-xs font-semibold text-primary hover:underline"
           >
             Resource details
           </Link>
@@ -188,13 +188,13 @@ export function ReaderShell() {
       </main>
 
       {/* Mobile page controls */}
-      <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-center gap-2 border-t border-slate-200 bg-white/95 p-3 backdrop-blur-md dark:border-slate-700/60 dark:bg-slate-900/95 md:hidden">
-        <IconButton icon={ChevronLeft} label="Previous page" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
-        <div className="flex h-10 items-center gap-1.5 rounded-lg bg-slate-100 px-4 dark:bg-slate-800">
-          <span className="text-sm font-semibold text-slate-900 dark:text-white">{page}</span>
-          <span className="text-xs text-slate-400">/ {totalPages}</span>
+      <footer className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-center gap-2 border-t border-border bg-surface/95 p-3 backdrop-blur-md md:hidden">
+        <IconButton icon={ChevronLeft} label="Previous page" variant="bar" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
+        <div className="flex h-10 items-center gap-1.5 rounded-lg bg-surface-muted px-4">
+          <span className="text-sm font-bold text-foreground">{page}</span>
+          <span className="text-xs font-medium text-muted-foreground">/ {totalPages}</span>
         </div>
-        <IconButton icon={ChevronRight} label="Next page" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
+        <IconButton icon={ChevronRight} label="Next page" variant="bar" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
       </footer>
     </div>
   );

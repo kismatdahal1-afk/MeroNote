@@ -14,15 +14,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:outline-indigo-600 dark:bg-indigo-500 dark:hover:bg-indigo-600",
+    "bg-primary text-primary-foreground hover:bg-primary-hover focus-visible:outline-primary",
   secondary:
-    "bg-indigo-600/10 text-indigo-700 hover:bg-indigo-600/15 focus-visible:outline-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25",
+    "bg-secondary text-secondary-foreground hover:bg-secondary-hover focus-visible:outline-primary",
   outline:
-    "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 focus-visible:outline-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700",
+    "border border-border-strong bg-surface text-foreground hover:bg-surface-hover focus-visible:outline-primary",
   ghost:
-    "text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-slate-400 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white",
+    "text-muted-foreground hover:bg-surface-hover hover:text-foreground focus-visible:outline-primary",
   danger:
-    "bg-red-600 text-white hover:bg-red-700 focus-visible:outline-red-600 dark:bg-red-500 dark:hover:bg-red-600",
+    "bg-error text-white hover:opacity-90 focus-visible:outline-error",
 };
 
 const SIZES: Record<Size, string> = {
@@ -44,7 +44,7 @@ export function Button({
     <button
       type="button"
       className={cx(
-        "inline-flex items-center justify-center rounded-lg font-medium transition-colors",
+        "inline-flex items-center justify-center rounded-lg font-semibold transition-colors",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
         "disabled:pointer-events-none disabled:opacity-50",
         VARIANTS[variant],

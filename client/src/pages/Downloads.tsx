@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Trash2, Eye, HardDrive, CheckCircle2, Loader2 } from "lucide-react";
 import { PageHeader, Card } from "../components/common/PageHeader";
@@ -31,30 +31,30 @@ export default function Downloads() {
       {/* Storage summary */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card className="flex items-center gap-4 p-5">
-          <div className="flex size-11 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+          <div className="flex size-11 items-center justify-center rounded-lg bg-success-muted text-success">
             <HardDrive className="size-5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Total storage</p>
-            <p className="mt-0.5 text-xl font-bold text-slate-900 dark:text-white">{formatFileSize(totalDownloadSize)}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total storage</p>
+            <p className="mt-0.5 text-xl font-bold text-foreground">{formatFileSize(totalDownloadSize)}</p>
           </div>
         </Card>
         <Card className="flex items-center gap-4 p-5">
-          <div className="flex size-11 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-300">
+          <div className="flex size-11 items-center justify-center rounded-lg bg-primary-muted text-primary">
             <CheckCircle2 className="size-5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Downloaded files</p>
-            <p className="mt-0.5 text-xl font-bold text-slate-900 dark:text-white">{completedCount}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Downloaded files</p>
+            <p className="mt-0.5 text-xl font-bold text-foreground">{completedCount}</p>
           </div>
         </Card>
         <Card className="flex items-center gap-4 p-5">
-          <div className="flex size-11 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-300">
+          <div className="flex size-11 items-center justify-center rounded-lg bg-primary-muted text-primary">
             <Loader2 className="size-5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">In progress</p>
-            <p className="mt-0.5 text-xl font-bold text-slate-900 dark:text-white">{activeCount}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">In progress</p>
+            <p className="mt-0.5 text-xl font-bold text-foreground">{activeCount}</p>
           </div>
         </Card>
       </div>
@@ -80,35 +80,35 @@ export default function Downloads() {
                 <div className="min-w-0 flex-1">
                   <Link
                     to={`/resources/${resource.id}`}
-                    className="line-clamp-1 text-sm font-semibold text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400"
+                    className="line-clamp-1 text-sm font-semibold text-foreground hover:text-primary"
                   >
                     {resource.title}
                   </Link>
-                  <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
-                    {subject?.name} · {formatFileSize(dl.sizeBytes)}
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {subject?.name} Â· {formatFileSize(dl.sizeBytes)}
                   </p>
                   {dl.status === "downloading" && (
                     <div className="mt-2 flex items-center gap-2.5">
                       <ProgressBar value={dl.progress / 100} label={`Download progress ${dl.progress}%`} className="max-w-48" />
-                      <span className="text-xs font-medium text-sky-600 dark:text-sky-400">{dl.progress}%</span>
+                      <span className="text-xs font-medium text-primary">{dl.progress}%</span>
                     </div>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {dl.status === "completed" && (
                     <>
-                      <Badge tone="emerald">
+                      <Badge tone="success">
                         <CheckCircle2 className="size-3" aria-hidden="true" />
                         Saved
                       </Badge>
-                      <span className="hidden text-xs text-slate-400 sm:block">
+                      <span className="hidden text-xs text-muted-foreground/70 sm:block">
                         {formatRelativeTime(dl.downloadedAt)}
                       </span>
                       <Link
                         to={`/reader/${resource.id}`}
                         onClick={() => markOpened(resource.id)}
                         aria-label={`Open ${resource.title}`}
-                        className="flex size-9 items-center justify-center rounded-lg bg-indigo-600/10 text-indigo-600 hover:bg-indigo-600/20 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+                        className="flex size-9 items-center justify-center rounded-lg bg-primary-muted text-primary hover:bg-primary-muted-hover"
                       >
                         <Eye className="size-4" aria-hidden="true" />
                       </Link>

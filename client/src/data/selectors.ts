@@ -15,6 +15,30 @@ export function getSemesterById(id: string | undefined): Semester | undefined {
   return semesters.find((s) => s.id === id);
 }
 
+/** The semester the student is currently enrolled in. */
+export function getActiveSemester(): Semester {
+  const active = semesters.find((s) => s.status === "active");
+  return active ?? semesters[0];
+}
+
+/** Count of core subjects across the curriculum. */
+export function countCoreSubjects(): number {
+  return subjects.filter((s) => s.category === "core").length;
+}
+
+/** Resources tagged as exam-relevant (past papers, questions, important). */
+export function getTrendingExamResources(): Resource[] {
+  return resources
+    .filter(
+      (r) =>
+        r.type === "past_paper" ||
+        r.type === "important_questions" ||
+        r.tags.some((t) => t.includes("exam") || t.includes("2080")),
+    )
+    .sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt))
+    .slice(0, 4);
+}
+
 export function getSubjectsBySemester(semesterId: string): Subject[] {
   return subjects.filter((s) => s.semesterId === semesterId);
 }

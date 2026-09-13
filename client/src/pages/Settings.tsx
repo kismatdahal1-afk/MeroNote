@@ -1,15 +1,14 @@
 ﻿import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Sun, Moon, User, Palette, BookOpen, HardDrive, Info, ShieldCheck,
+  Sun, Moon, Monitor, User, Palette, BookOpen, HardDrive, Info, ShieldCheck,
 } from "lucide-react";
 import { PageHeader, Card } from "../components/common/PageHeader";
 import { Badge } from "../components/common/Badge";
 import { useTheme } from "../state/ThemeProvider";
 import { useLibrary } from "../state/LibraryProvider";
 import { mockUser } from "../data/mock";
-import { formatFileSize } from "../lib/utils";
-import { cx } from "../lib/utils";
+import { formatFileSize, cx } from "../lib/utils";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 type HealthState = "checking" | "ok" | "down";
@@ -31,7 +30,7 @@ function ApiHealth() {
   }, []);
 
   return (
-    <Badge tone={health === "ok" ? "emerald" : health === "down" ? "red" : "sky"}>
+    <Badge tone={health === "ok" ? "success" : health === "down" ? "error" : "accent"}>
       {health === "ok" ? "API connected" : health === "down" ? "API offline" : "Checking API..."}
     </Badge>
   );
@@ -39,8 +38,8 @@ function ApiHealth() {
 
 function SectionTitle({ icon: Icon, children }: { icon: typeof Sun; children: string }) {
   return (
-    <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
-      <Icon className="size-4.5 text-indigo-500" aria-hidden="true" />
+    <h2 className="flex items-center gap-2 text-base font-bold text-foreground">
+      <Icon className="size-4.5 text-primary" aria-hidden="true" />
       {children}
     </h2>
   );
@@ -51,9 +50,10 @@ export default function Settings() {
   const { totalDownloadSize, downloads } = useLibrary();
   const completed = downloads.filter((d) => d.status === "completed").length;
 
-  const themeOptions: { value: "light" | "dark"; label: string; icon: typeof Sun }[] = [
+  const themeOptions: { value: "light" | "dark" | "system"; label: string; icon: typeof Sun }[] = [
     { value: "light", label: "Light", icon: Sun },
     { value: "dark", label: "Dark", icon: Moon },
+    { value: "system", label: "System", icon: Monitor },
   ];
 
   return (
@@ -64,8 +64,8 @@ export default function Settings() {
         {/* Appearance */}
         <Card className="p-6">
           <SectionTitle icon={Palette}>Appearance</SectionTitle>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Choose how Mero Note looks. Light for daytime, dark for low-light reading.
+          <p className="mt-1 text-sm font-medium text-muted-foreground">
+            Choose how Mero Note looks. System follows your device preference.
           </p>
           <div className="mt-4 grid grid-cols-3 gap-2" role="group" aria-label="Theme selection">
             {themeOptions.map(({ value, label, icon: Icon }) => (
@@ -75,11 +75,11 @@ export default function Settings() {
                 onClick={() => setTheme(value)}
                 aria-pressed={theme === value}
                 className={cx(
-                  "flex flex-col items-center gap-2 rounded-xl border p-4 text-sm font-medium transition-colors",
-                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500",
+                  "flex flex-col items-center gap-2 rounded-xl border p-4 text-sm font-semibold transition-colors",
+                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                   theme === value
-                    ? "border-indigo-500 bg-indigo-500/5 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800",
+                    ? "border-primary bg-primary-muted text-primary"
+                    : "border-border text-muted-foreground hover:bg-surface-hover hover:text-foreground",
                 )}
               >
                 <Icon className="size-5" aria-hidden="true" />
@@ -93,16 +93,16 @@ export default function Settings() {
         <Card className="p-6">
           <SectionTitle icon={User}>Account</SectionTitle>
           <div className="mt-4 flex items-center gap-4">
-            <span className="flex size-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-sm font-bold text-white">
+            <span className="flex size-12 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
               AS
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">{mockUser.name}</p>
-              <p className="truncate text-sm text-slate-500 dark:text-slate-400">{mockUser.email}</p>
+              <p className="text-sm font-bold text-foreground">{mockUser.name}</p>
+              <p className="truncate text-sm font-medium text-muted-foreground">{mockUser.email}</p>
             </div>
-            <Badge tone={mockUser.role === "ADMIN" ? "amber" : "sky"}>{mockUser.role}</Badge>
+            <Badge tone={mockUser.role === "ADMIN" ? "warning" : "accent"}>{mockUser.role}</Badge>
           </div>
-          <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-4 text-xs font-medium text-muted-foreground/70">
             Profile management arrives with authentication in Phase 4.
           </p>
         </Card>
@@ -113,28 +113,28 @@ export default function Settings() {
           <div className="mt-4 space-y-4">
             <label className="flex cursor-pointer items-center justify-between gap-4">
               <span className="min-w-0">
-                <span className="block text-sm font-medium text-slate-800 dark:text-slate-200">Continue where you left off</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                <span className="block text-sm font-semibold text-foreground">Continue where you left off</span>
+                <span className="block text-xs font-medium text-muted-foreground">
                   Reopen resources at your last-read page.
                 </span>
               </span>
               <input
                 type="checkbox"
                 defaultChecked
-                className="size-5 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800"
+                className="size-5 shrink-0 rounded border-border-strong text-primary focus:ring-primary/25"
               />
             </label>
             <label className="flex cursor-pointer items-center justify-between gap-4">
               <span className="min-w-0">
-                <span className="block text-sm font-medium text-slate-800 dark:text-slate-200">Track reading progress</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400">
+                <span className="block text-sm font-semibold text-foreground">Track reading progress</span>
+                <span className="block text-xs font-medium text-muted-foreground">
                   Keep your last page and completion percentage up to date.
                 </span>
               </span>
               <input
                 type="checkbox"
                 defaultChecked
-                className="size-5 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800"
+                className="size-5 shrink-0 rounded border-border-strong text-primary focus:ring-primary/25"
               />
             </label>
           </div>
@@ -145,40 +145,40 @@ export default function Settings() {
           <SectionTitle icon={HardDrive}>Storage</SectionTitle>
           <div className="mt-4 space-y-3 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-slate-600 dark:text-slate-300">Downloaded files</span>
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {completed} Â· {formatFileSize(totalDownloadSize)}
+              <span className="font-medium text-muted-foreground">Downloaded files</span>
+              <span className="font-bold text-foreground">
+                {completed} · {formatFileSize(totalDownloadSize)}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-600 dark:text-slate-300">Temporary cache</span>
-              <span className="font-semibold text-slate-900 dark:text-white">0 B</span>
+              <span className="font-medium text-muted-foreground">Temporary cache</span>
+              <span className="font-bold text-foreground">0 B</span>
             </div>
-            <div className="flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-700/50">
-              <span className="font-medium text-slate-700 dark:text-slate-200">Total used</span>
-              <span className="font-bold text-slate-900 dark:text-white">{formatFileSize(totalDownloadSize)}</span>
+            <div className="flex items-center justify-between border-t border-border pt-3">
+              <span className="font-bold text-foreground">Total used</span>
+              <span className="font-bold text-foreground">{formatFileSize(totalDownloadSize)}</span>
             </div>
           </div>
-          <p className="mt-4 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-4 text-xs font-medium text-muted-foreground/70">
             Full storage management (clear cache, manage downloads) arrives in Phase 9.
           </p>
           <Link
             to="/downloads"
-            className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+            className="mt-3 inline-block text-sm font-semibold text-primary hover:underline"
           >
-            Manage downloads â†’
+            Manage downloads →
           </Link>
         </Card>
 
         {/* About */}
         <Card className="p-6">
           <SectionTitle icon={Info}>About</SectionTitle>
-          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-            <Badge>Mero Note v0.2.0</Badge>
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm font-medium text-muted-foreground">
+            <Badge>Mero Note v0.2.5</Badge>
             <ApiHealth />
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="size-4 text-slate-400" aria-hidden="true" />
-              Phase 2 prototype â€” mock data
+              <ShieldCheck className="size-4 text-muted-foreground/60" aria-hidden="true" />
+              Phase 2.5 prototype — mock data
             </span>
           </div>
         </Card>

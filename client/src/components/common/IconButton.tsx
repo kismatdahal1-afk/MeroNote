@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cx } from "../../lib/utils";
 
-type Variant = "default" | "active" | "danger";
+type Variant = "default" | "active" | "danger" | "bar";
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: LucideIcon;
@@ -14,11 +14,13 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANTS: Record<Variant, string> = {
   default:
-    "text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white",
+    "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
   active:
-    "bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 dark:text-amber-400",
+    "bg-warning-muted text-warning hover:bg-warning-muted hover:text-warning",
   danger:
-    "text-slate-500 hover:bg-red-500/10 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-500/15 dark:hover:text-red-400",
+    "text-muted-foreground hover:bg-error-muted hover:text-error",
+  bar:
+    "text-foreground/75 hover:bg-surface-hover hover:text-foreground",
 };
 
 export function IconButton({
@@ -38,7 +40,7 @@ export function IconButton({
       aria-pressed={rest["aria-pressed"]}
       className={cx(
         "inline-flex items-center justify-center rounded-lg transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
         "disabled:pointer-events-none disabled:opacity-40",
         size === "sm" ? "size-8" : "size-10",
         VARIANTS[variant],

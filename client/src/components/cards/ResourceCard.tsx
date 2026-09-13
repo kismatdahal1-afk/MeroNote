@@ -37,8 +37,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
       toast("Already bookmarked — remove it from the Bookmarks page", "info");
       return;
     }
-    const progressPage = 1;
-    addBookmark(resource, progressPage, "");
+    addBookmark(resource, 1, "");
     toast("Bookmark saved (mock)");
   };
 
@@ -54,9 +53,17 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
   return (
     <Card interactive className="flex h-full flex-col p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
-          <TypeIcon className="size-5" aria-hidden="true" />
-        </div>
+        <Link
+          to={`/resources/${resource.id}`}
+          className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
+            <TypeIcon className="size-5" aria-hidden="true" />
+          </div>
+          <span className={cx("inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold", typeConfig.badgeClass)}>
+            {typeConfig.label}
+          </span>
+        </Link>
         <div className="flex items-center gap-0.5">
           <IconButton
             icon={Heart}
@@ -79,16 +86,13 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
 
       <Link
         to={`/resources/${resource.id}`}
-        className="mt-3 flex min-w-0 flex-1 flex-col rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+        className="mt-3 flex min-w-0 flex-1 flex-col rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
-        <span className={cx("mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", typeConfig.badgeClass)}>
-          {typeConfig.label}
-        </span>
-        <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400">
+        <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground hover:text-primary">
           {resource.title}
         </h3>
         {showContext && (subject || semester) && (
-          <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+          <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
             {[subject?.name, semester?.name].filter(Boolean).join(" · ")}
           </p>
         )}
@@ -98,28 +102,28 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
         {resource.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
-            className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+            className="rounded-md bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
           >
             {tag}
           </span>
         ))}
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-700/50 dark:text-slate-400">
+      <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs font-medium text-muted-foreground">
         <span>
           {resource.pageCount} pages · {formatFileSize(resource.fileSize)}
         </span>
         <div className="flex items-center gap-1">
           <Link
             to={`/reader/${resource.id}`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-indigo-600/10 px-2.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-600/20 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
             aria-label={`Open ${resource.title} in reader`}
           >
             <Eye className="size-3.5" aria-hidden="true" />
             Read
           </Link>
           {download?.status === "completed" ? (
-            <span className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-500/10 px-2.5 text-xs font-semibold text-emerald-600 dark:text-emerald-300">
+            <span className="inline-flex h-8 items-center gap-1 rounded-lg bg-success-muted px-2.5 text-xs font-bold text-success">
               <Check className="size-3.5" aria-hidden="true" />
               Saved
             </span>

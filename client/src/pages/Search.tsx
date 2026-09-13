@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/common/PageHeader";
 import { SearchBar } from "../components/common/SearchBar";
@@ -43,9 +43,9 @@ export default function Search() {
       />
 
       {query && (
-        <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mb-4 text-sm text-muted-foreground">
           {results.length} result{results.length === 1 ? "" : "s"} for{" "}
-          <span className="font-semibold text-slate-700 dark:text-slate-200">&ldquo;{query}&rdquo;</span>
+          <span className="font-semibold text-foreground">&ldquo;{query}&rdquo;</span>
         </p>
       )}
 

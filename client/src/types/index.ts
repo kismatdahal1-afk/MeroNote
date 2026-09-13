@@ -16,6 +16,11 @@ export interface Semester {
   description: string;
   subjectCount: number;
   resourceCount: number;
+  /** total credit hours for the semester */
+  credits: number;
+  status: "passed" | "active" | "upcoming";
+  /** 0..1 study completion for active semester */
+  completion: number;
 }
 
 export interface Subject {
@@ -25,6 +30,28 @@ export interface Subject {
   code: string;
   description: string;
   category: "core" | "elective" | "practical";
+  /** credit hours */
+  credits: number;
+  /** 0..1 offline sync progress */
+  offlineSync: number;
+  /** frequently repeated board-exam topics */
+  hotTopics: string[];
+}
+
+/** Program-level info shown on the dashboard greeting banner. */
+export interface ProgramInfo {
+  university: string;
+  program: string;
+  /** short batch label, e.g. "Batch '80" */
+  batch: string;
+  studentLabel: string;
+  currentSemesterId: string;
+  exam: {
+    title: string;
+    /** short label, e.g. "Sem V" */
+    scope: string;
+    date: string;
+  };
 }
 
 export interface Resource {

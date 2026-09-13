@@ -48,8 +48,8 @@ export function ConfirmDialog({
     >
       <div className="flex items-start gap-3">
         {danger && (
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/15">
-            <AlertTriangle className="size-4 text-red-500" aria-hidden="true" />
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-error-muted">
+            <AlertTriangle className="size-4 text-error" aria-hidden="true" />
           </div>
         )}
         <p className="text-sm leading-6">{message}</p>

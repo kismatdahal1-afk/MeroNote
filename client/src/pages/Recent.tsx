@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import { History, Play } from "lucide-react";
 import { PageHeader, Card } from "../components/common/PageHeader";
 import { EmptyState } from "../components/common/States";
@@ -39,17 +39,17 @@ export default function Recent() {
                 <div className="min-w-0 flex-1">
                   <Link
                     to={`/resources/${resource.id}`}
-                    className="line-clamp-1 text-sm font-semibold text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400"
+                    className="line-clamp-1 text-sm font-semibold text-foreground hover:text-primary"
                   >
                     {resource.title}
                   </Link>
-                  <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                     <History className="size-3" aria-hidden="true" />
-                    {subject?.name} · opened {formatRelativeTime(entry.openedAt)}
+                    {subject?.name} Â· opened {formatRelativeTime(entry.openedAt)}
                   </p>
                 </div>
                 {prog && (
-                  <Badge tone="indigo" className="hidden sm:inline-flex">
+                  <Badge tone="primary" className="hidden sm:inline-flex">
                     Page {prog.lastPage}
                   </Badge>
                 )}
@@ -57,7 +57,7 @@ export default function Recent() {
                   to={`/reader/${resource.id}`}
                   onClick={() => markOpened(resource.id)}
                   aria-label={`Continue reading ${resource.title}`}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600/10 text-indigo-600 hover:bg-indigo-600/20 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary hover:bg-primary-muted-hover"
                 >
                   <Play className="size-4 translate-x-px fill-current" aria-hidden="true" />
                 </Link>

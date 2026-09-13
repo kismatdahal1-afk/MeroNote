@@ -20,19 +20,19 @@ export function PageHeader({ title, subtitle, breadcrumbs, actions }: PageHeader
     <div className="mb-6">
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav aria-label="Breadcrumb" className="mb-2">
-          <ol className="flex flex-wrap items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
+          <ol className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
             {breadcrumbs.map((crumb, i) => (
               <li key={i} className="flex items-center gap-1">
                 {i > 0 && <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />}
                 {crumb.to ? (
                   <Link
                     to={crumb.to}
-                    className="rounded px-1 py-0.5 hover:text-indigo-600 dark:hover:text-indigo-400"
+                    className="rounded px-1 py-0.5 font-medium hover:text-primary"
                   >
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span aria-current="page" className="font-medium text-slate-700 dark:text-slate-300">
+                  <span aria-current="page" className="font-semibold text-foreground">
                     {crumb.label}
                   </span>
                 )}
@@ -43,11 +43,11 @@ export function PageHeader({ title, subtitle, breadcrumbs, actions }: PageHeader
       )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="truncate text-2xl font-bold tracking-tight text-foreground">
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
           )}
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
@@ -66,10 +66,9 @@ export function Card({ children, className, interactive = false }: CardProps) {
   return (
     <div
       className={cx(
-        "rounded-xl border border-slate-200 bg-white shadow-sm",
-        "dark:border-slate-700/60 dark:bg-slate-900",
+        "rounded-xl border border-border bg-surface shadow-card",
         interactive &&
-          "transition-shadow hover:shadow-md hover:shadow-slate-200/60 dark:hover:shadow-black/30",
+          "transition-all hover:border-primary/40 hover:shadow-card-hover",
         className,
       )}
     >
@@ -90,13 +89,13 @@ export function StatCard({ label, value, icon, hint }: StatCardProps) {
     <Card className="p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="mt-1.5 text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
-          {hint && <p className="mt-0.5 truncate text-xs text-slate-400">{hint}</p>}
+          <p className="mt-1.5 text-2xl font-bold text-foreground">{value}</p>
+          {hint && <p className="mt-0.5 truncate text-xs text-muted-foreground/80">{hint}</p>}
         </div>
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary">
           {icon}
         </div>
       </div>

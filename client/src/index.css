@@ -1,9 +1,171 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+/* ============================================================
+   MERO NOTE — GLOBAL DESIGN TOKENS
+   Light: warm cream (#FFF1DE base). Dark: deep navy (#00072D base).
+   Locked brand backgrounds — do not replace with pure white/black.
+   ============================================================ */
+
+:root {
+  /* Backgrounds — deeper cream hero melting into warm #EFE9E0 body */
+  --color-background: #efe9e0; /* main dashboard area */
+  --color-hero: #f1e2c4; /* upper hero/header region (slightly darker cream) */
+  --color-surface: #fffdf8;
+  --color-surface-muted: #f5eee2;
+  --color-surface-hover: #efe7d9;
+
+  /* Foreground — deep midnight navy/slate */
+  --color-foreground: #0f172a;
+  --color-muted-foreground: #64748b;
+
+  /* Borders — delicate warm */
+  --color-border: #ece5d8;
+  --color-border-strong: #ddd2bd;
+
+  /* Primary — dark blue (light mode: solid navy) */
+  --color-primary: #1d3a8f;
+  --color-primary-hover: #16307a;
+  --color-primary-foreground: #ffffff;
+  --color-primary-muted: #e3e7f4;
+  --color-primary-muted-hover: #d6dcf0;
+
+  /* Secondary — dark blue, softer surface treatment */
+  --color-secondary: #24449c;
+  --color-secondary-hover: #1d3a8f;
+  --color-secondary-foreground: #ffffff;
+
+  /* Accent (cyan) */
+  --color-accent: #0e7490;
+  --color-accent-foreground: #ffffff;
+
+  /* States */
+  --color-success: #15803d;
+  --color-success-muted: #dff0e5;
+  --color-warning: #9a6700;
+  --color-warning-muted: #f6ead2;
+  --color-error: #c42d2d;
+  --color-error-muted: #f9e3e3;
+
+  /* Misc */
+  --color-scrim: rgba(15, 23, 42, 0.45);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.dark {
+  /* Foundation: deep navy #00072D */
+  --color-background: #00072d;
+  --color-hero: #001040;
+  --color-surface: #01114b;
+  --color-surface-muted: #0a1b54;
+  --color-surface-hover: #12245e;
+
+  --color-foreground: #e9ecf8;
+  --color-muted-foreground: #8f9ac2;
+
+  --color-border: #1b2c66;
+  --color-border-strong: #2d3f84;
+
+  /* Primary — brighter blue for dark-mode contrast */
+  --color-primary: #6e9bff;
+  --color-primary-hover: #8bb0ff;
+  --color-primary-foreground: #041038;
+  --color-primary-muted: #16295f;
+  --color-primary-muted-hover: #1e3370;
+
+  --color-secondary: #1c3a8a;
+  --color-secondary-hover: #27499e;
+  --color-secondary-foreground: #dce6ff;
+
+  --color-accent: #5fd4e8;
+  --color-accent-foreground: #041038;
+
+  --color-success: #3dd68c;
+  --color-success-muted: #0a2e26;
+  --color-warning: #f5b942;
+  --color-warning-muted: #33240a;
+  --color-error: #f87171;
+  --color-error-muted: #3b0f18;
+
+  --color-scrim: rgba(0, 0, 0, 0.65);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.55);
+}
+
+/* Reader chrome — dark-blue toolbar in BOTH modes (focused study zone) */
+.reader-bar {
+  --color-background: #0d1b45;
+  --color-surface: #122456;
+  --color-surface-muted: #182c63;
+  --color-surface-hover: #1e3570;
+  --color-foreground: #eef1fb;
+  --color-muted-foreground: #a3ade0;
+  --color-border: #26386f;
+  --color-border-strong: #36498a;
+  --color-primary: #6e9bff;
+  --color-primary-hover: #8bb0ff;
+  --color-primary-foreground: #041038;
+  --color-primary-muted: #1c2f68;
+  --color-primary-muted-hover: #243a7a;
+  --color-scrim: rgba(0, 0, 0, 0.6);
+}
+
+/* Map tokens to Tailwind utilities (bg-surface, text-foreground, ...) */
+@theme inline {
+  --font-sans: "Inter Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --color-background: var(--color-background);
+  --color-hero: var(--color-hero);
+  --color-surface: var(--color-surface);
+  --color-surface-muted: var(--color-surface-muted);
+  --color-surface-hover: var(--color-surface-hover);
+
+  --color-foreground: var(--color-foreground);
+  --color-muted-foreground: var(--color-muted-foreground);
+
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-primary-muted: var(--color-primary-muted);
+  --color-primary-muted-hover: var(--color-primary-muted-hover);
+
+  --color-secondary: var(--color-secondary);
+  --color-secondary-hover: var(--color-secondary-hover);
+  --color-secondary-foreground: var(--color-secondary-foreground);
+
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+
+  --color-success: var(--color-success);
+  --color-success-muted: var(--color-success-muted);
+  --color-warning: var(--color-warning);
+  --color-warning-muted: var(--color-warning-muted);
+  --color-error: var(--color-error);
+  --color-error-muted: var(--color-error-muted);
+
+  --color-scrim: var(--color-scrim);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+
+  --animate-toast-in: toast-in 0.2s ease-out;
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
 }
 
 html {
@@ -11,16 +173,28 @@ html {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  @apply bg-background text-foreground font-sans antialiased;
+}
+
+/* Layered page treatment: soft cream #FFF1DE at the very top melting into
+   the curdy milky #FBF8F2 body by mid-viewport. Background-only. */
+.bg-hero-gradient {
+  background-image: linear-gradient(
+    180deg,
+    var(--color-hero) 0%,
+    var(--color-background) 50vh
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: theme(--color-slate-300) transparent;
+  scrollbar-color: var(--color-border-strong) transparent;
 }
 
-.dark * {
-  scrollbar-color: theme(--color-slate-600) transparent;
+::selection {
+  background: var(--color-primary-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

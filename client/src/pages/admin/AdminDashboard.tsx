@@ -39,7 +39,7 @@ export default function AdminDashboard() {
         title="Admin Dashboard"
         subtitle="Library overview and management shortcuts."
         actions={
-          <Badge tone="amber">ADMIN</Badge>
+          <Badge tone="warning">ADMIN</Badge>
         }
       />
 
@@ -56,7 +56,7 @@ export default function AdminDashboard() {
 
       {/* Management shortcuts */}
       <section className="mt-8" aria-labelledby="admin-actions">
-        <h2 id="admin-actions" className="mb-3.5 text-lg font-semibold text-slate-900 dark:text-white">
+        <h2 id="admin-actions" className="mb-3.5 text-lg font-semibold text-foreground">
           Quick Actions
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -64,18 +64,18 @@ export default function AdminDashboard() {
             <Link
               key={to}
               to={to}
-              className="group flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 transition-all hover:border-indigo-300 hover:shadow-md dark:border-slate-700/60 dark:bg-slate-900 dark:hover:border-indigo-500/40"
+              className="group flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition-all hover:border-primary/40 hover:shadow-card-hover"
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary ">
                 <Icon className="size-5" aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-white dark:group-hover:text-indigo-400">
+                <span className="block text-sm font-bold text-foreground group-hover:text-primary">
                   {title}
                 </span>
-                <span className="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">{description}</span>
+                <span className="mt-0.5 block text-sm text-muted-foreground">{description}</span>
               </span>
-              <ArrowRight className="mt-1 size-4 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 dark:text-slate-600" aria-hidden="true" />
+              <ArrowRight className="mt-1 size-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </Link>
           ))}
         </div>
@@ -84,23 +84,23 @@ export default function AdminDashboard() {
       {/* Recent uploads */}
       <section className="mt-8" aria-labelledby="admin-recent">
         <div className="mb-3.5 flex items-center justify-between">
-          <h2 id="admin-recent" className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h2 id="admin-recent" className="text-lg font-semibold text-foreground">
             Recent Uploads
           </h2>
-          <Link to="/admin/resources" className="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link to="/admin/resources" className="text-sm font-semibold text-primary hover:underline">
             Manage all
           </Link>
         </div>
-        <Card className="divide-y divide-slate-100 dark:divide-slate-700/50">
+        <Card className="divide-y divide-border">
           {recentUploads.map((r) => (
             <div key={r.id} className="flex items-center gap-4 p-4">
               <div className="min-w-0 flex-1">
-                <p className="line-clamp-1 text-sm font-medium text-slate-900 dark:text-white">{r.title}</p>
-                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                <p className="line-clamp-1 text-sm font-medium text-foreground">{r.title}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {r.subjectId} · {r.pageCount} pages · {formatFileSize(r.fileSize)}
                 </p>
               </div>
-              <span className="flex shrink-0 items-center gap-1 text-xs text-slate-400">
+              <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground/70">
                 <Clock className="size-3.5" aria-hidden="true" />
                 {formatRelativeTime(r.uploadedAt)}
               </span>

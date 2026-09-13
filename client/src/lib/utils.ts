@@ -38,6 +38,26 @@ export function formatRelativeTime(iso: string): string {
   return `${Math.floor(months / 12)}y ago`;
 }
 
+/** "Today, 8:15 AM"-style timestamp from an ISO string. */
+export function formatTimestamp(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const time = d
+    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    .toUpperCase();
+  if (sameDay) return `Today, ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return `Yesterday, ${time}`;
+  return `${formatDate(iso)}, ${time}`;
+}
+
+/** Days remaining until an ISO date (rounded up, never negative). */
+export function daysUntil(iso: string): number {
+  return Math.max(0, Math.ceil((+new Date(iso) - Date.now()) / 86400000));
+}
+
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }

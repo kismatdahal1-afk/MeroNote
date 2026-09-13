@@ -23,9 +23,9 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const VARIANT_STYLES: Record<Toast["variant"], { icon: typeof CheckCircle2; iconClass: string }> = {
-  success: { icon: CheckCircle2, iconClass: "text-emerald-500" },
-  error: { icon: XCircle, iconClass: "text-red-500" },
-  info: { icon: Info, iconClass: "text-sky-500" },
+  success: { icon: CheckCircle2, iconClass: "text-success" },
+  error: { icon: XCircle, iconClass: "text-error" },
+  info: { icon: Info, iconClass: "text-accent" },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -60,15 +60,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={t.id}
               role="status"
-              className="pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-lg animate-[toast-in_.2s_ease-out] dark:border-slate-700 dark:bg-slate-800"
+              className="pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-xl animate-toast-in"
             >
               <Icon className={cx("size-5 shrink-0", iconClass)} aria-hidden="true" />
-              <p className="flex-1 text-sm text-slate-700 dark:text-slate-200">{t.message}</p>
+              <p className="flex-1 text-sm font-medium text-foreground">{t.message}</p>
               <button
                 type="button"
                 onClick={() => remove(t.id)}
                 aria-label="Dismiss notification"
-                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                className="rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
               >
                 <X className="size-4" aria-hidden="true" />
               </button>

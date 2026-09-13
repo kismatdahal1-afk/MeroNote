@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { Bookmark as BookmarkIcon, Trash2, Play } from "lucide-react";
+﻿import { Link } from "react-router-dom";
+import { Bookmark as BookmarkIcon, Trash2, Play, HardDrive, WifiOff } from "lucide-react";
 import { PageHeader, Card } from "../components/common/PageHeader";
 import { EmptyState } from "../components/common/States";
 import { IconButton } from "../components/common/IconButton";
@@ -12,17 +12,61 @@ import { cx, formatDate } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
 
+const SAVE_CHIPS = ["Books", "Past Papers", "Lab Code", "Cheatsheets"];
+
 export default function Bookmarks() {
-  const { bookmarks, removeBookmark, markOpened } = useLibrary();
+  const { bookmarks, removeBookmark, markOpened, totalDownloadSize } = useLibrary();
   const { toast } = useToast();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   return (
     <div>
       <PageHeader
-        title="Bookmarks"
-        subtitle="Pages you saved while reading."
+        title="Saved & Bookmarks"
+        subtitle="Pages you saved while reading — available offline."
       />
+
+      {/* Offline storage indicator */}
+      <Card className="mb-6 flex items-center gap-4 p-5">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-muted text-primary">
+          <HardDrive className="size-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-foreground">
+            {formatBytes(totalDownloadSize)} used
+          </p>
+          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <WifiOff className="size-3.5" aria-hidden="true" />
+            100% Offline Accessible
+          </p>
+        </div>
+        <Badge tone="success">Synced</Badge>
+      </Card>
+
+      {/* Filter chips */}
+      <div
+        role="group"
+        aria-label="Filter saved resources"
+        className="mb-5 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {SAVE_CHIPS.map((chip, i) => (
+          <button
+            key={chip}
+            type="button"
+            aria-pressed={i === 0}
+            className={cx(
+              "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors",
+              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+              i === 0
+                ? "bg-primary text-primary-foreground"
+                : "border border-border-strong bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+            )}
+          >
+            {chip}
+          </button>
+        ))}
+      </div>
+
       {bookmarks.length === 0 ? (
         <EmptyState
           title="No bookmarks yet"
@@ -45,16 +89,16 @@ export default function Bookmarks() {
                   <Link
                     to={`/reader/${resource.id}`}
                     onClick={() => markOpened(resource.id)}
-                    className="line-clamp-1 text-sm font-semibold text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400"
+                    className="line-clamp-1 text-sm font-bold text-foreground hover:text-primary"
                   >
                     {resource.title}
                   </Link>
-                  <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
                     {subject?.name} · saved {formatDate(bm.createdAt)}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <Badge tone="indigo">
+                  <Badge tone="primary">
                     <BookmarkIcon className="size-3" aria-hidden="true" />
                     Page {bm.page}
                   </Badge>
@@ -65,7 +109,7 @@ export default function Bookmarks() {
                     to={`/reader/${resource.id}`}
                     onClick={() => markOpened(resource.id)}
                     aria-label={`Open ${resource.title} at page ${bm.page}`}
-                    className="flex size-9 items-center justify-center rounded-lg bg-indigo-600/10 text-indigo-600 hover:bg-indigo-600/20 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+                    className="flex size-9 items-center justify-center rounded-lg bg-primary-muted text-primary hover:bg-primary-muted-hover"
                   >
                     <Play className="size-4" aria-hidden="true" />
                   </Link>
@@ -100,4 +144,9 @@ export default function Bookmarks() {
       />
     </div>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
 }

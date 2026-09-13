@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+﻿import { useParams, useNavigate } from "react-router-dom";
 import {
   Eye, Download, Heart, Calendar, FileText, Tag, BookOpen, GraduationCap, Bookmark, Layers,
 } from "lucide-react";
@@ -52,7 +52,7 @@ export default function ResourceDetail() {
 
   const handleBookmark = () => {
     if (bookmarked) {
-      toast("Already bookmarked — manage from Bookmarks page", "info");
+      toast("Already bookmarked â€” manage from Bookmarks page", "info");
       return;
     }
     addBookmark(resource, progress?.lastPage ?? 1, "");
@@ -109,55 +109,55 @@ export default function ResourceDetail() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-6 lg:col-span-2">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Details</h2>
+          <h2 className="text-base font-bold text-foreground">Details</h2>
           <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <Layers className="size-3.5" aria-hidden="true" />
                 Type
               </dt>
               <dd className="mt-1">
-                <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", typeConfig.badgeClass)}>
+                <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold", typeConfig.badgeClass)}>
                   <TypeIcon className="size-3.5" aria-hidden="true" />
                   {typeConfig.label}
                 </span>
               </dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <BookOpen className="size-3.5" aria-hidden="true" /> Subject
               </dt>
-              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{subject?.name}</dd>
+              <dd className="mt-1 text-sm font-medium text-foreground">{subject?.name}</dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <GraduationCap className="size-3.5" aria-hidden="true" /> Semester
               </dt>
-              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{semester?.name}</dd>
+              <dd className="mt-1 text-sm font-medium text-foreground">{semester?.name}</dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <FileText className="size-3.5" aria-hidden="true" /> Pages
               </dt>
-              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{resource.pageCount}</dd>
+              <dd className="mt-1 text-sm font-medium text-foreground">{resource.pageCount}</dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <FileText className="size-3.5" aria-hidden="true" /> File size
               </dt>
-              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{formatFileSize(resource.fileSize)}</dd>
+              <dd className="mt-1 text-sm font-medium text-foreground">{formatFileSize(resource.fileSize)}</dd>
             </div>
             <div>
-              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+              <dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <Calendar className="size-3.5" aria-hidden="true" /> Added
               </dt>
-              <dd className="mt-1 text-sm text-slate-800 dark:text-slate-200">{formatDate(resource.uploadedAt)}</dd>
+              <dd className="mt-1 text-sm font-medium text-foreground">{formatDate(resource.uploadedAt)}</dd>
             </div>
           </dl>
 
           {resource.tags.length > 0 && (
-            <div className="mt-6 border-t border-slate-100 pt-4 dark:border-slate-700/50">
-              <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+            <div className="mt-6 border-t border-border pt-4">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <Tag className="size-3.5" aria-hidden="true" /> Tags
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
@@ -170,27 +170,27 @@ export default function ResourceDetail() {
         </Card>
 
         <Card className="h-fit p-5">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Quick info</h3>
-          <ul className="mt-3 space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
+          <h3 className="text-sm font-bold text-foreground">Quick info</h3>
+          <ul className="mt-3 space-y-2.5 text-sm text-muted-foreground">
             <li className="flex items-center justify-between gap-3">
-              <span className="text-slate-500 dark:text-slate-400">File</span>
+              <span className="font-medium">File</span>
               <span className="truncate font-mono text-xs">{resource.fileName}</span>
             </li>
             <li className="flex items-center justify-between gap-3">
-              <span className="text-slate-500 dark:text-slate-400">Updated</span>
+              <span className="font-medium">Updated</span>
               <span>{formatDate(resource.updatedAt)}</span>
             </li>
             <li className="flex items-center justify-between gap-3">
-              <span className="text-slate-500 dark:text-slate-400">Status</span>
+              <span className="font-medium">Status</span>
               {download?.status === "completed" ? (
-                <Badge tone="emerald">Downloaded</Badge>
+                <Badge tone="success">Downloaded</Badge>
               ) : (
-                <Badge tone="sky">Online</Badge>
+                <Badge tone="accent">Online</Badge>
               )}
             </li>
             {progress && (
               <li className="flex items-center justify-between gap-3">
-                <span className="text-slate-500 dark:text-slate-400">Progress</span>
+                <span className="font-medium">Progress</span>
                 <span>Page {progress.lastPage} / {resource.pageCount}</span>
               </li>
             )}

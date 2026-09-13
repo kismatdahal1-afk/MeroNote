@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { SubjectCard } from "../components/cards/SubjectCard";
 import { Select } from "../components/common/Field";
 import { EmptyState } from "../components/common/States";
@@ -29,9 +29,9 @@ export default function Subjects() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Subjects</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          All {allSubjects.length} subjects across {semesters.length} semesters — {totalResources} resources.
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Subjects</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          All {allSubjects.length} subjects across {semesters.length} semesters â€” {totalResources} resources.
         </p>
       </div>
 

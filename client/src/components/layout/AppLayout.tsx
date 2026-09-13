@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Outlet, ScrollRestoration } from "react-router-dom";
 import { Header } from "./Header";
 import { MobileNav } from "./MobileNav";
@@ -10,17 +10,17 @@ export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="bg-hero-gradient min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white dark:border-slate-700/60 dark:bg-slate-900 lg:flex">
-        <div className="flex h-16 items-center border-b border-slate-200 px-5 dark:border-slate-700/60">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-surface lg:flex">
+        <div className="flex h-16 items-center border-b border-border px-5">
           <BrandMark subtitle />
         </div>
         <div className="flex-1 overflow-y-auto p-3">
           <SidebarNav />
         </div>
-        <div className="border-t border-slate-200 p-4 text-xs text-slate-400 dark:border-slate-700/60 dark:text-slate-500">
-          v0.2.0 — Phase 2 (mock data)
+        <div className="border-t border-border p-4 text-xs font-medium text-muted-foreground/70">
+          v0.2.5 — Phase 2.5 (mock data)
         </div>
       </aside>
 
@@ -38,8 +38,4 @@ export function AppLayout() {
       <ScrollRestoration />
     </div>
   );
-}
-
-export function Page({ children }: { children: ReactNode }) {
-  return <div className="animate-in">{children}</div>;
 }

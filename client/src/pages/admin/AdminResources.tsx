@@ -60,7 +60,7 @@ export default function AdminResources() {
         />
         <Link
           to="/admin/upload"
-          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary-hover"
         >
           <Plus className="size-4" aria-hidden="true" /> Upload
         </Link>
@@ -82,7 +82,7 @@ export default function AdminResources() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+                <tr className="border-b border-border bg-surface-muted text-xs uppercase tracking-wide text-muted-foreground/70">
                   <th scope="col" className="px-4 py-3 font-medium">Resource</th>
                   <th scope="col" className="px-4 py-3 font-medium">Type</th>
                   <th scope="col" className="px-4 py-3 font-medium">Subject</th>
@@ -91,30 +91,30 @@ export default function AdminResources() {
                   <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+              <tbody className="divide-y divide-border">
                 {filtered.map((r) => {
                   const subject = getSubjectById(r.subjectId);
                   const typeConfig = RESOURCE_TYPE_CONFIG[r.type];
                   return (
-                    <tr key={r.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <tr key={r.id} className="transition-colors hover:bg-surface-hover">
                       <td className="max-w-xs px-4 py-3">
-                        <Link to={`/resources/${r.id}`} className="line-clamp-1 font-medium text-slate-900 hover:text-indigo-600 dark:text-white dark:hover:text-indigo-400">
+                        <Link to={`/resources/${r.id}`} className="line-clamp-1 font-medium text-foreground hover:text-primary">
                           {r.title}
                         </Link>
-                        <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{r.description}</p>
+                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/70">{r.description}</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", typeConfig.badgeClass)}>
                           {resourceTypeLabel(r.type)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                      <td className="px-4 py-3 text-muted-foreground">
                         {subject?.name}
                       </td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                      <td className="px-4 py-3 text-muted-foreground">
                         {formatFileSize(r.fileSize)}
                       </td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                      <td className="px-4 py-3 text-muted-foreground">
                         {formatDate(r.uploadedAt)}
                       </td>
                       <td className="px-4 py-3">

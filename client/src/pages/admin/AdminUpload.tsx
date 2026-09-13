@@ -52,12 +52,8 @@ export default function AdminUpload() {
     if (!form.title.trim()) next.title = "Title is required.";
     if (!form.semesterId) next.semesterId = "Select a semester.";
     if (!form.subjectId) next.subjectId = "Select a subject.";
-    if (!file) {
-      // file input error rendered near the dropzone
-      next.description = undefined;
-    }
     setErrors(next);
-    return Object.keys(next).length === 0 && file !== null;
+    return Object.keys(next).length === 0;
   };
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -77,12 +73,13 @@ export default function AdminUpload() {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!validate()) {
-      if (!file) toast("Select a PDF file to upload", "error");
+    if (!validate()) return;
+    if (!file) {
+      toast("Select a PDF file to upload", "error");
       return;
     }
     setSubmitting(true);
-    // Mock upload â€” real storage arrives in Phase 5.
+    // Mock upload — real storage arrives in Phase 5.
     window.setTimeout(() => {
       setSubmitting(false);
       toast(`"${form.title}" uploaded (mock)`);
@@ -95,7 +92,7 @@ export default function AdminUpload() {
     <div>
       <PageHeader
         title="Upload Resource"
-        subtitle="Add a new study resource to the library. (Mock â€” nothing is stored.)"
+        subtitle="Add a new study resource to the library. (Mock — nothing is stored.)"
         breadcrumbs={[
           { label: "Admin", to: "/admin" },
           { label: "Upload" },
@@ -103,7 +100,7 @@ export default function AdminUpload() {
         actions={
           <Link
             to="/admin/resources"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
           >
             <ArrowLeft className="size-4" aria-hidden="true" /> Manage resources
           </Link>
@@ -112,12 +109,12 @@ export default function AdminUpload() {
 
       <form onSubmit={handleSubmit} noValidate className="mx-auto grid max-w-4xl gap-6 lg:grid-cols-5">
         <Card className="p-6 lg:col-span-3">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Resource details</h2>
+          <h2 className="text-base font-bold text-foreground">Resource details</h2>
           <div className="mt-5 space-y-4">
             <Input
               id="upload-title"
               label="Title"
-              placeholder="e.g. DSA Short Notes â€” Arrays to Graphs"
+              placeholder="e.g. DSA Short Notes — Arrays to Graphs"
               value={form.title}
               onChange={(e) => set("title", e.target.value)}
               error={errors.title}
@@ -153,7 +150,7 @@ export default function AdminUpload() {
                 disabled={!form.semesterId}
                 options={[
                   { value: "", label: form.semesterId ? "Select subject..." : "Choose a semester first" },
-                  ...subjects.map((s) => ({ value: s.id, label: `${s.code} â€” ${s.name}` })),
+                  ...subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` })),
                 ]}
               />
             </div>
@@ -189,7 +186,7 @@ export default function AdminUpload() {
         <div className="space-y-6 lg:col-span-2">
           {/* Dropzone */}
           <Card className="p-6">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white">PDF file</h2>
+            <h2 className="text-base font-bold text-foreground">PDF file</h2>
             <div
               role="button"
               tabIndex={0}
@@ -206,32 +203,32 @@ export default function AdminUpload() {
               onDrop={onDrop}
               className={cx(
                 "mt-4 flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                 dragActive
-                  ? "border-indigo-500 bg-indigo-500/5"
+                  ? "border-primary bg-primary-muted"
                   : file
-                    ? "border-emerald-400 bg-emerald-500/5"
-                    : "border-slate-300 hover:border-indigo-400 hover:bg-slate-50 dark:border-slate-600 dark:hover:border-indigo-500 dark:hover:bg-slate-800/50",
+                    ? "border-success bg-success-muted/50"
+                    : "border-border-strong hover:border-primary/50 hover:bg-surface-hover",
               )}
             >
               {file ? (
                 <>
-                  <CheckCircle2 className="size-10 text-emerald-500" aria-hidden="true" />
-                  <p className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-white">
+                  <CheckCircle2 className="size-10 text-success" aria-hidden="true" />
+                  <p className="flex items-center gap-2 text-sm font-bold text-foreground">
                     <FileText className="size-4" aria-hidden="true" />
                     {file.name}
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {formatFileSize(file.size)} Â· Click to replace
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {formatFileSize(file.size)} · Click to replace
                   </p>
                 </>
               ) : (
                 <>
-                  <CloudUpload className="size-10 text-slate-400" aria-hidden="true" />
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <CloudUpload className="size-10 text-muted-foreground" aria-hidden="true" />
+                  <p className="text-sm font-bold text-foreground">
                     Drag &amp; drop your PDF here
                   </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">or click to browse files</p>
+                  <p className="text-xs font-medium text-muted-foreground">or click to browse files</p>
                 </>
               )}
               <input
@@ -245,18 +242,17 @@ export default function AdminUpload() {
                 }}
               />
             </div>
-            {!file && errors.description === "__nofile" && null}
           </Card>
 
           <Card className="p-6">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Publish</h2>
-            <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="text-base font-bold text-foreground">Publish</h2>
+            <p className="mt-1.5 text-sm font-medium text-muted-foreground">
               The resource will appear in the library immediately after upload.
             </p>
             <Button type="submit" className="mt-4 w-full" size="lg" loading={submitting}>
               {submitting ? "Uploading..." : "Upload resource"}
             </Button>
-            <p className="mt-3 text-center text-xs text-slate-400">
+            <p className="mt-3 flex items-center justify-center gap-2 text-xs font-medium text-muted-foreground/70">
               <Badge>MOCK</Badge> Phase 5 will store files for real.
             </p>
           </Card>

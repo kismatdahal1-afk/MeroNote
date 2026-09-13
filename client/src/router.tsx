@@ -26,7 +26,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 function PageFallback() {
   return (
     <div>
-      <div className="mb-6 h-8 w-48 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
+      <div className="mb-6 h-8 w-48 animate-pulse rounded-lg bg-surface-muted" />
       <SkeletonCards />
     </div>
   );
