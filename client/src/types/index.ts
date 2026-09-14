@@ -116,7 +116,7 @@ export interface Resource {
   updatedAt: string;
   /** Optional linked book (books reuse the reader/download system). */
   bookId?: string;
-  /** Featured resources appear on the admin Featured board. */
+  /** Featured resources are starred for quick access. */
   featured: boolean;
   /** Past-paper specific metadata (optional). */
   paperYear?: number;
@@ -152,6 +152,9 @@ export interface Book {
 export type NoticeType =
   | "exam"
   | "deadline"
+  | "assignment"
+  | "event"
+  | "important"
   | "announcement"
   | "reminder"
   | "general";

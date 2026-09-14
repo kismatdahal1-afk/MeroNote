@@ -43,7 +43,6 @@ interface FormState {
   paperYear: string;
   paperFullMarks: string;
   paperDuration: string;
-  featured: boolean;
   status: Resource["status"];
 }
 
@@ -61,7 +60,6 @@ function toForm(r: Resource): FormState {
     paperYear: r.paperYear ? String(r.paperYear) : "",
     paperFullMarks: r.paperFullMarks ? String(r.paperFullMarks) : "",
     paperDuration: r.paperDurationMinutes ? String(r.paperDurationMinutes) : "",
-    featured: r.featured,
     status: r.status,
   };
 }
@@ -91,7 +89,6 @@ export function ResourceFormModal({
           paperYear: "",
           paperFullMarks: "",
           paperDuration: "",
-          featured: false,
           status: "published",
         },
   );
@@ -127,7 +124,6 @@ export function ResourceFormModal({
             paperYear: "",
             paperFullMarks: "",
             paperDuration: "",
-            featured: false,
             status: "published",
           },
     );
@@ -186,7 +182,6 @@ export function ResourceFormModal({
       type: form.type,
       pageCount: Number(form.pageCount),
       tags,
-      featured: form.featured,
       paperYear: form.type === "past_paper" && form.paperYear ? Number(form.paperYear) : undefined,
       paperFullMarks: form.type === "past_paper" && form.paperFullMarks ? Number(form.paperFullMarks) : undefined,
       paperDurationMinutes: form.type === "past_paper" && form.paperDuration ? Number(form.paperDuration) : undefined,
@@ -407,17 +402,9 @@ export function ResourceFormModal({
           />
         </div>
 
-        {/* Featured + status */}
+        {/* Status */}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-muted/50 px-4 py-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
-            <input
-              type="checkbox"
-              checked={form.featured}
-              onChange={(e) => set("featured", e.target.checked)}
-              className="size-4 rounded border-border-strong text-primary focus:ring-primary/25"
-            />
-            Featured resource
-          </label>
+          <p className="text-sm font-medium text-foreground">Status</p>
           <StatusToggleGroup value={form.status} onChange={(s) => set("status", s)} size="md" />
         </div>
 

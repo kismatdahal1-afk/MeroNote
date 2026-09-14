@@ -1,6 +1,8 @@
-﻿import { useParams, useNavigate } from "react-router-dom";
+﻿import { useState } from "react";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import {
-  Eye, Download, Heart, Calendar, FileText, Tag, BookOpen, GraduationCap, Bookmark, Layers,
+  Eye, EyeOff, Download, Heart, Calendar, FileText, Tag, BookOpen, GraduationCap, Bookmark, Layers,
+  Pencil, Trash2,
 } from "lucide-react";
 import { PageHeader, Card } from "../components/common/PageHeader";
 import { ErrorState } from "../components/common/States";
@@ -8,19 +10,40 @@ import { Button } from "../components/common/Button";
 import { IconButton } from "../components/common/IconButton";
 import { BackButton } from "../components/common/BackButton";
 import { Badge } from "../components/common/Badge";
+import { StatusBadge } from "../components/admin/StatusBadge";
+import { ResourceEditorModal } from "../components/admin/ResourceEditorModal";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { getResourceById, getSubjectById, getSemesterById } from "../data/selectors";
 import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
 import { cx, formatFileSize, formatDate } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
+import { setResourceStatus, softDelete, getDb } from "../state/cmsStore";
 import { useCmsSync } from "../components/common/CmsSync";
 
+/**
+ * THE canonical Resource Detail page — shared by the student panel
+ * (/resources/:id) and the admin panel (/admin/resources/:id, and topic
+ * clicks from Admin → Topics). Admin context (detected from the route)
+ * only adds a compact management strip: Edit / Hide-Unhide / Delete.
+ * Everything else — header, details, quick info, reader — is identical.
+ */
 export default function ResourceDetail() {
   useCmsSync();
   const { resourceId } = useParams<{ resourceId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { pathname, state } = location;
   const { toast } = useToast();
   const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, markOpened, getProgress } = useLibrary();
+  const [editOpen, setEditOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(false);
+
+  const isAdmin = pathname.startsWith("/admin");
+  const readerRoute = isAdmin ? "/admin/reader" : "/reader";
+  /** Admin navigation context: "topics" when opened from Admin → Topics,
+   *  so the breadcrumb reflects where the admin came from. */
+  const via = (state as { via?: string } | null)?.via;
 
   const resource = getResourceById(resourceId);
 
@@ -29,13 +52,18 @@ export default function ResourceDetail() {
       <ErrorState
         title="Resource not found"
         message="This resource does not exist or has been removed."
-        onRetry={() => navigate(-1)}
+        onRetry={() => navigate(isAdmin ? "/admin/resources" : "/resources")}
       />
     );
   }
 
   const subject = getSubjectById(resource.subjectId);
   const semester = getSemesterById(resource.semesterId);
+  /** Topic the resource is linked to (resource.topicId) — used for the
+   *  Topics-context breadcrumb: Admin → Topics → Subject → Topic. */
+  const topic = resource.topicId
+    ? getDb().topics.find((t) => t.id === resource.topicId && !t.deletedAt)
+    : undefined;
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
   const TypeIcon = typeConfig.icon;
   const favorite = isFavorite(resource.id);
@@ -45,7 +73,9 @@ export default function ResourceDetail() {
 
   const openReader = () => {
     markOpened(resource.id);
-    navigate(`/reader/${resource.id}`);
+    // Forward the navigation source (via:"topics") so the sidebar keeps
+    // highlighting Topics while the reader is open.
+    navigate(`${readerRoute}/${resource.id}`, { state: { via } });
   };
 
   const handleFavorite = () => {
@@ -55,7 +85,7 @@ export default function ResourceDetail() {
 
   const handleBookmark = () => {
     if (bookmarked) {
-      toast("Already bookmarked â€” manage from Bookmarks page", "info");
+      toast("Already bookmarked — manage from Bookmarks page", "info");
       return;
     }
     addBookmark(resource, progress?.lastPage ?? 1, "");
@@ -71,49 +101,131 @@ export default function ResourceDetail() {
     toast("Download started (mock)");
   };
 
+  const handleDelete = () => {
+    softDelete("resource", resource.id);
+    toast("Resource moved to trash");
+    navigate("/admin/resources");
+  };
+
   return (
     <div>
       <div className="mb-1 -ml-1 sm:-ml-1">
-        <BackButton label="Back" />
+        <BackButton
+          label="Back"
+          fallbackTo={isAdmin ? (via === "topics" ? "/admin/topics" : "/admin/resources") : "/resources"}
+        />
       </div>
       <PageHeader
         title={resource.title}
         subtitle={resource.description}
-        breadcrumbs={[
-          { label: "Semesters", to: "/semesters" },
-          ...(semester ? [{ label: semester.name, to: `/semesters/${semester.id}` }] : []),
-          ...(subject ? [{ label: subject.name, to: `/subjects/${subject.id}` }] : []),
-          { label: typeConfig.label },
-        ]}
+        breadcrumbs={
+          isAdmin
+            ? via === "topics"
+              ? [
+                  { label: "Admin", to: "/admin" },
+                  { label: "Topics", to: "/admin/topics" },
+                  ...(subject ? [{ label: subject.name }] : []),
+                  ...(topic ? [{ label: topic.title }] : []),
+                ]
+              : [
+                  { label: "Admin", to: "/admin" },
+                  { label: "Resources", to: "/admin/resources" },
+                  ...(subject ? [{ label: subject.name }] : []),
+                ]
+            : [
+                { label: "Semesters", to: "/semesters" },
+                ...(semester ? [{ label: semester.name, to: `/semesters/${semester.id}` }] : []),
+                ...(subject ? [{ label: subject.name, to: `/subjects/${subject.id}` }] : []),
+                { label: typeConfig.label },
+              ]
+        }
         actions={
-          <>
-            <IconButton
-              icon={Heart}
-              label={favorite ? "Remove from favorites" : "Add to favorites"}
-              variant={favorite ? "favorite" : "default"}
-              filled={favorite}
-              aria-pressed={favorite}
-              onClick={handleFavorite}
-            />
-            <IconButton
-              icon={Bookmark}
-              label={bookmarked ? "Bookmarked" : "Bookmark this resource"}
-              variant={bookmarked ? "bookmark" : "default"}
-              filled={bookmarked}
-              aria-pressed={bookmarked}
-              onClick={handleBookmark}
-            />
-            <Button variant="outline" onClick={handleDownload}>
-              <Download className="size-4" aria-hidden="true" />
-              {download?.status === "completed" ? "Downloaded" : "Download"}
-            </Button>
+          isAdmin ? (
             <Button onClick={openReader}>
               <Eye className="size-4" aria-hidden="true" />
               {progress ? "Continue reading" : "Read now"}
             </Button>
-          </>
+          ) : (
+            <>
+              <IconButton
+                icon={Heart}
+                label={favorite ? "Remove from favorites" : "Add to favorites"}
+                variant={favorite ? "favorite" : "default"}
+                filled={favorite}
+                aria-pressed={favorite}
+                onClick={handleFavorite}
+              />
+              <IconButton
+                icon={Bookmark}
+                label={bookmarked ? "Bookmarked" : "Bookmark this resource"}
+                variant={bookmarked ? "bookmark" : "default"}
+                filled={bookmarked}
+                aria-pressed={bookmarked}
+                onClick={handleBookmark}
+              />
+              <Button variant="outline" onClick={handleDownload}>
+                <Download className="size-4" aria-hidden="true" />
+                {download?.status === "completed" ? "Downloaded" : "Download"}
+              </Button>
+              <Button onClick={openReader}>
+                <Eye className="size-4" aria-hidden="true" />
+                {progress ? "Continue reading" : "Read now"}
+              </Button>
+            </>
+          )
         }
       />
+
+      {/* Admin-only management strip — Edit / Hide / Delete */}
+      {isAdmin && (
+        <Card className="mb-6 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <StatusBadge status={resource.status} />
+              <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold", typeConfig.badgeClass)}>
+                <TypeIcon className="size-3.5" aria-hidden="true" />
+                {typeConfig.label}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+                <Pencil className="size-4" aria-hidden="true" /> Edit
+              </Button>
+              {resource.status === "hidden" ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setResourceStatus(resource.id, "published");
+                    toast(`"${resource.title}" visible again`);
+                  }}
+                >
+                  <Eye className="size-4" aria-hidden="true" /> Unhide
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setResourceStatus(resource.id, "hidden");
+                    toast(`"${resource.title}" hidden from students`);
+                  }}
+                >
+                  <EyeOff className="size-4" aria-hidden="true" /> Hide
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-error hover:bg-error-muted hover:text-error"
+                onClick={() => setPendingDelete(true)}
+              >
+                <Trash2 className="size-4" aria-hidden="true" /> Delete
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-6 lg:col-span-2">
@@ -190,7 +302,9 @@ export default function ResourceDetail() {
             </li>
             <li className="flex items-center justify-between gap-3">
               <span className="font-medium">Status</span>
-              {download?.status === "completed" ? (
+              {isAdmin ? (
+                <StatusBadge status={resource.status} />
+              ) : download?.status === "completed" ? (
                 <Badge tone="success">Downloaded</Badge>
               ) : (
                 <Badge tone="accent">Online</Badge>
@@ -209,6 +323,29 @@ export default function ResourceDetail() {
           </Button>
         </Card>
       </div>
+
+      {/* Admin edit — same editor modal as the Resources management table */}
+      {isAdmin && (
+        <>
+          <ResourceEditorModal
+            open={editOpen}
+            editing={resource}
+            onClose={() => setEditOpen(false)}
+          />
+          <ConfirmDialog
+            open={pendingDelete}
+            title="Delete resource"
+            message={`"${resource.title}" will move to the trash. You can restore it from Trash, or delete it permanently there.`}
+            confirmLabel="Delete"
+            danger
+            onCancel={() => setPendingDelete(false)}
+            onConfirm={() => {
+              setPendingDelete(false);
+              handleDelete();
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

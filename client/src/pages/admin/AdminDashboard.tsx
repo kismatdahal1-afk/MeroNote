@@ -1,7 +1,8 @@
 ﻿import { Link } from "react-router-dom";
 import {
-  LibraryBig, GraduationCap, BookMarked, Library, Bell, Star, Clock, Upload, Plus,
+  LibraryBig, GraduationCap, BookMarked, Bell, Star, Clock, Upload, Plus,
 } from "lucide-react";
+
 import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
 import { Badge } from "../../components/common/Badge";
 import { useCms } from "../../state/CmsProvider";
@@ -13,7 +14,6 @@ const QUICK_ACTIONS = [
   { to: "/admin/semesters", label: "Add Semester", icon: GraduationCap },
   { to: "/admin/subjects", label: "Add Subject", icon: BookMarked },
   { to: "/admin/topics", label: "Add Topic", icon: Plus },
-  { to: "/admin/books", label: "Add Book", icon: Library },
   { to: "/admin/resources?new=1", label: "Add Resource", icon: Upload },
 ];
 
@@ -61,15 +61,15 @@ export default function AdminDashboard() {
           icon={<GraduationCap className="size-5" aria-hidden="true" />}
         />
         <StatCard
-          label="Books"
-          value={stats.books}
-          hint={`${stats.notices} notices`}
-          icon={<Library className="size-5" aria-hidden="true" />}
+          label="Notices"
+          value={stats.notices}
+          hint={`${stats.publishedResources} published resources`}
+          icon={<Bell className="size-5" aria-hidden="true" />}
         />
         <StatCard
           label="Library Size"
           value={formatFileSize(totalLibrarySize)}
-          hint={`${stats.featured} featured`}
+          hint={`${stats.draftResources} drafts in progress`}
           icon={<Upload className="size-5" aria-hidden="true" />}
         />
       </div>
@@ -79,7 +79,7 @@ export default function AdminDashboard() {
         <h2 id="admin-actions" className="mb-3.5 text-lg font-semibold text-foreground">
           Quick Actions
         </h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
           {QUICK_ACTIONS.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}

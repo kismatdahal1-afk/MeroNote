@@ -25,9 +25,9 @@ const AdminNotices = lazy(() => import("./pages/admin/AdminNotices"));
 const AdminSemesters = lazy(() => import("./pages/admin/AdminSemesters"));
 const AdminSubjects = lazy(() => import("./pages/admin/AdminSubjects"));
 const AdminTopics = lazy(() => import("./pages/admin/AdminTopics"));
-const AdminBooks = lazy(() => import("./pages/admin/AdminBooks"));
+const AdminTopicDetail = lazy(() => import("./pages/admin/AdminTopicDetail"));
 const AdminResources = lazy(() => import("./pages/admin/AdminResources"));
-const AdminFeatured = lazy(() => import("./pages/admin/AdminFeatured"));
+const AdminReader = lazy(() => import("./pages/admin/AdminReader"));
 const AdminDrafts = lazy(() => import("./pages/admin/AdminDrafts"));
 const AdminTrash = lazy(() => import("./pages/admin/AdminTrash"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
@@ -78,9 +78,10 @@ export const router = createBrowserRouter([
           { path: "admin/semesters", element: withSuspense(<AdminSemesters />) },
           { path: "admin/subjects", element: withSuspense(<AdminSubjects />) },
           { path: "admin/topics", element: withSuspense(<AdminTopics />) },
-          { path: "admin/books", element: withSuspense(<AdminBooks />) },
+          { path: "admin/topics/:topicId", element: withSuspense(<AdminTopicDetail />) },
           { path: "admin/resources", element: withSuspense(<AdminResources />) },
-          { path: "admin/featured", element: withSuspense(<AdminFeatured />) },
+          { path: "admin/resources/:resourceId", element: withSuspense(<ResourceDetail />) },
+          { path: "admin/reader/:resourceId", element: withSuspense(<AdminReader />) },
           { path: "admin/drafts", element: withSuspense(<AdminDrafts />) },
           { path: "admin/trash", element: withSuspense(<AdminTrash />) },
           { path: "admin/settings", element: withSuspense(<AdminSettings />) },

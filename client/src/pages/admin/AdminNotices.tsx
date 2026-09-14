@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Pin, PinOff, Trash2, Pencil, Plus, Eye, EyeOff } from "lucide-react";
+import { Pin, PinOff, Trash2, Pencil, Plus, Eye, EyeOff, Search } from "lucide-react";
 import { PageHeader, Card } from "../../components/common/PageHeader";
 import { Input, Select, Textarea } from "../../components/common/Field";
 import { Button } from "../../components/common/Button";
@@ -12,16 +12,19 @@ import { StatusBadge } from "../../components/admin/StatusBadge";
 import { Badge } from "../../components/common/Badge";
 import { useCms } from "../../state/CmsProvider";
 import {
-  createNotice, updateNotice, setNoticeStatus, toggleNoticePinned,
+  createNotice, updateNotice, branchNoticeToDraft, setNoticeStatus, toggleNoticePinned,
   softDelete, noticeWithState,
 } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
-import { formatDate } from "../../lib/utils";
+import { cx, formatDate } from "../../lib/utils";
 import type { Notice, NoticeType } from "../../types";
 
 const NOTICE_TYPES: { value: NoticeType; label: string }[] = [
   { value: "exam", label: "Exam" },
   { value: "deadline", label: "Deadline" },
+  { value: "assignment", label: "Assignment" },
+  { value: "event", label: "Event" },
+  { value: "important", label: "Important" },
   { value: "announcement", label: "Announcement" },
   { value: "reminder", label: "Reminder" },
   { value: "general", label: "General" },
@@ -30,6 +33,9 @@ const NOTICE_TYPES: { value: NoticeType; label: string }[] = [
 const TYPE_TONE: Record<NoticeType, "error" | "warning" | "primary" | "accent" | "neutral"> = {
   exam: "error",
   deadline: "warning",
+  assignment: "warning",
+  event: "accent",
+  important: "error",
   announcement: "primary",
   reminder: "accent",
   general: "neutral",
@@ -71,6 +77,8 @@ export default function AdminNotices() {
   const db = useCms();
   const { toast } = useToast();
   const [params, setParams] = useSearchParams();
+  const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<NoticeType | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Notice | null>(null);
   const [form, setForm] = useState<NoticeFormState>(emptyForm);
@@ -99,10 +107,35 @@ export default function AdminNotices() {
     [db.notices],
   );
 
+  const counts = useMemo(() => {
+    const byType: Partial<Record<NoticeType, number>> = {};
+    for (const n of notices) byType[n.type] = (byType[n.type] ?? 0) + 1;
+    return byType;
+  }, [notices]);
+
+  /** Search + type filter chips. */
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return notices.filter((n) => {
+      if (typeFilter !== "all" && n.type !== typeFilter) return false;
+      if (!q) return true;
+      return (
+        n.heading.toLowerCase().includes(q) ||
+        n.subtext.toLowerCase().includes(q)
+      );
+    });
+  }, [notices, query, typeFilter]);
+
   const subjects = useMemo(
     () => (form.semesterId ? db.subjects.filter((s) => !s.deletedAt && s.semesterId === form.semesterId) : []),
     [db.subjects, form.semesterId],
   );
+
+  const openForm = () => {
+    setEditing(null);
+    setForm(emptyForm());
+    setFormOpen(true);
+  };
 
   const openEdit = (n: Notice) => {
     setEditing(n);
@@ -126,14 +159,16 @@ export default function AdminNotices() {
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
+  const validate = () => {
     const next: typeof errors = {};
-    if (!form.heading.trim()) next.heading = "Heading is required.";
+    if (!form.heading.trim()) next.heading = "Title is required.";
     if (!form.date) next.date = "Date is required.";
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    return Object.keys(next).length === 0;
+  };
 
+  const save = (status: Notice["status"]) => {
+    if (!validate()) return;
     const draft = {
       heading: form.heading.trim(),
       subtext: form.subtext.trim(),
@@ -142,16 +177,23 @@ export default function AdminNotices() {
       semesterId: form.semesterId || undefined,
       subjectId: form.subjectId || undefined,
       priority: form.priority,
-      status: form.status,
+      status,
       showOnDashboard: form.showOnDashboard,
       pinned: form.pinned,
     };
     if (editing) {
-      updateNotice(editing.id, draft);
-      toast("Notice updated");
+      // Editing a published/hidden notice + Save as Draft → keep the live
+      // version untouched and stage the edits as a new draft in Drafts.
+      if (status === "draft" && editing.status !== "draft") {
+        branchNoticeToDraft(editing.id, draft);
+        toast("Edits saved as a new draft — the published notice is unchanged");
+      } else {
+        updateNotice(editing.id, draft);
+        toast("Notice updated");
+      }
     } else {
       createNotice(draft);
-      toast("Notice created");
+      toast(status === "draft" ? "Notice saved as draft" : "Notice published");
     }
     setFormOpen(false);
   };
@@ -166,28 +208,71 @@ export default function AdminNotices() {
           { label: "Notices" },
         ]}
         actions={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setForm(emptyForm());
-              setFormOpen(true);
-            }}
-          >
+          <Button onClick={openForm}>
             <Plus className="size-4" aria-hidden="true" /> Add Notice
           </Button>
         }
       />
 
-      {notices.length === 0 ? (
+      {/* Filter bar: search + type chips */}
+      <div className="mb-5">
+        <div className="relative mb-3 max-w-md">
+          <Search
+            className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search notices..."
+            aria-label="Search notices"
+            className="h-10 w-full rounded-lg border border-border-strong bg-surface-muted pl-10 pr-3.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 focus:bg-surface"
+          />
+        </div>
+        <div
+          role="group"
+          aria-label="Filter by notice type"
+          className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {(["all", ...NOTICE_TYPES.map((t) => t.value)] as const).map((chip) => {
+            const isActive = typeFilter === chip;
+            const count = chip === "all" ? notices.length : counts[chip];
+            const label = chip === "all" ? "All" : NOTICE_TYPES.find((t) => t.value === chip)!.label;
+            return (
+              <button
+                key={chip}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setTypeFilter(chip)}
+                className={cx(
+                  "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
+                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border-strong bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+                )}
+              >
+                {label}
+                <span className={cx("ml-1 font-bold", isActive ? "opacity-80" : "text-primary")}>
+                  {count ?? 0}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
         <EmptyState
-          title="No notices"
-          message="Create your first notice to show it on the student dashboard."
+          title={query || typeFilter !== "all" ? "No notices match" : "No notices"}
+          message={
+            query || typeFilter !== "all"
+              ? "No notices match the current filters. Try a different search or filter."
+              : "Create your first notice to show it on the student dashboard."
+          }
           actionLabel="Add Notice"
-          onAction={() => {
-            setEditing(null);
-            setForm(emptyForm());
-            setFormOpen(true);
-          }}
+          onAction={openForm}
         />
       ) : (
         <Card className="overflow-hidden">
@@ -203,7 +288,7 @@ export default function AdminNotices() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {notices.map((n) => {
+                {filtered.map((n) => {
                   const withState = noticeWithState(n);
                   const semester = n.semesterId ? db.semesters.find((s) => s.id === n.semesterId) : undefined;
                   const subject = n.subjectId ? db.subjects.find((s) => s.id === n.subjectId) : undefined;
@@ -295,123 +380,120 @@ export default function AdminNotices() {
         </Card>
       )}
 
-      {/* Create / edit modal */}
+      {/* Create / edit modal — compact, centered */}
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
         title={editing ? "Edit Notice" : "Add Notice"}
-        className="max-w-2xl"
+        className="max-w-lg"
       >
-        <form onSubmit={handleSubmit} noValidate className="mt-2 space-y-4">
-          <Input
-            id="notice-heading"
-            label="Heading"
-            placeholder="e.g. TU Board Exam — Sem IV"
-            value={form.heading}
-            onChange={(e) => set("heading", e.target.value)}
-            error={errors.heading}
-          />
-          <Textarea
-            id="notice-subtext"
-            label="Description / Subtext"
-            rows={3}
-            placeholder="Details shown under the heading..."
-            value={form.subtext}
-            onChange={(e) => set("subtext", e.target.value)}
-          />
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Select
-              id="notice-type"
-              label="Type"
-              value={form.type}
-              onChange={(e) => set("type", e.target.value as NoticeType)}
-              options={NOTICE_TYPES}
-            />
+        <form onSubmit={(e: FormEvent) => { e.preventDefault(); save(form.status); }} noValidate className="mt-2 space-y-4">
+          <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
             <Input
-              id="notice-date"
-              label="Date"
-              type="date"
-              value={form.date}
-              onChange={(e) => set("date", e.target.value)}
-              error={errors.date}
+              id="notice-heading"
+              label="Notice Title"
+              placeholder="e.g. TU Board Exam — Sem IV"
+              value={form.heading}
+              onChange={(e) => set("heading", e.target.value)}
+              error={errors.heading}
             />
-            <Select
-              id="notice-priority"
-              label="Priority"
-              value={form.priority}
-              onChange={(e) => set("priority", e.target.value as Notice["priority"])}
-              options={[
-                { value: "low", label: "Low" },
-                { value: "normal", label: "Normal" },
-                { value: "high", label: "High" },
-              ]}
+            <Textarea
+              id="notice-subtext"
+              label="Description"
+              rows={3}
+              placeholder="Details shown under the heading..."
+              value={form.subtext}
+              onChange={(e) => set("subtext", e.target.value)}
             />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              id="notice-semester"
-              label="Semester (optional)"
-              value={form.semesterId}
-              onChange={(e) => {
-                set("semesterId", e.target.value);
-                set("subjectId", "");
-              }}
-              options={[
-                { value: "", label: "All semesters" },
-                ...db.semesters.filter((s) => !s.deletedAt).map((s) => ({ value: s.id, label: s.name })),
-              ]}
-            />
-            <Select
-              id="notice-subject"
-              label="Subject (optional)"
-              value={form.subjectId}
-              disabled={!form.semesterId}
-              onChange={(e) => set("subjectId", e.target.value)}
-              options={[
-                { value: "", label: form.semesterId ? "All subjects" : "Choose a semester first" },
-                ...subjects.map((s) => ({ value: s.id, label: s.name })),
-              ]}
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-5 rounded-xl border border-border bg-surface-muted/50 px-4 py-3">
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
-              <input
-                type="checkbox"
-                checked={form.showOnDashboard}
-                onChange={(e) => set("showOnDashboard", e.target.checked)}
-                className="size-4 rounded border-border-strong text-primary focus:ring-primary/25"
-              />
-              Show on Dashboard
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
-              <input
-                type="checkbox"
-                checked={form.pinned}
-                onChange={(e) => set("pinned", e.target.checked)}
-                className="size-4 rounded border-border-strong text-primary focus:ring-primary/25"
-              />
-              Pinned
-            </label>
-            <div className="ml-auto flex items-center gap-3">
-              <span className="text-sm font-semibold text-foreground">Status</span>
+            <div className="grid gap-4 sm:grid-cols-3">
               <Select
-                id="notice-status"
-                label=""
-                value={form.status}
-                onChange={(e) => set("status", e.target.value as Notice["status"])}
+                id="notice-type"
+                label="Notice Type"
+                value={form.type}
+                onChange={(e) => set("type", e.target.value as NoticeType)}
+                options={NOTICE_TYPES}
+              />
+              <Input
+                id="notice-date"
+                label="Date"
+                type="date"
+                value={form.date}
+                onChange={(e) => set("date", e.target.value)}
+                error={errors.date}
+              />
+              <Select
+                id="notice-priority"
+                label="Priority"
+                value={form.priority}
+                onChange={(e) => set("priority", e.target.value as Notice["priority"])}
                 options={[
-                  { value: "published", label: "Published" },
-                  { value: "draft", label: "Draft" },
-                  { value: "hidden", label: "Hidden" },
+                  { value: "low", label: "Low" },
+                  { value: "normal", label: "Normal" },
+                  { value: "high", label: "High" },
                 ]}
               />
             </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Select
+                id="notice-semester"
+                label="Semester (optional)"
+                value={form.semesterId}
+                onChange={(e) => {
+                  set("semesterId", e.target.value);
+                  set("subjectId", "");
+                }}
+                options={[
+                  { value: "", label: "All semesters" },
+                  ...db.semesters.filter((s) => !s.deletedAt).map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+              <Select
+                id="notice-subject"
+                label="Subject (optional)"
+                value={form.subjectId}
+                disabled={!form.semesterId}
+                onChange={(e) => set("subjectId", e.target.value)}
+                options={[
+                  { value: "", label: form.semesterId ? "All subjects" : "Choose a semester first" },
+                  ...subjects.map((s) => ({ value: s.id, label: s.name })),
+                ]}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-5 rounded-xl border border-border bg-surface-muted/50 px-4 py-3">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
+                <input
+                  type="checkbox"
+                  checked={form.showOnDashboard}
+                  onChange={(e) => set("showOnDashboard", e.target.checked)}
+                  className="size-4 rounded border-border-strong text-primary focus:ring-primary/25"
+                />
+                Show on Dashboard
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
+                <input
+                  type="checkbox"
+                  checked={form.pinned}
+                  onChange={(e) => set("pinned", e.target.checked)}
+                  className="size-4 rounded border-border-strong text-primary focus:ring-primary/25"
+                />
+                Pinned
+              </label>
+            </div>
           </div>
-          <div className="flex justify-end gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <Button variant="outline" type="button" onClick={() => setFormOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">{editing ? "Save changes" : "Create notice"}</Button>
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => save("draft")}
+            >
+              Save as Draft
+            </Button>
+            <Button type="submit">
+              {editing ? "Save changes" : "Save & Publish"}
+            </Button>
           </div>
         </form>
       </Modal>

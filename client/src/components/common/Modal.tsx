@@ -28,32 +28,39 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50"
     >
       <div
         className="absolute inset-0 bg-scrim backdrop-blur-[2px]"
-        onClick={onClose}
         aria-hidden="true"
       />
       <div
-        className={cx(
-          "card-glow relative w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl",
-          className,
-        )}
+        className="relative h-full overflow-y-auto overscroll-contain"
+        onClick={onClose}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-foreground">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+        <div className="flex min-h-full justify-center p-4">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={cx(
+              "card-glow relative my-auto w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl",
+              className,
+            )}
           >
-            <X className="size-5" aria-hidden="true" />
-          </button>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-foreground">{title}</h2>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close dialog"
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="mt-4 text-sm text-muted-foreground">{children}</div>
+            {footer && <div className="mt-6 flex shrink-0 justify-end gap-3">{footer}</div>}
+          </div>
         </div>
-        <div className="mt-4 text-sm text-muted-foreground">{children}</div>
-        {footer && <div className="mt-6 flex justify-end gap-3">{footer}</div>}
       </div>
     </div>
   );

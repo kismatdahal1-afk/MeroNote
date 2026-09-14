@@ -8,6 +8,9 @@ import { cx, formatDate } from "../../lib/utils";
 const TYPE_TONE: Record<NoticeWithState["type"], "error" | "warning" | "primary" | "accent" | "neutral"> = {
   exam: "error",
   deadline: "warning",
+  assignment: "warning",
+  event: "accent",
+  important: "error",
   announcement: "primary",
   reminder: "accent",
   general: "neutral",

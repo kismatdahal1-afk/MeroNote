@@ -435,3 +435,25 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+@media (min-width: 64rem) {
+  .landscape-form form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.5rem;
+    row-gap: 1rem;
+    align-content: start;
+  }
+  .landscape-form form > .landscape-col-span-2 {
+    grid-column: span 2 / span 2;
+  }
+  .landscape-form form > .landscape-actions {
+    grid-column: span 2 / span 2;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+  }
+}

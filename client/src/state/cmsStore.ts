@@ -28,6 +28,8 @@ import {
  */
 
 const STORAGE_KEY = "meronote-cms-db-v1";
+/** One-time migration flag: clear seed-era featured flags (Featured board removed). */
+const MIGRATION_KEY = `${STORAGE_KEY}-migrated-unfeature-v1`;
 
 export interface CmsDb {
   semesters: Semester[];
@@ -93,7 +95,7 @@ function seedDb(): CmsDb {
 
   const resources = copy(seedResources).map((r) => ({
     ...r,
-    featured: r.type === "book",
+    featured: false,
     status: "published" as const,
   })) as Resource[];
 
@@ -175,11 +177,15 @@ function loadDb(): CmsDb {
       Array.isArray(parsed.resources) &&
       Array.isArray(parsed.notices)
     ) {
+      const needsUnfeatureMigration =
+        window.localStorage.getItem(MIGRATION_KEY) !== "1";
       return {
         semesters: parsed.semesters,
         subjects: parsed.subjects,
         topics: parsed.topics,
-        resources: parsed.resources,
+        resources: needsUnfeatureMigration
+          ? parsed.resources.map((r) => ({ ...r, featured: false }))
+          : parsed.resources,
         books: parsed.books ?? [],
         notices: parsed.notices,
         activity: parsed.activity ?? [],
@@ -208,6 +214,17 @@ type Listener = (db: CmsDb) => void;
 
 let db: CmsDb = loadDb();
 const listeners = new Set<Listener>();
+
+// Run once on boot: if the loaded DB had legacy featured flags cleared above,
+// persist the result and mark the migration done.
+if (typeof window !== "undefined" && window.localStorage.getItem(MIGRATION_KEY) !== "1") {
+  persist(db);
+  try {
+    window.localStorage.setItem(MIGRATION_KEY, "1");
+  } catch {
+    // Storage unavailable — in-memory only.
+  }
+}
 
 function commit(): void {
   persist(db);
@@ -397,6 +414,24 @@ export function setSemesterStatus(id: string, status: Semester["status"]): void 
   commit();
 }
 
+/** Same fork semantics as branchResourceToDraft — see there. */
+export function branchSemesterToDraft(id: string, patch: Partial<SemesterDraft>): Semester | undefined {
+  const item = db.semesters.find((s) => s.id === id);
+  if (!item) return undefined;
+  const copyItem: Semester = {
+    ...copy(item),
+    id: nextId("sem", db),
+    ...patch,
+    createdAt: item.createdAt,
+    updatedAt: nowIso(),
+    status: "draft",
+  };
+  db.semesters = [...db.semesters, copyItem];
+  logActivity("semester", "create", copyItem.name);
+  commit();
+  return copyItem;
+}
+
 /* ------------------------------------------------------------------ */
 /* Subjects                                                            */
 /* ------------------------------------------------------------------ */
@@ -491,6 +526,25 @@ export function updateTopic(id: string, patch: Partial<TopicDraft>): void {
   }
   logActivity("topic", "update", item.title);
   commit();
+}
+
+/** Same fork semantics as branchResourceToDraft — see there. */
+export function branchTopicToDraft(id: string, patch: Partial<TopicDraft>): Topic | undefined {
+  const item = db.topics.find((t) => t.id === id);
+  if (!item) return undefined;
+  const copyItem: Topic = {
+    ...copy(item),
+    id: nextId("top", db),
+    ...patch,
+    published: false,
+    createdAt: item.createdAt,
+    updatedAt: nowIso(),
+    status: "draft",
+  };
+  db.topics = [...db.topics, copyItem];
+  logActivity("topic", "create", copyItem.title);
+  commit();
+  return copyItem;
 }
 
 export function reorderTopics(id: string, direction: -1 | 1): void {
@@ -626,6 +680,29 @@ export function setResourceStatus(id: string, status: Resource["status"]): void 
   commit();
 }
 
+/**
+ * Editing a non-draft (published/hidden) item and choosing "Save as Draft"
+ * must NOT overwrite the live version. Instead: keep the original untouched
+ * and stage the edited content as a NEW draft copy in Drafts.
+ * (Editing an existing draft just updates it — see updateResource.)
+ */
+export function branchResourceToDraft(id: string, patch: Partial<ResourceDraft>): Resource | undefined {
+  const item = db.resources.find((r) => r.id === id);
+  if (!item) return undefined;
+  const copyItem: Resource = {
+    ...copy(item),
+    id: nextId("res", db),
+    ...patch,
+    uploadedAt: item.uploadedAt,
+    updatedAt: nowIso(),
+    status: "draft",
+  };
+  db.resources = [...db.resources, copyItem];
+  logActivity("resource", "create", copyItem.title);
+  commit();
+  return copyItem;
+}
+
 export function toggleResourceFeatured(id: string): void {
   const item = db.resources.find((r) => r.id === id);
   if (!item) return;
@@ -689,6 +766,24 @@ export function setNoticeStatus(id: string, status: Notice["status"]): void {
   item.updatedAt = nowIso();
   logActivity("notice", status === "published" ? "publish" : "unpublish", item.heading);
   commit();
+}
+
+/** Same fork semantics as branchResourceToDraft — see there. */
+export function branchNoticeToDraft(id: string, patch: Partial<NoticeDraft>): Notice | undefined {
+  const item = db.notices.find((n) => n.id === id);
+  if (!item) return undefined;
+  const copyItem: Notice = {
+    ...copy(item),
+    id: nextId("notice", db),
+    ...patch,
+    createdAt: item.createdAt,
+    updatedAt: nowIso(),
+    status: "draft",
+  };
+  db.notices = [...db.notices, copyItem];
+  logActivity("notice", "create", copyItem.heading);
+  commit();
+  return copyItem;
 }
 
 export function toggleNoticePinned(id: string): void {

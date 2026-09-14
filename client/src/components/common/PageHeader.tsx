@@ -60,13 +60,16 @@ interface CardProps {
   children: ReactNode;
   className?: string;
   interactive?: boolean;
+  onClick?: () => void;
 }
 
-export function Card({ children, className, interactive = false }: CardProps) {
+export function Card({ children, className, interactive = false, onClick }: CardProps) {
   return (
     <div
+      onClick={onClick}
       className={cx(
         "card-glow rounded-xl border border-border bg-surface shadow-card",
+        onClick && "cursor-pointer transition-colors hover:bg-surface-hover",
         interactive &&
           "transition-all hover:border-primary/40 hover:shadow-card-hover",
         className,
