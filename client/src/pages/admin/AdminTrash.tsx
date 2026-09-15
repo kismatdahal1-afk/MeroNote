@@ -150,7 +150,7 @@ export default function AdminTrash() {
       if (!n.deletedAt) continue;
       out.push({
         id: n.id, entity: "notice", label: n.heading, detail: n.subtext,
-        semesterId: n.semesterId ?? "", subjectId: n.subjectId ?? "", deletedAt: n.deletedAt,
+        semesterId: "", subjectId: "", deletedAt: n.deletedAt,
       });
     }
     for (const b of db.books) {

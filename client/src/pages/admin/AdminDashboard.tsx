@@ -6,7 +6,8 @@ import {
 import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
 import { Badge } from "../../components/common/Badge";
 import { useCms } from "../../state/CmsProvider";
-import { getStats } from "../../state/cmsStore";
+import { getStats, getDashboardNotices } from "../../state/cmsStore";
+import { NoticesBoard } from "../../components/dashboard/NoticesBoard";
 import { formatRelativeTime, formatFileSize } from "../../lib/utils";
 
 const QUICK_ACTIONS = [
@@ -26,6 +27,7 @@ export default function AdminDashboard() {
   const db = useCms();
   const stats = getStats();
   const recentActivity = RecentActivitySection();
+  const dashboardNotices = getDashboardNotices();
 
   const recentUploads = db.resources
     .filter((r) => !r.deletedAt)
@@ -78,21 +80,28 @@ export default function AdminDashboard() {
         <h2 id="admin-actions" className="mb-3.5 text-lg font-semibold text-foreground">
           Quick Actions
         </h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+        <div className="grid auto-rows-fr grid-cols-2 gap-4 md:gap-5 lg:grid-cols-4 lg:gap-5 xl:gap-6">
           {QUICK_ACTIONS.map(({ to, label, icon: Icon }) => (
             <Link
-              key={to}
+              key={`${to}-${label}`}
               to={to}
-              className="card-glow group flex flex-col items-center gap-3 rounded-xl border border-border bg-surface p-5 text-center transition-all hover:border-primary/40 hover:shadow-card-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="card-glow group flex h-full min-h-[112px] flex-col items-center justify-center gap-3 rounded-xl border border-border bg-surface p-5 text-center transition-all hover:border-primary/40 hover:shadow-card-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-h-[118px] lg:min-h-[132px]"
             >
-              <span className="flex size-10 items-center justify-center rounded-lg bg-primary-muted text-primary">
-                <Icon className="size-5" aria-hidden="true" />
+              <span className="flex size-12 items-center justify-center rounded-lg bg-primary-muted text-primary">
+                <Icon className="size-6" aria-hidden="true" />
               </span>
-              <span className="text-xs font-bold text-foreground group-hover:text-primary">{label}</span>
+              <span className="text-xs font-bold leading-tight text-foreground group-hover:text-primary">{label}</span>
             </Link>
           ))}
         </div>
       </section>
+
+      {/* Notices preview — reuses existing Student Dashboard notice section, same data source */}
+      {dashboardNotices.length > 0 && (
+        <div className="mt-8">
+          <NoticesBoard notices={dashboardNotices} seeAllTo="/admin/notices" />
+        </div>
+      )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         {/* Recent uploads (real DB timestamps) */}

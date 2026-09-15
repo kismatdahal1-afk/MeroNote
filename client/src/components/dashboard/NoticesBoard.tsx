@@ -23,6 +23,13 @@ const PRIORITY_TONE: Record<NoticeWithState["priority"], "success" | "warning" |
   urgent: "error",
 };
 
+const ANNOUNCER_LABEL: Record<NoticeWithState["announcer"], string> = {
+  administration: "Administration",
+  "csit-department": "CSIT Department",
+  examination: "Examination Section",
+  library: "Library",
+};
+
 /** One notice row with its computed day state (X days remaining / Today / Past).
  *  Shared by the dashboard board and the full student Notices page. */
 export function NoticeRow({ notice }: { notice: NoticeWithState }) {
@@ -58,9 +65,12 @@ export function NoticeRow({ notice }: { notice: NoticeWithState }) {
           </Badge>
           {notice.priority === "high" && <Badge tone={PRIORITY_TONE[notice.priority]}>High priority</Badge>}
         </div>
-        <p className="mt-1.5 text-sm font-bold leading-snug text-foreground">{notice.heading}</p>
+        <p className="mt-1.5 break-words text-sm font-bold leading-snug text-foreground">{notice.heading}</p>
+        <p className="mt-0.5 break-words text-[11px] font-medium leading-tight text-muted-foreground/60">
+          {ANNOUNCER_LABEL[notice.announcer] ?? notice.announcer}
+        </p>
         {notice.subtext && (
-          <p className="mt-1 line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground">
+          <p className="mt-1 break-words line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground">
             {notice.subtext}
           </p>
         )}
@@ -88,8 +98,15 @@ export function NoticeRow({ notice }: { notice: NoticeWithState }) {
   );
 }
 
-/** Student dashboard notices section — loads from the CMS store (admin-managed). */
-export function NoticesBoard({ notices }: { notices: NoticeWithState[] }) {
+/** Dashboard notices section — loads from the CMS store (admin-managed).
+ *  Shared by Student and Admin dashboards — same data source and ordering. */
+export function NoticesBoard({
+  notices,
+  seeAllTo = "/notices",
+}: {
+  notices: NoticeWithState[];
+  seeAllTo?: string;
+}) {
   if (notices.length === 0) return null;
 
   return (
@@ -100,7 +117,7 @@ export function NoticesBoard({ notices }: { notices: NoticeWithState[] }) {
           Notices &amp; Reminders
         </h2>
         <Link
-          to="/notices"
+          to={seeAllTo}
           className="rounded text-xs font-bold text-primary hover:text-primary-hover hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           See all →

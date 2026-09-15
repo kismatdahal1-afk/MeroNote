@@ -23,7 +23,7 @@ import { useToast } from "../../state/ToastProvider";
 import { RESOURCE_TYPE_CONFIG, resourceTypeLabel } from "../../lib/resourceType";
 import { StatusBadge } from "../../components/admin/StatusBadge";
 import { cx, formatDate, formatFileSize, formatRelativeTime } from "../../lib/utils";
-import type { Notice, NoticeType, Resource, Semester, Subject, Topic } from "../../types";
+import type { Notice, NoticeType, NoticeAnnouncer, Resource, Semester, Subject, Topic } from "../../types";
 
 type DraftKind = "resource" | "topic" | "notice" | "semester" | "subject";
 type KindFilter = DraftKind | "all";
@@ -49,6 +49,13 @@ const NOTICE_LABEL: Record<NoticeType, string> = {
   reminder: "Reminder",
   general: "General",
 };
+
+const ANNOUNCER_OPTIONS: { value: NoticeAnnouncer; label: string }[] = [
+  { value: "administration", label: "Administration" },
+  { value: "csit-department", label: "CSIT Department" },
+  { value: "examination", label: "Examination Section" },
+  { value: "library", label: "Library" },
+];
 
 interface DraftRowBase {
   id: string;
@@ -80,9 +87,8 @@ interface NoticeEditState {
   heading: string;
   subtext: string;
   type: NoticeType;
+  announcer: NoticeAnnouncer;
   date: string;
-  semesterId: string;
-  subjectId: string;
   priority: Notice["priority"];
   showOnDashboard: boolean;
   pinned: boolean;
@@ -156,8 +162,8 @@ export default function AdminDrafts() {
   const [topicErrors, setTopicErrors] = useState<Partial<Record<"title" | "order", string>>>({});
   const [noticeEdit, setNoticeEdit] = useState<Notice | null>(null);
   const [noticeForm, setNoticeForm] = useState<NoticeEditState>({
-    heading: "", subtext: "", type: "announcement", date: "",
-    semesterId: "", subjectId: "", priority: "normal", showOnDashboard: true, pinned: false,
+    heading: "", subtext: "", type: "announcement", announcer: "administration", date: "",
+    priority: "normal", showOnDashboard: true, pinned: false,
   });
   const [noticeErrors, setNoticeErrors] = useState<Partial<Record<"heading" | "date", string>>>({});
   const [pendingPublish, setPendingPublish] = useState<DraftRow | null>(null);
@@ -216,8 +222,8 @@ export default function AdminDrafts() {
         notice: n,
         title: n.heading,
         subtitle: n.subtext,
-        semesterId: n.semesterId ?? "",
-        subjectId: n.subjectId ?? "",
+        semesterId: "",
+        subjectId: "",
         updatedAt: n.updatedAt,
         typeIcon: Bell,
         typeLabel: `${NOTICE_LABEL[n.type]} Notice`,
@@ -279,19 +285,15 @@ export default function AdminDrafts() {
         (r) => r.title.toLowerCase().includes(q) || r.subtitle.toLowerCase().includes(q),
       );
     }
-    if (semesterFilter) list = list.filter((r) => r.semesterId === semesterFilter);
-    if (subjectFilter) list = list.filter((r) => r.subjectId === subjectFilter);
+    // Notices are general (no semester/subject) — exempt them from those filters
+    if (semesterFilter) list = list.filter((r) => r.kind === "notice" || r.semesterId === semesterFilter);
+    if (subjectFilter) list = list.filter((r) => r.kind === "notice" || r.subjectId === subjectFilter);
     return list;
   }, [rows, kindFilter, query, semesterFilter, subjectFilter]);
 
   const subjectOptions = useMemo(
     () => (semesterFilter ? subjectsAll.filter((s) => s.semesterId === semesterFilter) : subjectsAll),
     [subjectsAll, semesterFilter],
-  );
-
-  const noticeSubjects = useMemo(
-    () => (noticeForm.semesterId ? subjectsAll.filter((s) => s.semesterId === noticeForm.semesterId) : []),
-    [subjectsAll, noticeForm.semesterId],
   );
 
   const anyFilterActive =
@@ -340,9 +342,8 @@ export default function AdminDrafts() {
       heading: n.heading,
       subtext: n.subtext,
       type: n.type,
+      announcer: n.announcer,
       date: n.date.slice(0, 10),
-      semesterId: n.semesterId ?? "",
-      subjectId: n.subjectId ?? "",
       priority: n.priority,
       showOnDashboard: n.showOnDashboard,
       pinned: n.pinned,
@@ -360,9 +361,8 @@ export default function AdminDrafts() {
       heading: noticeForm.heading.trim(),
       subtext: noticeForm.subtext.trim(),
       type: noticeForm.type,
+      announcer: noticeForm.announcer,
       date: new Date(`${noticeForm.date}T00:00:00`).toISOString(),
-      semesterId: noticeForm.semesterId || undefined,
-      subjectId: noticeForm.subjectId || undefined,
       priority: noticeForm.priority,
       showOnDashboard: noticeForm.showOnDashboard,
       pinned: noticeForm.pinned,
@@ -834,7 +834,7 @@ export default function AdminDrafts() {
             value={noticeForm.subtext}
             onChange={(e) => setNoticeForm((p) => ({ ...p, subtext: e.target.value }))}
           />
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Select
               id="draft-notice-type"
               label="Notice Type"
@@ -842,6 +842,15 @@ export default function AdminDrafts() {
               onChange={(e) => setNoticeForm((p) => ({ ...p, type: e.target.value as NoticeType }))}
               options={NOTICE_TYPES}
             />
+            <Select
+              id="draft-notice-announcer"
+              label="Announcer"
+              value={noticeForm.announcer}
+              onChange={(e) => setNoticeForm((p) => ({ ...p, announcer: e.target.value as NoticeAnnouncer }))}
+              options={ANNOUNCER_OPTIONS}
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
             <Input
               id="draft-notice-date"
               label="Date"
@@ -859,29 +868,6 @@ export default function AdminDrafts() {
                 { value: "low", label: "Low" },
                 { value: "normal", label: "Normal" },
                 { value: "high", label: "High" },
-              ]}
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              id="draft-notice-semester"
-              label="Semester (optional)"
-              value={noticeForm.semesterId}
-              onChange={(e) => setNoticeForm((p) => ({ ...p, semesterId: e.target.value, subjectId: "" }))}
-              options={[
-                { value: "", label: "All semesters" },
-                ...semesters.map((s) => ({ value: s.id, label: s.name })),
-              ]}
-            />
-            <Select
-              id="draft-notice-subject"
-              label="Subject (optional)"
-              value={noticeForm.subjectId}
-              disabled={!noticeForm.semesterId}
-              onChange={(e) => setNoticeForm((p) => ({ ...p, subjectId: e.target.value }))}
-              options={[
-                { value: "", label: noticeForm.semesterId ? "All subjects" : "Choose a semester first" },
-                ...noticeSubjects.map((s) => ({ value: s.id, label: s.name })),
               ]}
             />
           </div>

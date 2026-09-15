@@ -164,15 +164,17 @@ export type NoticeType =
 
 export type NoticePriority = "low" | "normal" | "high" | "urgent";
 
+export type NoticeAnnouncer = "administration" | "csit-department" | "examination" | "library";
+
 export interface Notice {
   id: string;
   heading: string;
   subtext: string;
   type: NoticeType;
+  /** Who announced the notice. */
+  announcer: NoticeAnnouncer;
   /** ISO date the notice refers to (exam day, deadline, event…). */
   date: string;
-  semesterId?: string;
-  subjectId?: string;
   priority: NoticePriority;
   status: PublishStatus;
   /** Show on the student dashboard. */

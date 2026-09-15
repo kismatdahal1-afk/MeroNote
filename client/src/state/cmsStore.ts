@@ -107,6 +107,7 @@ function seedDb(): CmsDb {
       heading: "TU Board Exam — Sem IV",
       subtext: "Admit cards are available from the department office. Bring your student ID.",
       type: "exam",
+      announcer: "examination",
       date: new Date(Date.now() + 24 * 24 * 60 * 60 * 1000).toISOString(),
       priority: "high",
       status: "published",
@@ -120,9 +121,8 @@ function seedDb(): CmsDb {
       heading: "DBMS Assignment 3 Deadline",
       subtext: "Submit normalization exercises via the department portal before 5 PM.",
       type: "deadline",
+      announcer: "csit-department",
       date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-      semesterId: "sem-4",
-      subjectId: "sub-dbms",
       priority: "normal",
       status: "published",
       showOnDashboard: true,
@@ -135,6 +135,7 @@ function seedDb(): CmsDb {
       heading: "Library Hours Extended",
       subtext: "Reading room stays open until 8 PM during the exam period.",
       type: "announcement",
+      announcer: "library",
       date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
       priority: "low",
       status: "published",
@@ -187,13 +188,21 @@ function loadDb(): CmsDb {
       const migratedResources = baseResources.map((r: any) =>
         r.type === "other" ? { ...r, type: "custom" } : r,
       );
+      // Migrate notices: drop unused semester/subject, ensure announcer exists
+      const migratedNotices = (parsed.notices as any[]).map((n) => {
+        const { semesterId: _sem, subjectId: _sub, announcer, ...rest } = n;
+        return {
+          ...rest,
+          announcer: announcer ?? "administration",
+        };
+      });
       return {
         semesters: parsed.semesters,
         subjects: parsed.subjects,
         topics: parsed.topics,
         resources: migratedResources as typeof parsed.resources,
         books: parsed.books ?? [],
-        notices: parsed.notices,
+        notices: migratedNotices as typeof parsed.notices,
         activity: parsed.activity ?? [],
       };
     }
@@ -858,9 +867,8 @@ export interface NoticeDraft {
   heading: string;
   subtext: string;
   type: Notice["type"];
+  announcer: Notice["announcer"];
   date: string;
-  semesterId?: string;
-  subjectId?: string;
   priority: Notice["priority"];
   status: Notice["status"];
   showOnDashboard: boolean;
@@ -873,9 +881,8 @@ export function createNotice(draft: NoticeDraft): Notice {
     heading: draft.heading,
     subtext: draft.subtext,
     type: draft.type,
+    announcer: draft.announcer,
     date: draft.date,
-    semesterId: draft.semesterId,
-    subjectId: draft.subjectId,
     priority: draft.priority,
     status: draft.status,
     showOnDashboard: draft.showOnDashboard,
@@ -1023,30 +1030,36 @@ export function noticeWithState(notice: Notice): NoticeWithState {
   };
 }
 
+const PRIORITY_WEIGHT: Record<Notice["priority"], number> = { urgent: 4, high: 3, normal: 2, low: 1 };
+
+function noticeSort(a: NoticeWithState, b: NoticeWithState): number {
+  if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+  const pa = PRIORITY_WEIGHT[a.priority] ?? 0;
+  const pb = PRIORITY_WEIGHT[b.priority] ?? 0;
+  if (pa !== pb) return pb - pa;
+  if (a.dayState !== b.dayState) {
+    const order: Record<NoticeWithState["dayState"], number> = { today: 0, upcoming: 1, past: 2 };
+    return order[a.dayState] - order[b.dayState];
+  }
+  return +new Date(a.date) - +new Date(b.date);
+}
+
 /** Student dashboard notices: published, visible-on-dashboard, alive. */
 export function getDashboardNotices(): NoticeWithState[] {
   return db.notices
     .filter((n) => !n.deletedAt && n.status === "published" && n.showOnDashboard)
     .map(noticeWithState)
-    .sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      if (a.dayState !== b.dayState) return a.dayState === "today" ? -1 : a.dayState === "upcoming" ? -1 : 1;
-      return +new Date(a.date) - +new Date(b.date);
-    });
+    .sort(noticeSort);
 }
 
 /** Student Notices page: every notice published by the admin (alive,
     any type, regardless of the dashboard-visibility flag). Same sort
-    as the dashboard board — pinned first, then today/upcoming, past. */
+    as the dashboard board — pinned first, then priority, then today/upcoming, past. */
 export function getStudentNotices(): NoticeWithState[] {
   return db.notices
     .filter((n) => !n.deletedAt && n.status === "published")
     .map(noticeWithState)
-    .sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      if (a.dayState !== b.dayState) return a.dayState === "today" ? -1 : a.dayState === "upcoming" ? -1 : 1;
-      return +new Date(a.date) - +new Date(b.date);
-    });
+    .sort(noticeSort);
 }
 
 export { programInfo };
