@@ -1,10 +1,10 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+﻿import { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   CheckCircle2, EyeOff, FileEdit, FileText, Layers,
-  LibraryBig, Pencil, Plus, Trash2, X, type LucideIcon,
+  LibraryBig, Pencil, Plus, Trash2, X,
 } from "lucide-react";
-import { PageHeader, Card } from "../../components/common/PageHeader";
+import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
 import { SearchBar } from "../../components/common/SearchBar";
 import { IconButton } from "../../components/common/IconButton";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
@@ -23,32 +23,10 @@ import type { Resource, ResourceType } from "../../types";
 
 type StatusFilter = "all" | "published" | "draft" | "hidden";
 
-function StatTile({ label, value, icon: Icon, iconClass }: {
-  label: string;
-  value: number;
-  icon: LucideIcon;
-  iconClass: string;
-}) {
-  return (
-    <Card className="flex items-center justify-between gap-3 p-3.5">
-      <div className="min-w-0">
-        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{value}</p>
-      </div>
-      <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", iconClass)}>
-        <Icon className="size-4" aria-hidden="true" />
-      </div>
-    </Card>
-  );
-}
-
 export default function AdminResources() {
   const db = useCms();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [type, setType] = useState<ResourceType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -56,15 +34,6 @@ export default function AdminResources() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Resource | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Resource | null>(null);
-
-  // "Add Resource" quick action deep link: /admin/resources?new=1
-  useEffect(() => {
-    if (params.get("new")) {
-      setEditing(null);
-      setFormOpen(true);
-      setParams({}, { replace: true });
-    }
-  }, [params, setParams]);
 
   const semesters = useMemo(
     () => db.semesters.filter((s) => !s.deletedAt).sort((a, b) => a.order - b.order),
@@ -149,11 +118,11 @@ export default function AdminResources() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Total Resources" value={stats.total} icon={LibraryBig} iconClass="bg-primary-muted text-primary" />
-        <StatTile label="Published" value={stats.published} icon={CheckCircle2} iconClass="bg-success-muted text-success" />
-        <StatTile label="Drafts" value={stats.drafts} icon={FileEdit} iconClass="bg-warning-muted text-warning" />
-        <StatTile label="Hidden" value={stats.hidden} icon={EyeOff} iconClass="bg-secondary text-secondary-foreground" />
+      <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard label="Total Resources" value={stats.total} hint="All resources" icon={<LibraryBig className="size-5" aria-hidden="true" />} />
+        <StatCard label="Published" value={stats.published} hint="Live resources" icon={<CheckCircle2 className="size-5" aria-hidden="true" />} />
+        <StatCard label="Drafts" value={stats.drafts} hint="Unpublished" icon={<FileEdit className="size-5" aria-hidden="true" />} />
+        <StatCard label="Hidden" value={stats.hidden} hint="Not visible" icon={<EyeOff className="size-5" aria-hidden="true" />} />
       </div>
 
       {/* Search + dropdown filters */}

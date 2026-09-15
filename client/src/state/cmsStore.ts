@@ -30,6 +30,7 @@ import {
 const STORAGE_KEY = "meronote-cms-db-v1";
 /** One-time migration flag: clear seed-era featured flags (Featured board removed). */
 const MIGRATION_KEY = `${STORAGE_KEY}-migrated-unfeature-v1`;
+const SETTINGS_KEY = "meronote-settings-v1";
 
 export interface CmsDb {
   semesters: Semester[];
@@ -179,13 +180,18 @@ function loadDb(): CmsDb {
     ) {
       const needsUnfeatureMigration =
         window.localStorage.getItem(MIGRATION_KEY) !== "1";
+      const baseResources = needsUnfeatureMigration
+        ? parsed.resources.map((r) => ({ ...r, featured: false }))
+        : parsed.resources;
+      // Migrate old "other" type (now "custom") — keep persisted data compatible
+      const migratedResources = baseResources.map((r: any) =>
+        r.type === "other" ? { ...r, type: "custom" } : r,
+      );
       return {
         semesters: parsed.semesters,
         subjects: parsed.subjects,
         topics: parsed.topics,
-        resources: needsUnfeatureMigration
-          ? parsed.resources.map((r) => ({ ...r, featured: false }))
-          : parsed.resources,
+        resources: migratedResources as typeof parsed.resources,
         books: parsed.books ?? [],
         notices: parsed.notices,
         activity: parsed.activity ?? [],
@@ -349,6 +355,136 @@ export function emptyTrash(entity?: CmsEntity): void {
     const list = collection(e).filter((x) => x.deletedAt);
     for (const item of list) purgeEntity(e, item.id);
   }
+  commit();
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings                                                            */
+/* ------------------------------------------------------------------ */
+
+export interface ContentDefaults {
+  defaultResourceStatus: "draft" | "published" | "hidden";
+  defaultVisibility: "published" | "draft" | "hidden";
+  requireDescription: boolean;
+  requireSemester: boolean;
+  requireSubject: boolean;
+  requirePdf: boolean;
+  confirmDelete: boolean;
+}
+
+export interface PublishingSettings {
+  allowDirectPublishing: boolean;
+  defaultPublishingStatus: "draft" | "published" | "hidden";
+  showNewlyPublished: boolean;
+  allowFeatured: boolean;
+}
+
+export interface NoticeSettings {
+  defaultNoticeType: "exam" | "deadline" | "assignment" | "event" | "important" | "general";
+  defaultPriority: "normal" | "high" | "urgent";
+  autoExpireNotices: boolean;
+  autoHideExpired: boolean;
+  showOnDashboard: boolean;
+}
+
+export interface DraftTrashSettings {
+  saveAsDraftByDefault: boolean;
+  moveDeletedToTrash: boolean;
+  confirmDeleteForever: boolean;
+  preservePublishedVersion: boolean;
+}
+
+export interface AppSettings {
+  contentDefaults: ContentDefaults;
+  publishing: PublishingSettings;
+  notices: NoticeSettings;
+  draftTrash: DraftTrashSettings;
+}
+
+const defaultSettings: AppSettings = {
+  contentDefaults: {
+    defaultResourceStatus: "draft",
+    defaultVisibility: "published",
+    requireDescription: true,
+    requireSemester: true,
+    requireSubject: true,
+    requirePdf: true,
+    confirmDelete: true,
+  },
+  publishing: {
+    allowDirectPublishing: false,
+    defaultPublishingStatus: "draft",
+    showNewlyPublished: true,
+    allowFeatured: true,
+  },
+  notices: {
+    defaultNoticeType: "general",
+    defaultPriority: "normal",
+    autoExpireNotices: true,
+    autoHideExpired: true,
+    showOnDashboard: true,
+  },
+  draftTrash: {
+    saveAsDraftByDefault: true,
+    moveDeletedToTrash: true,
+    confirmDeleteForever: true,
+    preservePublishedVersion: true,
+  },
+};
+
+function loadSettings(): AppSettings {
+  if (typeof window === "undefined") return defaultSettings;
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return defaultSettings;
+    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    return {
+      contentDefaults: { ...defaultSettings.contentDefaults, ...parsed.contentDefaults },
+      publishing: { ...defaultSettings.publishing, ...parsed.publishing },
+      notices: { ...defaultSettings.notices, ...parsed.notices },
+      draftTrash: { ...defaultSettings.draftTrash, ...parsed.draftTrash },
+    };
+  } catch {
+    return defaultSettings;
+  }
+}
+
+function persistSettings(s: AppSettings): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  } catch {
+    // Storage unavailable — keep in-memory only.
+  }
+}
+
+let settings: AppSettings = loadSettings();
+
+export function getSettings(): AppSettings {
+  return settings;
+}
+
+export function updateContentDefaults(patch: Partial<ContentDefaults>): void {
+  settings = { ...settings, contentDefaults: { ...settings.contentDefaults, ...patch } };
+  persistSettings(settings);
+  commit();
+}
+
+export function updatePublishing(patch: Partial<PublishingSettings>): void {
+  settings = { ...settings, publishing: { ...settings.publishing, ...patch } };
+  persistSettings(settings);
+  commit();
+}
+
+export function updateNotices(patch: Partial<NoticeSettings>): void {
+  settings = { ...settings, notices: { ...settings.notices, ...patch } };
+  persistSettings(settings);
+  commit();
+}
+
+export function updateDraftTrash(patch: Partial<DraftTrashSettings>): void {
+  settings = { ...settings, draftTrash: { ...settings.draftTrash, ...patch } };
+  persistSettings(settings);
   commit();
 }
 
@@ -622,6 +758,7 @@ export interface ResourceDraft {
   topicId?: string;
   bookId?: string;
   type: Resource["type"];
+  customType?: string;
   fileName: string;
   fileSize: number;
   pageCount: number;
@@ -645,6 +782,7 @@ export function createResource(draft: ResourceDraft): Resource {
     topicId: draft.topicId,
     bookId: draft.bookId,
     type: draft.type,
+    customType: draft.customType,
     fileName: draft.fileName,
     fileSize: draft.fileSize,
     pageCount: draft.pageCount,

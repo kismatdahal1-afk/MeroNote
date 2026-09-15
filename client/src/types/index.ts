@@ -1,15 +1,16 @@
 export type ResourceType =
   | "book"
   | "short_note"
-  | "extra_note"
   | "handwritten_note"
+  | "extra_note"
   | "questions"
-  | "past_paper"
-  | "hot_topic"
   | "important_questions"
-  | "practical"
+  | "hot_topic"
+  | "topic"
+  | "past_paper"
   | "revision_note"
-  | "other";
+  | "practical"
+  | "custom";
 
 /** CMS publish status shared by all admin-managed entities. */
 export type PublishStatus = "draft" | "published" | "hidden";
@@ -108,6 +109,8 @@ export interface Resource {
   /** Optional topic link — a resource may belong to a syllabus topic. */
   topicId?: string;
   type: ResourceType;
+  /** When type is "custom", the admin-entered label. */
+  customType?: string;
   fileName: string;
   fileSize: number;
   pageCount: number;
@@ -159,7 +162,7 @@ export type NoticeType =
   | "reminder"
   | "general";
 
-export type NoticePriority = "low" | "normal" | "high";
+export type NoticePriority = "low" | "normal" | "high" | "urgent";
 
 export interface Notice {
   id: string;

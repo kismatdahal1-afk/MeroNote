@@ -23,9 +23,6 @@ const HelpSupport = lazy(() => import("./pages/HelpSupport"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminNotices = lazy(() => import("./pages/admin/AdminNotices"));
 const AdminSemesters = lazy(() => import("./pages/admin/AdminSemesters"));
-const AdminSubjects = lazy(() => import("./pages/admin/AdminSubjects"));
-const AdminTopics = lazy(() => import("./pages/admin/AdminTopics"));
-const AdminTopicDetail = lazy(() => import("./pages/admin/AdminTopicDetail"));
 const AdminResources = lazy(() => import("./pages/admin/AdminResources"));
 const AdminReader = lazy(() => import("./pages/admin/AdminReader"));
 const AdminDrafts = lazy(() => import("./pages/admin/AdminDrafts"));
@@ -75,11 +72,8 @@ export const router = createBrowserRouter([
           // Admin CMS
           { path: "admin", element: withSuspense(<AdminDashboard />) },
           { path: "admin/notices", element: withSuspense(<AdminNotices />) },
-          { path: "admin/semesters", element: withSuspense(<AdminSemesters />) },
-          { path: "admin/subjects", element: withSuspense(<AdminSubjects />) },
-          { path: "admin/topics", element: withSuspense(<AdminTopics />) },
-          { path: "admin/topics/:topicId", element: withSuspense(<AdminTopicDetail />) },
-          { path: "admin/resources", element: withSuspense(<AdminResources />) },
+{ path: "admin/semesters", element: withSuspense(<AdminSemesters />) },
+            { path: "admin/resources", element: withSuspense(<AdminResources />) },
           { path: "admin/resources/:resourceId", element: withSuspense(<ResourceDetail />) },
           { path: "admin/reader/:resourceId", element: withSuspense(<AdminReader />) },
           { path: "admin/drafts", element: withSuspense(<AdminDrafts />) },

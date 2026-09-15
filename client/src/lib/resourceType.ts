@@ -11,6 +11,7 @@ import {
   FlaskConical,
   ClipboardList,
   Package,
+  Bookmark,
 } from "lucide-react";
 import type { ResourceType } from "../types";
 
@@ -33,28 +34,28 @@ export const RESOURCE_TYPE_CONFIG: Record<ResourceType, ResourceTypeConfig> = {
     badgeClass: "bg-primary-muted text-primary",
   },
   short_note: {
-    label: "Short Note",
+    label: "Short Notes",
     icon: FileText,
     badgeClass: "bg-accent/15 text-accent",
   },
-  extra_note: {
-    label: "Extra Note",
-    icon: Layers,
-    badgeClass: "bg-accent/15 text-accent",
-  },
   handwritten_note: {
-    label: "Handwritten Note",
+    label: "Handwritten Notes",
     icon: PenLine,
     badgeClass: "bg-accent/15 text-accent",
   },
+  extra_note: {
+    label: "Extra Notes",
+    icon: Layers,
+    badgeClass: "bg-accent/15 text-accent",
+  },
   questions: {
-    label: "Questions",
+    label: "Question",
     icon: HelpCircle,
     badgeClass: "bg-secondary/15 text-secondary",
   },
-  past_paper: {
-    label: "Past Paper",
-    icon: FileArchive,
+  important_questions: {
+    label: "Important Question",
+    icon: Sparkles,
     badgeClass: "bg-warning-muted text-warning",
   },
   hot_topic: {
@@ -62,29 +63,37 @@ export const RESOURCE_TYPE_CONFIG: Record<ResourceType, ResourceTypeConfig> = {
     icon: Flame,
     badgeClass: "bg-warning-muted text-warning",
   },
-  important_questions: {
-    label: "Important Questions",
-    icon: Sparkles,
+  topic: {
+    label: "Topic",
+    icon: Bookmark,
+    badgeClass: "bg-accent/15 text-accent",
+  },
+  past_paper: {
+    label: "Past Paper",
+    icon: FileArchive,
     badgeClass: "bg-warning-muted text-warning",
   },
-  practical: {
-    label: "Practical/Lab",
-    icon: FlaskConical,
-    badgeClass: "bg-success-muted text-success",
-  },
   revision_note: {
-    label: "Revision Note",
+    label: "Revision Notes",
     icon: ClipboardList,
     badgeClass: "bg-error-muted text-error",
   },
-  other: {
-    label: "Other",
+  practical: {
+    label: "Practical Lab",
+    icon: FlaskConical,
+    badgeClass: "bg-success-muted text-success",
+  },
+  custom: {
+    label: "Custom",
     icon: Package,
     badgeClass: "bg-surface-muted text-muted-foreground",
   },
-};
+} as Record<ResourceType, ResourceTypeConfig>;
 
-/** Canonical display order for resource types. */
+// Back-compat: old persisted resources may have type "other" — alias to custom
+(RESOURCE_TYPE_CONFIG as Record<string, ResourceTypeConfig>).other = RESOURCE_TYPE_CONFIG.custom;
+
+/** Canonical display order for resource types — matches spec exactly. */
 export const ALL_RESOURCE_TYPES: ResourceType[] = [
   "book",
   "short_note",
@@ -93,12 +102,15 @@ export const ALL_RESOURCE_TYPES: ResourceType[] = [
   "questions",
   "important_questions",
   "hot_topic",
+  "topic",
   "past_paper",
   "revision_note",
   "practical",
-  "other",
+  "custom",
 ];
 
 export function resourceTypeLabel(type: ResourceType): string {
-  return RESOURCE_TYPE_CONFIG[type].label;
+  // Back-compat: old data may have "other" which is now "custom"
+  if ((type as string) === "other") return "Custom";
+  return RESOURCE_TYPE_CONFIG[type]?.label ?? String(type);
 }

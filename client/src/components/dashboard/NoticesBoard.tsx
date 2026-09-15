@@ -20,6 +20,7 @@ const PRIORITY_TONE: Record<NoticeWithState["priority"], "success" | "warning" |
   low: "success",
   normal: "warning",
   high: "error",
+  urgent: "error",
 };
 
 /** One notice row with its computed day state (X days remaining / Today / Past).

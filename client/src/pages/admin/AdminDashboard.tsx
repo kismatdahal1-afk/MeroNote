@@ -1,6 +1,6 @@
 ﻿import { Link } from "react-router-dom";
 import {
-  LibraryBig, GraduationCap, BookMarked, Bell, Star, Clock, Upload, Plus,
+  LibraryBig, GraduationCap, Bell, Star, Clock, Upload, BookOpen,
 } from "lucide-react";
 
 import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
@@ -10,11 +10,10 @@ import { getStats } from "../../state/cmsStore";
 import { formatRelativeTime, formatFileSize } from "../../lib/utils";
 
 const QUICK_ACTIONS = [
-  { to: "/admin/notices?new=1", label: "Add Notice", icon: Bell },
-  { to: "/admin/semesters", label: "Add Semester", icon: GraduationCap },
-  { to: "/admin/subjects", label: "Add Subject", icon: BookMarked },
-  { to: "/admin/topics", label: "Add Topic", icon: Plus },
-  { to: "/admin/resources?new=1", label: "Add Resource", icon: Upload },
+  { to: "/admin/resources", label: "Add Resource", icon: Upload },
+  { to: "/admin/semesters", label: "Add Subject", icon: BookOpen },
+  { to: "/admin/notices", label: "Add Note", icon: Bell },
+  { to: "/admin/semesters", label: "Manage Curriculum", icon: GraduationCap },
 ];
 
 /** Recent admin activity (create/publish/delete events + latest uploads). */

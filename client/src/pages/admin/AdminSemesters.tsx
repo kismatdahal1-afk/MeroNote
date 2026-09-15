@@ -1,487 +1,387 @@
-import { useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useState } from "react";
 import {
-  ArrowDown, ArrowUp, BookOpen, CheckCircle2, ChevronRight, EyeOff,
-  FileEdit, GraduationCap, Pencil, Plus, Trash2, type LucideIcon,
+  Award, BookOpen, CalendarDays, ChevronRight, FileText, GraduationCap, Pencil, Plus, Trash2,
 } from "lucide-react";
-import { Card } from "../../components/common/PageHeader";
-import { Input, Textarea } from "../../components/common/Field";
+import { Link, useNavigate } from "react-router-dom";
+import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
+import { Input, Select, Textarea } from "../../components/common/Field";
 import { Button } from "../../components/common/Button";
 import { IconButton } from "../../components/common/IconButton";
 import { Modal } from "../../components/common/Modal";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { EmptyState } from "../../components/common/States";
-import { Badge } from "../../components/common/Badge";
-import { StatusBadge, StatusToggleGroup } from "../../components/admin/StatusBadge";
+import { StatusBadge } from "../../components/admin/StatusBadge";
 import { useCms } from "../../state/CmsProvider";
 import {
-  createSemester, createSubject, branchSemesterToDraft, reorderSemesters,
-  setSemesterStatus, softDelete, updateSemester,
+  createSubject, updateSubject,
+  softDelete,
 } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { cx } from "../../lib/utils";
-import type { Semester } from "../../types";
+import { RESOURCE_TYPE_CONFIG, resourceTypeLabel } from "../../lib/resourceType";
+import type { Resource, Subject, PublishStatus } from "../../types";
+import { ResourceEditorModal } from "../../components/admin/ResourceEditorModal";
 
-const STATUS_CYCLE: Record<Semester["status"], Semester["status"]> = {
-  published: "draft",
-  draft: "hidden",
-  hidden: "published",
-};
-
-interface SemesterFormState {
+interface SubjectFormState {
   name: string;
+  code: string;
   description: string;
-  order: string;
-  status: Semester["status"];
-  subjects: string;
+  category: "core" | "elective" | "practical";
+  credits: number;
+  status: PublishStatus;
+  semesterId: string;
 }
 
-function subjectCode(name: string): string {
-  const code = name.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 4);
-  return code || "SUB";
+function emptySubjectForm(semesterId: string): SubjectFormState {
+  return { name: "", code: "", description: "", category: "core", credits: 3, status: "published", semesterId };
 }
 
-function addSubjectsFor(semesterId: string, names: string[], status: Semester["status"]): number {
-  let created = 0;
-  for (const name of names) {
-    createSubject({
-      semesterId,
-      name,
-      code: subjectCode(name),
-      description: "",
-      category: "core",
-      credits: 3,
-      status,
-    });
-    created += 1;
-  }
-  return created;
-}
-
-function StatTile({ label, value, icon: Icon, iconClass }: {
-  label: string;
-  value: number;
-  icon: LucideIcon;
-  iconClass: string;
-}) {
-  return (
-    <Card className="flex items-center justify-between gap-3 p-3.5">
-      <div className="min-w-0">
-        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{value}</p>
-      </div>
-      <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", iconClass)}>
-        <Icon className="size-4" aria-hidden="true" />
-      </div>
-    </Card>
-  );
+const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII"] as const;
+function toRoman(n: number): string {
+  return ROMAN[n] ?? String(n);
 }
 
 export default function AdminSemesters() {
   const db = useCms();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<Semester | null>(null);
-  const [form, setForm] = useState<SemesterFormState>({
-    name: "", description: "", order: "", status: "published", subjects: "",
-  });
-  const [errors, setErrors] = useState<Partial<Record<keyof SemesterFormState, string>>>({});
-  const [pendingDelete, setPendingDelete] = useState<Semester | null>(null);
 
-  const semesters = useMemo(
-    () => db.semesters.filter((s) => !s.deletedAt).sort((a, b) => a.order - b.order),
-    [db.semesters],
-  );
+  const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [subjectFormOpen, setSubjectFormOpen] = useState(false);
+  const [resourceFormOpen, setResourceFormOpen] = useState(false);
+  const [resourceDefaultSemester, setResourceDefaultSemester] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; type: "subject" } | null>(null);
 
-  const stats = useMemo(() => ({
-    total: semesters.length,
-    published: semesters.filter((s) => s.status === "published").length,
-    draft: semesters.filter((s) => s.status === "draft").length,
-    hidden: semesters.filter((s) => s.status === "hidden").length,
-  }), [semesters]);
+  const [subjectForm, setSubjectForm] = useState<SubjectFormState>(emptySubjectForm(""));
 
-  const subjectsOf = (semesterId: string) =>
-    db.subjects.filter((x) => !x.deletedAt && x.semesterId === semesterId);
+  const semesters = db.semesters.filter((s) => !s.deletedAt).sort((a, b) => a.order - b.order);
+  const allSubjects = db.subjects.filter((s) => !s.deletedAt);
 
-  const openCreate = () => {
-    setEditing(null);
-    setErrors({});
-    setForm({
-      name: `Semester ${semesters.length + 1}`,
-      description: "",
-      order: String(semesters.length + 1),
-      status: "published",
-      subjects: "",
-    });
-    setFormOpen(true);
+  const resourceCountForSubject = (subId: string) => db.resources.filter((r) => !r.deletedAt && r.subjectId === subId).length;
+
+  const toggleExpand = (subjectId: string) => {
+    setExpandedSubjectId((prev) => (prev === subjectId ? null : subjectId));
   };
 
-  const openEdit = (s: Semester) => {
-    setEditing(s);
-    setErrors({});
-    setForm({ name: s.name, description: s.description, order: String(s.order), status: s.status, subjects: "" });
-    setFormOpen(true);
+  const openAddSubject = (semesterId: string) => {
+    setEditingSubject(null);
+    setSubjectForm(emptySubjectForm(semesterId));
+    setSubjectFormOpen(true);
   };
 
-  const cycleStatus = (s: Semester) => {
-    const next = STATUS_CYCLE[s.status];
-    setSemesterStatus(s.id, next);
-    toast(`${s.name} is now ${next}`, "info");
+  const openEditSubject = (s: Subject) => {
+    setEditingSubject(s);
+    setSubjectForm({ name: s.name, code: s.code, description: s.description, category: s.category, credits: s.credits, status: s.status, semesterId: s.semesterId });
+    setSubjectFormOpen(true);
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubjectSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const orderNum = Number(form.order);
-    const next: typeof errors = {};
-    if (!form.name.trim()) next.name = "Semester name is required.";
-    if (!form.order || !Number.isInteger(orderNum) || orderNum < 1) {
-      next.order = "Order must be a whole number of at least 1.";
-    } else if (semesters.some((s) => s.order === orderNum && s.id !== editing?.id)) {
-      next.order = "This order is already used by another semester.";
-    }
-    setErrors(next);
-    if (Object.keys(next).length > 0) return;
-
-    const existingNames = new Set(
-      editing ? subjectsOf(editing.id).map((x) => x.name.toLowerCase()) : [],
-    );
-    const subjectNames = [...new Set(
-      form.subjects
-        .split(",")
-        .map((x) => x.trim())
-        .filter((x) => x.length > 0 && !existingNames.has(x.toLowerCase())),
-    )];
+    if (!subjectForm.semesterId || !subjectForm.name.trim() || !subjectForm.code.trim() || !subjectForm.credits || Number(subjectForm.credits) < 1) return;
 
     const draft = {
-      name: form.name.trim(),
-      description: form.description.trim(),
-      order: orderNum,
-      status: form.status,
+      semesterId: subjectForm.semesterId,
+      name: subjectForm.name.trim(),
+      code: subjectForm.code.trim().toUpperCase(),
+      description: subjectForm.description.trim(),
+      category: subjectForm.category,
+      credits: Number(subjectForm.credits),
+      status: subjectForm.status,
     };
 
-    if (editing) {
-      // Editing a published/hidden semester + switching to Draft → keep the
-      // live version untouched and stage the edits as a new draft in Drafts.
-      if (form.status === "draft" && editing.status !== "draft") {
-        branchSemesterToDraft(editing.id, draft);
-        toast("Edits saved as a new draft — the published semester is unchanged");
-      } else {
-        updateSemester(editing.id, draft);
-        const added = addSubjectsFor(editing.id, subjectNames, form.status);
-        toast(added > 0 ? `Semester updated — ${added} subject${added > 1 ? "s" : ""} added` : "Semester updated");
-      }
+    if (editingSubject) {
+      updateSubject(editingSubject.id, draft);
+      toast("Subject updated");
     } else {
-      const created = createSemester(draft);
-      addSubjectsFor(created.id, subjectNames, form.status);
-      toast("Semester created");
+      createSubject(draft);
+      toast("Subject created");
     }
-    setFormOpen(false);
+    setSubjectFormOpen(false);
+    setEditingSubject(null);
   };
 
+  const deleteSubject = (s: Subject) => {
+    setPendingDelete({ id: s.id, name: s.name, type: "subject" });
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDelete) return;
+    softDelete("subject", pendingDelete.id);
+    toast(`"${pendingDelete.name}" moved to trash`);
+    setPendingDelete(null);
+  };
+
+  const openAddResource = (semesterId: string) => {
+    setResourceDefaultSemester(semesterId);
+    setResourceFormOpen(true);
+  };
+
+  const handleResourceClick = (resource: Resource) => {
+    navigate(`/admin/resources/${resource.id}`, { state: { via: "topics" } });
+  };
+
+  const sortedSemesters = [...semesters].sort((a, b) => a.order - b.order);
+
+  // Overview stats — compact, not oversized
+  const totalSemesters = semesters.length;
+  const totalSubjects = allSubjects.length;
+  const totalCredits = semesters.reduce((s, sem) => s + sem.credits, 0);
+  const currentSemester = semesters.find((s) => s.enrollment === "active") ?? semesters.find((s) => s.order === 4) ?? semesters[0];
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
         <Link to="/admin" className="rounded px-1 py-0.5 hover:text-primary">Admin</Link>
         <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
         <span aria-current="page" className="font-semibold text-foreground">Semesters</span>
       </nav>
 
-      <Card className="flex flex-wrap items-center justify-between gap-4 p-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-muted text-primary">
-            <GraduationCap className="size-5" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-lg font-bold tracking-tight text-foreground">Semesters</h1>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              Organize the curriculum — add, reorder, and control semester visibility.
-            </p>
-          </div>
-        </div>
-        <Button onClick={openCreate} className="w-full sm:w-auto">
-          <Plus className="size-4" aria-hidden="true" /> Add Semester
-        </Button>
-      </Card>
+      <PageHeader
+        title="Semesters"
+        subtitle="Manage the academic structure, subjects, topics and resources."
+      />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Total Semesters" value={stats.total} icon={GraduationCap} iconClass="bg-primary-muted text-primary" />
-        <StatTile label="Published" value={stats.published} icon={CheckCircle2} iconClass="bg-success-muted text-success" />
-        <StatTile label="Draft" value={stats.draft} icon={FileEdit} iconClass="bg-warning-muted text-warning" />
-        <StatTile label="Hidden" value={stats.hidden} icon={EyeOff} iconClass="bg-surface-muted text-muted-foreground" />
+      {/* Overview — 4 small separate box-style cards in one row, same size as dashboard, equal and responsive */}
+      <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Total Semesters"
+          value={totalSemesters}
+          hint="BSc CSIT program"
+          icon={<GraduationCap className="size-5" aria-hidden="true" />}
+        />
+        <StatCard
+          label="Total Subjects"
+          value={totalSubjects}
+          hint="Across curriculum"
+          icon={<BookOpen className="size-5" aria-hidden="true" />}
+        />
+        <StatCard
+          label="Total Credits"
+          value={totalCredits}
+          hint="Total credit hours"
+          icon={<Award className="size-5" aria-hidden="true" />}
+        />
+        <StatCard
+          label="Current Semester"
+          value={currentSemester ? `Semester ${toRoman(currentSemester.number)}` : "—"}
+          hint={currentSemester ? (currentSemester.enrollment === "active" ? "Ongoing • Active now" : currentSemester.enrollment) : "—"}
+          icon={<CalendarDays className="size-5" aria-hidden="true" />}
+        />
       </div>
 
-      {semesters.length === 0 ? (
-        <EmptyState
-          title="No semesters"
-          message="Create your first semester to start building the curriculum."
-          actionLabel="Add Semester"
-          onAction={openCreate}
-        />
-      ) : (
-        <>
-          <Card className="hidden overflow-hidden md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-surface-muted text-[11px] uppercase tracking-wider text-muted-foreground/80">
-                    <th scope="col" className="px-4 py-3 font-semibold">Order</th>
-                    <th scope="col" className="px-4 py-3 font-semibold">Semester</th>
-                    <th scope="col" className="px-4 py-3 font-semibold">Subjects</th>
-                    <th scope="col" className="px-4 py-3 font-semibold">Status</th>
-                    <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {semesters.map((s, i) => {
-                    const subjectCount = subjectsOf(s.id).length;
-                    return (
-                      <tr key={s.id} className="transition-colors hover:bg-surface-hover">
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-muted text-xs font-bold tabular-nums text-muted-foreground">
-                              {s.order}
-                            </span>
-                            <IconButton
-                              icon={ArrowUp}
-                              label={`Move ${s.name} up`}
-                              size="sm"
-                              disabled={i === 0}
-                              onClick={() => reorderSemesters(s.id, -1)}
-                            />
-                            <IconButton
-                              icon={ArrowDown}
-                              label={`Move ${s.name} down`}
-                              size="sm"
-                              disabled={i === semesters.length - 1}
-                              onClick={() => reorderSemesters(s.id, 1)}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary">
-                              <GraduationCap className="size-4" aria-hidden="true" />
-                            </div>
-                            <div className="min-w-0 max-w-[280px]">
-                              <p className="truncate text-sm font-semibold text-foreground">{s.name}</p>
-                              <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/80">
-                                {s.description || "No description"}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                            <BookOpen className="size-3.5" aria-hidden="true" />
-                            {subjectCount}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <button
-                            type="button"
-                            onClick={() => cycleStatus(s)}
-                            title={`Change status — currently ${s.status}`}
-                            className="rounded-full transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                          >
-                            <StatusBadge status={s.status} />
-                          </button>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <IconButton
-                              icon={Pencil}
-                              label={`Edit ${s.name}`}
-                              size="sm"
-                              className="border border-border bg-surface"
-                              onClick={() => openEdit(s)}
-                            />
-                            <IconButton
-                              icon={Trash2}
-                              label={`Delete ${s.name}`}
-                              size="sm"
-                              variant="danger"
-                              className="border border-border bg-surface"
-                              onClick={() => setPendingDelete(s)}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+      {sortedSemesters.map((semester) => {
+        const semSubjects = allSubjects.filter((s) => s.semesterId === semester.id).sort((a, b) => a.name.localeCompare(b.name));
 
-          <div className="space-y-3 md:hidden">
-            {semesters.map((s, i) => {
-              const subjectCount = subjectsOf(s.id).length;
-              return (
-                <Card key={s.id} className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary">
-                        <GraduationCap className="size-5" aria-hidden="true" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-foreground">{s.name}</p>
-                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                          {s.description || "No description"}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => cycleStatus(s)}
-                      title={`Change status — currently ${s.status}`}
-                      className="shrink-0 rounded-full transition-opacity hover:opacity-80"
-                    >
-                      <StatusBadge status={s.status} />
-                    </button>
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                      <BookOpen className="size-3.5" aria-hidden="true" />
-                      {subjectCount} subject{subjectCount === 1 ? "" : "s"}
-                    </span>
-                    <span className="inline-flex items-center rounded-full border border-border bg-surface-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                      Order {s.order}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
-                    <div className="flex items-center gap-1">
-                      <IconButton
-                        icon={ArrowUp}
-                        label={`Move ${s.name} up`}
-                        size="sm"
-                        disabled={i === 0}
-                        onClick={() => reorderSemesters(s.id, -1)}
-                      />
-                      <IconButton
-                        icon={ArrowDown}
-                        label={`Move ${s.name} down`}
-                        size="sm"
-                        disabled={i === semesters.length - 1}
-                        onClick={() => reorderSemesters(s.id, 1)}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <IconButton
-                        icon={Pencil}
-                        label={`Edit ${s.name}`}
-                        size="sm"
-                        className="border border-border bg-surface"
-                        onClick={() => openEdit(s)}
-                      />
-                      <IconButton
-                        icon={Trash2}
-                        label={`Delete ${s.name}`}
-                        size="sm"
-                        variant="danger"
-                        className="border border-border bg-surface"
-                        onClick={() => setPendingDelete(s)}
-                      />
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      <Modal
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        title={editing ? "Edit Semester" : "Add Semester"}
-      >
-        <form onSubmit={handleSubmit} noValidate className="mt-2 space-y-4">
-          <Input
-            id="sem-name"
-            label="Semester"
-            placeholder="e.g. Semester 5"
-            value={form.name}
-            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            error={errors.name}
-          />
-          <Textarea
-            id="sem-description"
-            label="Description"
-            rows={3}
-            placeholder="What this semester covers..."
-            value={form.description}
-            onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-          />
-          {editing && (
-            <div className="space-y-1.5">
-              <p className="text-sm font-semibold text-foreground">Current subjects</p>
-              {subjectsOf(editing.id).length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {subjectsOf(editing.id).map((sub) => (
-                    <Badge key={sub.id} tone="neutral">{sub.name}</Badge>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No subjects yet — add some below.</p>
-              )}
-            </div>
-          )}
-          <Input
-            id="sem-subjects"
-            label="Subjects / Courses"
-            placeholder="e.g. Data Structures, DBMS, Operating Systems"
-            hint={editing
-              ? "Comma-separated — new subjects are added to this semester."
-              : "Comma-separated — created with this semester."}
-            value={form.subjects}
-            onChange={(e) => setForm((p) => ({ ...p, subjects: e.target.value }))}
-          />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              id="sem-order"
-              label="Order"
-              type="number"
-              min={1}
-              value={form.order}
-              onChange={(e) => setForm((p) => ({ ...p, order: e.target.value }))}
-              error={errors.order}
-            />
-            <div className="space-y-1.5">
-              <span className="block text-sm font-semibold text-foreground">Status</span>
-              <div className="flex h-10 items-center">
-                <StatusToggleGroup
-                  value={form.status}
-                  onChange={(next) => setForm((p) => ({ ...p, status: next }))}
-                  size="md"
-                />
+        return (
+          <section key={semester.id} className="semester-section space-y-3">
+            {/* Semester heading — larger text, icon-only (no background card), actions on right */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-1">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="size-5 shrink-0 text-primary" aria-hidden="true" />
+                <h2 className="text-lg font-bold tracking-tight text-foreground sm:text-xl">Semester {toRoman(semester.number)}</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="primary" size="sm" onClick={() => openAddSubject(semester.id)}>
+                  <Plus className="size-3.5" aria-hidden="true" /> Add Subject
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => openAddResource(semester.id)}>
+                  <Plus className="size-3.5" aria-hidden="true" /> Add Resource
+                </Button>
               </div>
             </div>
+
+            {/* Subject cards grid: 2-col desktop / 1-col mobile — items-start prevents sibling card stretching */}
+            {semSubjects.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 items-start">
+                {semSubjects.map((subject) => {
+                  const isExpanded = expandedSubjectId === subject.id;
+
+                  return (
+                    <Card
+                      key={subject.id}
+                      className={cx(
+                        "self-start overflow-hidden border transition-[border-color,box-shadow] duration-200",
+                        isExpanded && "border-primary/40 shadow-card-hover",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        aria-expanded={isExpanded}
+                        onClick={() => toggleExpand(subject.id)}
+                        className="flex w-full cursor-pointer flex-col items-start gap-3 p-4 text-left transition-colors hover:bg-surface-hover"
+                      >
+                        <div className="flex w-full items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="rounded-md bg-primary-muted px-2 py-0.5 text-xs font-bold text-primary">{subject.code}</span>
+                            <StatusBadge status={subject.status} />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <IconButton icon={Pencil} label={`Edit ${subject.name}`} size="sm" onClick={(e) => { e.stopPropagation(); openEditSubject(subject); }} />
+                            <IconButton icon={Trash2} label={`Delete ${subject.name}`} size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); deleteSubject(subject); }} />
+                          </div>
+                        </div>
+                        <h3 className="text-base font-bold leading-tight text-foreground">{subject.name}</h3>
+                        <p className="line-clamp-2 min-h-[2.2rem] text-xs leading-relaxed text-muted-foreground">
+                          {subject.description || `${subject.category} • ${subject.credits} credits`}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>{resourceCountForSubject(subject.id)} {resourceCountForSubject(subject.id) === 1 ? "resource" : "resources"}</span>
+                          <span className="size-1 rounded-full bg-border-strong" aria-hidden="true" />
+                          <span>{subject.credits} cr</span>
+                        </div>
+                      </button>
+
+                      {/* Expanded — buttery smooth height + opacity + translate */}
+                      <div
+                        className={cx(
+                          "grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[grid-template-rows,opacity]",
+                          isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                        )}
+                      >
+                        <div
+                          className={cx(
+                            "overflow-hidden transition-[opacity,transform] duration-400 ease-out will-change-[opacity,transform]",
+                            isExpanded ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2",
+                          )}
+                        >
+                          <div className="border-t border-border bg-surface-muted/60 p-4">
+                            {(() => {
+                              const subjectResources = db.resources
+                                .filter((r) => !r.deletedAt && r.subjectId === subject.id)
+                                .sort((a, b) => +new Date(a.uploadedAt) - +new Date(b.uploadedAt));
+                              const mainBook = subjectResources.find((r) => r.type === "book");
+                              const childResources = subjectResources.filter((r) => r.id !== mainBook?.id);
+                              // Group child resources by actual Resource Type (or custom name) — only types that exist
+                              const grouped = new Map<string, { label: string; icon: any; resources: typeof childResources }>();
+                              for (const r of childResources) {
+                                const isCustom = r.type === "custom";
+                                const label = isCustom ? (r.customType?.trim() || "Custom") : resourceTypeLabel(r.type as any);
+                                const key = isCustom ? `custom:${label}` : r.type;
+                                const cfg = (RESOURCE_TYPE_CONFIG as any)[r.type] ?? RESOURCE_TYPE_CONFIG.custom;
+                                if (!grouped.has(key)) grouped.set(key, { label, icon: cfg.icon, resources: [] });
+                                grouped.get(key)!.resources.push(r);
+                              }
+                              const hasAny = mainBook || grouped.size > 0;
+                              if (!hasAny) {
+                                return (
+                                  <p className="rounded-lg border border-dashed border-border-strong bg-surface px-3 py-2.5 text-xs text-muted-foreground">No resources yet for this subject — add the first resource.</p>
+                                );
+                              }
+                              return (
+                                <div className="space-y-4">
+                                  {mainBook ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResourceClick(mainBook)}
+                                      className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface p-3 text-left shadow-sm transition-colors hover:border-primary/30 hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                    >
+                                      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary-muted text-primary">
+                                        <BookOpen className="size-4" aria-hidden="true" />
+                                      </span>
+                                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{mainBook.title}</span>
+                                      <span className="hidden shrink-0 rounded-full bg-primary-muted px-2 py-0.5 text-xs font-semibold text-primary sm:inline-flex">Book</span>
+                                    </button>
+                                  ) : null}
+
+                                  <div className="space-y-4">
+                                    {[...grouped.entries()].map(([key, group]) => {
+                                      const Icon = group.icon;
+                                      return (
+                                        <div key={key} className="space-y-2">
+                                          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                            <Icon className="size-3.5" aria-hidden="true" />
+                                            {group.label}
+                                          </p>
+                                          <ul className="space-y-2">
+                                            {group.resources.map((res) => (
+                                              <li key={res.id}>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleResourceClick(res)}
+                                                  className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-surface p-2.5 text-left transition-colors hover:border-primary/30 hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                                >
+                                                  <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{res.title}</span>
+                                                </button>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border bg-surface p-6 text-center text-muted-foreground">
+                <p className="text-base font-medium">No subjects yet for {semester.name}</p>
+                <p className="mt-2 text-sm">Click "Add Subject" to get started.</p>
+              </div>
+            )}
+          </section>
+        );
+      })}
+
+      {/* Subject modal */}
+      <Modal
+        open={subjectFormOpen}
+        onClose={() => { setSubjectFormOpen(false); setEditingSubject(null); }}
+        title={editingSubject ? "Edit Subject" : "Add Subject"}
+      >
+        <form onSubmit={handleSubjectSubmit} noValidate className="mt-4 space-y-4">
+          <Input id="sub-name" label="Subject Name" value={subjectForm.name} onChange={(e) => setSubjectForm((p) => ({ ...p, name: e.target.value }))} error={!subjectForm.name.trim() ? "Subject name is required" : undefined} required />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input id="sub-code" label="Code" value={subjectForm.code} onChange={(e) => setSubjectForm((p) => ({ ...p, code: e.target.value.toUpperCase() }))} error={!subjectForm.code.trim() ? "Code is required" : undefined} required />
+            <Input id="sub-credits" label="Credits" type="number" min={1} value={subjectForm.credits} onChange={(e) => setSubjectForm((p) => ({ ...p, credits: Number(e.target.value) || 0 }))} error={!subjectForm.credits || subjectForm.credits < 1 ? "Enter credits ≥ 1" : undefined} required />
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select id="sub-category" label="Category" value={subjectForm.category} onChange={(e) => setSubjectForm((p) => ({ ...p, category: e.target.value as "core" | "elective" | "practical" }))} options={[{ value: "core", label: "Core" }, { value: "elective", label: "Elective" }, { value: "practical", label: "Practical" }]} />
+            <Select id="sub-status" label="Status" value={subjectForm.status} onChange={(e) => setSubjectForm((p) => ({ ...p, status: e.target.value as PublishStatus }))} options={[{ value: "published", label: "Published" }, { value: "draft", label: "Draft" }, { value: "hidden", label: "Hidden" }]} />
+          </div>
+          <Select
+            id="sub-semester"
+            label="Semester"
+            value={subjectForm.semesterId}
+            onChange={(e) => setSubjectForm((p) => ({ ...p, semesterId: e.target.value }))}
+            options={[
+              { value: "", label: "Select semester..." },
+              ...semesters.map((s) => ({ value: s.id, label: s.name })),
+            ]}
+            error={!subjectForm.semesterId ? "Semester is required" : undefined}
+            required
+          />
+          <Textarea id="sub-desc" label="Description" rows={3} value={subjectForm.description} onChange={(e) => setSubjectForm((p) => ({ ...p, description: e.target.value }))} />
           <div className="flex justify-end gap-3">
-            <Button variant="outline" type="button" onClick={() => setFormOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">{editing ? "Save changes" : "Create semester"}</Button>
+            <Button variant="outline" type="button" onClick={() => { setSubjectFormOpen(false); setEditingSubject(null); }}>Cancel</Button>
+            <Button type="submit">{editingSubject ? "Save changes" : "Create subject"}</Button>
           </div>
         </form>
       </Modal>
 
+      {/* Resource modal */}
+      <ResourceEditorModal
+        open={resourceFormOpen}
+        onClose={() => setResourceFormOpen(false)}
+        defaultSemesterId={resourceDefaultSemester || undefined}
+      />
+
+      {/* Confirm delete */}
       <ConfirmDialog
         open={pendingDelete !== null}
-        title="Delete semester"
-        message={`"${pendingDelete?.name}" and its subjects, topics, and resources will move to the trash. Students will no longer see them.`}
+        title={`Delete ${pendingDelete?.type ?? ""}`}
+        message={`"${pendingDelete?.name}" will move to the trash.`}
         confirmLabel="Delete"
         danger
         onCancel={() => setPendingDelete(null)}
-        onConfirm={() => {
-          if (pendingDelete) {
-            softDelete("semester", pendingDelete.id);
-            toast("Semester moved to trash");
-          }
-          setPendingDelete(null);
-        }}
+        onConfirm={confirmDelete}
       />
     </div>
   );

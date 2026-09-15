@@ -1,7 +1,7 @@
 ﻿import { useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Bell, BookMarked, EyeOff, FileEdit, GraduationCap, Layers, LibraryBig, ListChecks,
+  Bell, BookMarked, EyeOff, FileEdit, FileText, GraduationCap, Layers, LibraryBig, ListChecks,
   Pencil, Rocket, Send, Trash2, X, type LucideIcon,
 } from "lucide-react";
 import { PageHeader, Card } from "../../components/common/PageHeader";
@@ -21,7 +21,8 @@ import {
 } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { RESOURCE_TYPE_CONFIG, resourceTypeLabel } from "../../lib/resourceType";
-import { cx, formatDate, formatRelativeTime } from "../../lib/utils";
+import { StatusBadge } from "../../components/admin/StatusBadge";
+import { cx, formatDate, formatFileSize, formatRelativeTime } from "../../lib/utils";
 import type { Notice, NoticeType, Resource, Semester, Subject, Topic } from "../../types";
 
 type DraftKind = "resource" | "topic" | "notice" | "semester" | "subject";
@@ -618,40 +619,50 @@ export default function AdminDrafts() {
               const TypeIcon = row.typeIcon;
               const subject = subjectById.get(row.subjectId);
               const semester = semesterById.get(row.semesterId);
+              const isResource = row.kind === "resource";
               return (
                 <Card
                   key={`${row.kind}-${idOf(row)}`}
                   className="p-4"
                   onClick={(row.kind === "resource" || row.kind === "topic" || row.kind === "notice") ? () => openDraft(row) : undefined}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", row.typeClass)}>
-                      <TypeIcon className="size-5" aria-hidden="true" />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", row.typeClass)}>
+                        <TypeIcon className="size-5" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0">
+                        {row.kind === "resource" ? (
+                          <Link
+                            to={`/admin/resources/${row.resource.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="truncate text-sm font-bold text-foreground hover:text-primary"
+                          >
+                            {row.title}
+                          </Link>
+                        ) : (
+                          <p className="truncate text-sm font-bold text-foreground">{row.title}</p>
+                        )}
+                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                          {semester?.name ?? "—"} · {subject?.name ?? "—"}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      {row.kind === "resource" ? (
-                        <Link
-                          to={`/admin/resources/${row.resource.id}`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="truncate text-sm font-bold text-foreground hover:text-primary"
-                        >
-                          {row.title}
-                        </Link>
-                      ) : (
-                        <p className="truncate text-sm font-bold text-foreground">{row.title}</p>
-                      )}
-                      {row.subtitle && (
-                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{row.subtitle}</p>
-                      )}
-                      <p className="mt-1 text-xs text-muted-foreground/80">
-                        {semester?.name ?? "â€”"} Â· {subject?.name ?? "â€”"}
-                      </p>
-                    </div>
+                    <StatusBadge status="draft" />
                   </div>
+                  {row.subtitle && (
+                    <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{row.subtitle}</p>
+                  )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", row.typeClass)}>
                       {row.typeLabel}
                     </span>
+                    {isResource && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                        <FileText className="size-3.5" aria-hidden="true" />
+                        {formatFileSize(row.resource.fileSize)} · {row.resource.pageCount}p
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                       <Layers className="size-3.5" aria-hidden="true" />
                       {formatRelativeTime(row.updatedAt)}
@@ -674,7 +685,6 @@ export default function AdminDrafts() {
                           icon={Pencil}
                           label={`Edit ${row.title}`}
                           size="sm"
-                          className="border border-border bg-surface"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (row.kind === "resource") setEditingResource(row.resource);
@@ -688,7 +698,6 @@ export default function AdminDrafts() {
                         label={`Delete ${row.title}`}
                         size="sm"
                         variant="danger"
-                        className="border border-border bg-surface"
                         onClick={(e) => {
                           e.stopPropagation();
                           setPendingDelete(row);
@@ -702,7 +711,6 @@ export default function AdminDrafts() {
           </div>
         </>
       )}
-
       <ResourceEditorModal
         open={editingResource !== null}
         editing={editingResource ?? undefined}

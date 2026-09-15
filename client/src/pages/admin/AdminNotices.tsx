@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useMemo, useState, type FormEvent } from "react";
 import { Pin, PinOff, Trash2, Pencil, Plus, Eye, EyeOff, Search } from "lucide-react";
 import { PageHeader, Card } from "../../components/common/PageHeader";
 import { Input, Select, Textarea } from "../../components/common/Field";
@@ -45,6 +44,7 @@ const PRIORITY_TONE: Record<Notice["priority"], "success" | "warning" | "error">
   low: "success",
   normal: "warning",
   high: "error",
+  urgent: "error",
 };
 
 interface NoticeFormState {
@@ -76,7 +76,6 @@ const emptyForm = (): NoticeFormState => ({
 export default function AdminNotices() {
   const db = useCms();
   const { toast } = useToast();
-  const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<NoticeType | "all">("all");
   const [formOpen, setFormOpen] = useState(false);
@@ -84,16 +83,6 @@ export default function AdminNotices() {
   const [form, setForm] = useState<NoticeFormState>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<keyof NoticeFormState, string>>>({});
   const [pendingDelete, setPendingDelete] = useState<Notice | null>(null);
-
-  // "Add Notice" quick action deep link: /admin/notices?new=1
-  useEffect(() => {
-    if (params.get("new")) {
-      setEditing(null);
-      setForm(emptyForm());
-      setFormOpen(true);
-      setParams({}, { replace: true });
-    }
-  }, [params, setParams]);
 
   const notices = useMemo(
     () =>

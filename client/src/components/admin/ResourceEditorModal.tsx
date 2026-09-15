@@ -7,7 +7,6 @@ import { Modal } from "../common/Modal";
 import { Input, Select, Textarea } from "../common/Field";
 import { Button } from "../common/Button";
 import { StatusToggleGroup } from "./StatusBadge";
-import { CascadeSelects } from "./CascadeSelects";
 import { ALL_RESOURCE_TYPES, resourceTypeLabel } from "../../lib/resourceType";
 import { cx, formatFileSize } from "../../lib/utils";
 import { useCms } from "../../state/CmsProvider";
@@ -19,6 +18,8 @@ import { useToast } from "../../state/ToastProvider";
  * - Creating: a PDF "upload" (client-side metadata) is required.
  * - Editing: metadata only — the existing file is kept unless replaced.
  * - Past Paper type reveals year/full marks/duration metadata.
+ * - Resource Type "Custom" reveals a text input for admin-entered type.
+ * - Topic has been removed — organization is Semester + Subject only.
  */
 
 interface ResourceEditorModalProps {
@@ -36,9 +37,9 @@ interface FormState {
   description: string;
   semesterId: string;
   subjectId: string;
-  topicId: string;
   bookId: string;
   type: ResourceType;
+  customType: string;
   tags: string;
   pageCount: string;
   paperYear: string;
@@ -54,9 +55,9 @@ function emptyForm(defaultSemesterId?: string, defaultSubjectId?: string): FormS
     description: "",
     semesterId: defaultSemesterId ?? "",
     subjectId: defaultSubjectId ?? "",
-    topicId: "",
     bookId: "",
     type: "short_note",
+    customType: "",
     tags: "",
     pageCount: "",
     paperYear: "",
@@ -73,9 +74,9 @@ function toForm(r: Resource): FormState {
     description: r.description,
     semesterId: r.semesterId,
     subjectId: r.subjectId,
-    topicId: r.topicId ?? "",
     bookId: r.bookId ?? "",
     type: r.type,
+    customType: r.customType ?? "",
     tags: r.tags.join(", "),
     pageCount: String(r.pageCount || ""),
     paperYear: r.paperYear ? String(r.paperYear) : "",
@@ -98,11 +99,23 @@ export function ResourceEditorModal({
   const [form, setForm] = useState<FormState>(() =>
     editing ? toForm(editing) : emptyForm(defaultSemesterId, defaultSubjectId),
   );
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState | "file", string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState | "file" | "customType", string>>>({});
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
   const suggestions = useMemo(() => getAllTags().slice(0, 8), [db]);
+
+  const semesters = useMemo(
+    () => db.semesters.filter((s) => !s.deletedAt).sort((a, b) => a.order - b.order),
+    [db.semesters],
+  );
+  const subjects = useMemo(
+    () =>
+      form.semesterId
+        ? db.subjects.filter((s) => !s.deletedAt && s.semesterId === form.semesterId)
+        : [],
+    [db.subjects, form.semesterId],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -114,7 +127,7 @@ export function ResourceEditorModal({
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-    setErrors((prev) => ({ ...prev, [key]: undefined }));
+    setErrors((prev) => ({ ...prev, [key]: undefined, ...(key === "type" ? { customType: undefined } : {}) }));
   };
 
   const parseTags = (raw: string): string[] =>
@@ -129,6 +142,7 @@ export function ResourceEditorModal({
     if (!form.title.trim()) next.title = "Title is required.";
     if (!form.semesterId) next.semesterId = "Select a semester.";
     if (!form.subjectId) next.subjectId = "Select a subject.";
+    if (form.type === "custom" && !form.customType.trim()) next.customType = "Enter custom type.";
     if (!editing && !file) next.file = "Select a PDF file to upload.";
     if (!form.pageCount || Number(form.pageCount) < 1) next.pageCount = "Enter the page count.";
     setErrors(next);
@@ -157,9 +171,10 @@ export function ResourceEditorModal({
       description: form.description.trim(),
       semesterId: form.semesterId,
       subjectId: form.subjectId,
-      topicId: form.topicId || undefined,
+      topicId: undefined,
       bookId: form.bookId || undefined,
       type: form.type,
+      customType: form.type === "custom" ? form.customType.trim() : undefined,
       pageCount: Number(form.pageCount),
       tags,
       paperYear: form.type === "past_paper" && form.paperYear ? Number(form.paperYear) : undefined,
@@ -234,6 +249,16 @@ export function ResourceEditorModal({
                   options={ALL_RESOURCE_TYPES.map((t) => ({ value: t, label: resourceTypeLabel(t) }))}
                 />
               </div>
+              {form.type === "custom" && (
+                <Input
+                  id="res-custom-type"
+                  label="Custom Type"
+                  placeholder="e.g. Lab Manual"
+                  value={form.customType}
+                  onChange={(e) => set("customType", e.target.value)}
+                  error={errors.customType}
+                />
+              )}
               <Textarea
                 id="res-description"
                 label="Description"
@@ -251,23 +276,35 @@ export function ResourceEditorModal({
                 onChange={(e) => set("tags", e.target.value)}
                 hint={suggestions.length > 0 ? `Existing: ${suggestions.slice(0, 5).map((t) => t.name).join(", ")}` : undefined}
               />
-              <div className="grid gap-4 sm:grid-cols-3">
-                <CascadeSelects
-                  semesterId={form.semesterId}
-                  subjectId={form.subjectId}
-                  topicId={form.topicId}
-                  topicOptional
-                  onSemesterChange={(id) => {
-                    set("semesterId", id);
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Select
+                  id="res-semester"
+                  label="Semester"
+                  value={form.semesterId}
+                  error={errors.semesterId}
+                  onChange={(e) => {
+                    set("semesterId", e.target.value);
                     set("subjectId", "");
-                    set("topicId", "");
                   }}
-                  onSubjectChange={(id) => {
-                    set("subjectId", id);
-                    set("topicId", "");
-                  }}
-                  onTopicChange={(id) => set("topicId", id)}
-                  showErrors={{ semesterId: errors.semesterId, subjectId: errors.subjectId }}
+                  options={[
+                    { value: "", label: "Select semester..." },
+                    ...semesters.map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+                />
+                <Select
+                  id="res-subject"
+                  label="Subject"
+                  value={form.subjectId}
+                  disabled={!form.semesterId}
+                  error={errors.subjectId}
+                  onChange={(e) => set("subjectId", e.target.value)}
+                  options={[
+                    {
+                      value: "",
+                      label: form.semesterId ? "Select subject..." : "Choose a semester first",
+                    },
+                    ...subjects.map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` })),
+                  ]}
                 />
               </div>
 

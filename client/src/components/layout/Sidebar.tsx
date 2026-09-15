@@ -1,4 +1,4 @@
-import { LayoutDashboard, BookMarked, GraduationCap, Heart, Bookmark, Download, FileStack, Settings, Bell, ListTree, FileEdit, Trash2 } from "lucide-react";
+import { LayoutDashboard, BookMarked, GraduationCap, Heart, Bookmark, Download, FileStack, Settings, Bell, FileEdit, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cx } from "../../lib/utils";
@@ -28,8 +28,6 @@ const ADMIN_NAV: NavItem[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/notices", label: "Notices", icon: Bell },
   { to: "/admin/semesters", label: "Semesters", icon: GraduationCap },
-  { to: "/admin/subjects", label: "Subjects", icon: BookMarked },
-  { to: "/admin/topics", label: "Topics", icon: ListTree },
   { to: "/admin/resources", label: "Resources", icon: FileStack },
   { to: "/admin/drafts", label: "Drafts", icon: FileEdit },
   { to: "/admin/trash", label: "Trash", icon: Trash2 },
@@ -73,15 +71,15 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { pathname, state } = useLocation();
   const inAdmin = role === "ADMIN" && pathname.startsWith("/admin");
   const items = inAdmin ? ADMIN_NAV : PRIMARY_NAV;
-  /** Shared Admin pages (detail /admin/resources/:id, reader
-   *  /admin/reader/:id) opened from Admin → Topics carry via:"topics" in
-   *  history state — keep Topics highlighted through the whole flow,
-   *  including while the PDF reader is open. */
+/** Shared Admin pages (detail /admin/resources/:id, reader
+    *  /admin/reader/:id) opened from Admin → Semesters carry via:"topics" in
+    *  history state — keep Semesters highlighted through the whole flow,
+    *  including while the PDF reader is open. */
   const activeOverride =
     inAdmin &&
     (pathname.startsWith("/admin/resources/") || pathname.startsWith("/admin/reader/")) &&
     (state as { via?: string } | null)?.via === "topics"
-      ? "/admin/topics"
+      ? "/admin/semesters"
       : undefined;
 
   return (

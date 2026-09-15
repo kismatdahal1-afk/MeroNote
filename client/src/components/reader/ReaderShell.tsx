@@ -1,12 +1,13 @@
 import { useParams, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
-import { getResourceById, getSubjectById } from "../../data/selectors";
+import { getResourceById, getSemesterById, getSubjectById } from "../../data/selectors";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 import { BackButton } from "../common/BackButton";
 import { useCmsSync } from "../common/CmsSync";
 import { PdfViewer } from "./PdfViewer";
+import { getDb } from "../../state/cmsStore";
 
 /**
  * Student PDF Reader page shell (Phase 2).
@@ -34,7 +35,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           <p className="text-lg font-bold text-foreground">Resource not found</p>
           <div className="mt-3 flex justify-center">
             <BackButton
-              fallbackTo={admin ? (via === "topics" ? "/admin/topics" : "/admin/resources") : "/dashboard"}
+              fallbackTo={admin ? (via === "topics" ? "/admin/semesters" : "/admin/resources") : "/dashboard"}
               label="Go back"
             />
           </div>
@@ -44,6 +45,8 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   }
 
   const subject = getSubjectById(resource.subjectId);
+  const semester = getSemesterById(resource.semesterId);
+  const topic = resource.topicId ? getDb().topics.find((t) => t.id === resource.topicId && !t.deletedAt) : undefined;
   const bookmarked = Boolean(getBookmark(resource.id));
   const download = getDownload(resource.id);
   const totalPages = resource.pageCount;
@@ -83,24 +86,48 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           <>
             <Link to="/admin" className="rounded px-1 py-0.5 hover:text-primary">Admin</Link>
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-            {via === "topics" ? (
-              <Link to="/admin/topics" state={detailState} className="rounded px-1 py-0.5 hover:text-primary">
-                Topics
-              </Link>
-            ) : (
+{via === "topics" ? (
+                  <Link to="/admin/semesters" state={detailState} className="rounded px-1 py-0.5 hover:text-primary">
+                    Semesters
+                  </Link>
+                ) : (
               <Link to="/admin/resources" className="rounded px-1 py-0.5 hover:text-primary">
                 Resources
               </Link>
+            )}
+            {semester && via === "topics" && (
+              <>
+                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+                <Link
+                  to="/admin/semesters"
+                  state={detailState}
+                  className="max-w-[10rem] truncate rounded px-1 py-0.5 hover:text-primary"
+                >
+                  {semester.name}
+                </Link>
+              </>
             )}
             {subject && (
               <>
                 <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
                 <Link
-                  to={via === "topics" ? "/admin/topics" : "/admin/resources"}
+                  to={via === "topics" ? "/admin/semesters" : "/admin/resources"}
                   state={detailState}
                   className="max-w-[12rem] truncate rounded px-1 py-0.5 hover:text-primary"
                 >
                   {subject.name}
+                </Link>
+              </>
+            )}
+            {topic && (
+              <>
+                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+                <Link
+                  to={`${baseRoute}/${resource.id}`}
+                  state={detailState}
+                  className="max-w-[12rem] truncate rounded px-1 py-0.5 hover:text-primary"
+                >
+                  {topic.title}
                 </Link>
               </>
             )}

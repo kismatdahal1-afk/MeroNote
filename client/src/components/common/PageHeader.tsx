@@ -89,17 +89,23 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon, hint }: StatCardProps) {
   return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <Card className="flex h-full items-center p-4 sm:p-5">
+      <div className="flex w-full items-center gap-4">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary sm:size-11">
+          <span className="flex size-5 items-center justify-center sm:size-6 [&>svg]:size-5 sm:[&>svg]:size-6">{icon}</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">
             {label}
           </p>
-          <p className="mt-1.5 text-2xl font-bold text-foreground">{value}</p>
-          {hint && <p className="mt-0.5 truncate text-xs text-muted-foreground/80">{hint}</p>}
-        </div>
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary">
-          {icon}
+          <p className="mt-1.5 truncate text-lg font-bold leading-none tracking-tight text-foreground tabular-nums sm:mt-2 sm:text-xl">
+            {value}
+          </p>
+          {hint && (
+            <p className="mt-1 truncate text-[11px] font-medium leading-tight text-muted-foreground sm:mt-1.5 sm:text-xs">
+              {hint}
+            </p>
+          )}
         </div>
       </div>
     </Card>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle, Bell, BookMarked, FileText, GraduationCap, HardDrive,
-  Library, ListChecks, RotateCcw, Trash2, type LucideIcon,
+  Layers, Library, ListChecks, RotateCcw, Trash2, type LucideIcon,
 } from "lucide-react";
 import { PageHeader, Card } from "../../components/common/PageHeader";
 import { IconButton } from "../../components/common/IconButton";
@@ -9,6 +9,7 @@ import { ConfirmDialog } from "../../components/common/ConfirmDialog";
 import { EmptyState } from "../../components/common/States";
 import { Button } from "../../components/common/Button";
 import { Badge } from "../../components/common/Badge";
+import { StatusBadge } from "../../components/admin/StatusBadge";
 import { useCms } from "../../state/CmsProvider";
 import { restoreEntity, purgeEntity, emptyTrash } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
@@ -248,17 +249,19 @@ export default function AdminTrash() {
           message="No deleted items in this category."
         />
       ) : (
-        <Card className="overflow-hidden">
+        <>
+          <Card className="hidden overflow-hidden md:block">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full table-fixed min-w-[60rem] text-left text-sm xl:min-w-0">
               <thead>
                 <tr className="border-b border-border bg-surface-muted text-[11px] uppercase tracking-wider text-muted-foreground/80">
-                  <th scope="col" className="px-4 py-3 font-semibold">Deleted Item</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Type</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Semester</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Subject</th>
-                  <th scope="col" className="px-4 py-3 font-semibold">Deleted On</th>
-                  <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
+                  <th scope="col" className="w-[25%] px-4 py-3 font-semibold">Resource</th>
+                  <th scope="col" className="w-[17%] px-3 py-3 font-semibold">Semester / Subject</th>
+                  <th scope="col" className="w-[12%] px-2 py-3 font-semibold">Type</th>
+                  <th scope="col" className="w-[11%] px-2 py-3 font-semibold">Size / Pages</th>
+                  <th scope="col" className="w-[11%] px-2 py-3 font-semibold">Status</th>
+                  <th scope="col" className="w-[11%] px-3 py-3 font-semibold">Deleted On</th>
+                  <th scope="col" className="w-[13%] px-3 py-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -271,43 +274,44 @@ export default function AdminTrash() {
                       onClick={() => restore(item)}
                       className="cursor-pointer transition-colors hover:bg-surface-hover"
                     >
-                      <td className="max-w-[280px] px-4 py-3.5">
+                      <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", config.badgeClass)}>
                             <Icon className="size-4" aria-hidden="true" />
                           </div>
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold text-foreground">{item.label}</p>
-                            {item.detail && (
-                              <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/80">{item.detail}</p>
-                            )}
-                            {item.fileSize !== undefined && (
-                              <p className="mt-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground/70">
-                                {formatFileSize(item.fileSize)}
-                              </p>
-                            )}
+                          <div className="min-w-0 flex-1">
+                            <p className="block truncate font-semibold text-foreground" title={item.label}>{item.label}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold", config.badgeClass)}>
-                          {config.label}
+                      <td className="px-3 py-3.5 text-xs text-muted-foreground">
+                        <p className="truncate font-semibold text-foreground/80">{item.semesterId ? nameOf(db.semesters, item.semesterId) : "—"}</p>
+                        <p className="mt-0.5 truncate">{item.subjectId ? nameOf(db.subjects, item.subjectId) : "—"}</p>
+                      </td>
+                      <td className="px-2 py-3.5">
+                        <span className={cx("inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold", config.badgeClass)}>
+                          <span className="truncate">{config.label}</span>
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-muted-foreground">
-                        {item.semesterId ? nameOf(db.semesters, item.semesterId) : "—"}
+                      <td className="px-2 py-3.5">
+                        {item.fileSize !== undefined ? (
+                          <>
+                            <p className="truncate text-sm font-medium tabular-nums text-foreground/80">{formatFileSize(item.fileSize)}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">—</p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">—</p>
+                        )}
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-muted-foreground">
-                        {item.subjectId ? nameOf(db.subjects, item.subjectId) : "—"}
+                      <td className="px-2 py-3.5">
+                        <StatusBadge status="hidden" />
                       </td>
-                      <td className="px-4 py-3.5">
-                        <p className="text-xs font-medium text-foreground/80">{formatDate(item.deletedAt)}</p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground/70">
-                          {formatRelativeTime(item.deletedAt)}
-                        </p>
+                      <td className="px-3 py-3.5">
+                        <p className="truncate text-xs font-medium text-foreground/80">{formatDate(item.deletedAt)}</p>
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">{formatRelativeTime(item.deletedAt)}</p>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="px-3 py-3.5">
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             size="sm"
                             variant="outline"
@@ -337,6 +341,74 @@ export default function AdminTrash() {
             </table>
           </div>
         </Card>
+
+          {/* ── Mobile cards ──────────────────────────────────── */}
+          <div className="space-y-3 md:hidden">
+            {filtered.map((item) => {
+              const config = ENTITY_CONFIG[item.entity];
+              const Icon = config.icon;
+              return (
+                <Card
+                  key={`${item.entity}-${item.id}`}
+                  className="p-4"
+                  onClick={() => restore(item)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", config.badgeClass)}>
+                        <Icon className="size-5" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-foreground">{item.label}</p>
+                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                          {item.semesterId ? nameOf(db.semesters, item.semesterId) : "—"} · {item.subjectId ? nameOf(db.subjects, item.subjectId) : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusBadge status="hidden" />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", config.badgeClass)}>
+                      {config.label}
+                    </span>
+                    {item.fileSize !== undefined && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                        <FileText className="size-3.5" aria-hidden="true" />
+                        {formatFileSize(item.fileSize)}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                      <Layers className="size-3.5" aria-hidden="true" />
+                      {formatRelativeTime(item.deletedAt)}
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between gap-2 border-t border-border pt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        restore(item);
+                      }}
+                    >
+                      <RotateCcw className="size-3.5" aria-hidden="true" /> Restore
+                    </Button>
+                    <IconButton
+                      icon={Trash2}
+                      label={`Delete ${item.label} forever`}
+                      size="sm"
+                      variant="danger"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPendingPurge(item);
+                      }}
+                    />
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <ConfirmDialog

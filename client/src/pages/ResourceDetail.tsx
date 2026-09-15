@@ -112,7 +112,7 @@ export default function ResourceDetail() {
       <div className="mb-1 -ml-1 sm:-ml-1">
         <BackButton
           label="Back"
-          fallbackTo={isAdmin ? (via === "topics" ? "/admin/topics" : "/admin/resources") : "/resources"}
+          fallbackTo={isAdmin ? (via === "topics" ? "/admin/semesters" : "/admin/resources") : "/resources"}
         />
       </div>
       <PageHeader
@@ -123,7 +123,8 @@ export default function ResourceDetail() {
             ? via === "topics"
               ? [
                   { label: "Admin", to: "/admin" },
-                  { label: "Topics", to: "/admin/topics" },
+                  { label: "Semesters", to: "/admin/semesters" },
+                  ...(semester ? [{ label: semester.name }] : []),
                   ...(subject ? [{ label: subject.name }] : []),
                   ...(topic ? [{ label: topic.title }] : []),
                 ]
@@ -131,6 +132,7 @@ export default function ResourceDetail() {
                   { label: "Admin", to: "/admin" },
                   { label: "Resources", to: "/admin/resources" },
                   ...(subject ? [{ label: subject.name }] : []),
+                  ...(topic ? [{ label: topic.title }] : []),
                 ]
             : [
                 { label: "Semesters", to: "/semesters" },
