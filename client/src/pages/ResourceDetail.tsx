@@ -114,7 +114,12 @@ export default function ResourceDetail() {
   const handleDelete = () => {
     softDelete("resource", resource.id);
     toast("Resource moved to trash");
-    navigate("/admin/resources");
+    // Return one level back to the exact parent context the item was opened
+    // from (same target as the Back button) — never to an unrelated page.
+    const fallback = isAdmin ? (via === "topics" ? "/admin/semesters" : "/admin/resources") : "/resources";
+    const idx = window.history.state?.idx;
+    if (typeof idx === "number" && idx > 0) navigate(-1);
+    else navigate(fallback, { replace: true });
   };
 
   return (
@@ -200,13 +205,22 @@ export default function ResourceDetail() {
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+              <Button
+                size="sm"
+                variant="primary"
+                title="Edit resource details"
+                className="transition-transform active:scale-95"
+                onClick={() => setEditOpen(true)}
+              >
                 <Pencil className="size-4" aria-hidden="true" /> Edit
               </Button>
               {resource.hidden ? (
                 <Button
                   size="sm"
                   variant="ghost"
+                  title="Currently hidden from students — click to make visible"
+                  aria-pressed={true}
+                  className="bg-warning-muted text-warning transition-transform hover:bg-warning-muted hover:text-warning active:scale-95"
                   onClick={() => {
                     setResourceHidden(resource.id, false);
                     toast(`"${resource.title}" visible to students again`);
@@ -217,7 +231,10 @@ export default function ResourceDetail() {
               ) : (
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant="outline"
+                  title="Hide this resource from students (stays in Admin)"
+                  aria-pressed={false}
+                  className="border-warning/50 text-warning transition-transform hover:bg-warning-muted hover:text-warning active:scale-95"
                   onClick={() => {
                     setResourceHidden(resource.id, true);
                     toast(`"${resource.title}" hidden from students`);
@@ -228,8 +245,9 @@ export default function ResourceDetail() {
               )}
               <Button
                 size="sm"
-                variant="ghost"
-                className="text-error hover:bg-error-muted hover:text-error"
+                variant="danger"
+                title="Move this resource to trash"
+                className="bg-[#FA003F]/15 text-[#FA003F] transition-transform hover:bg-[#FA003F] hover:text-white hover:opacity-100 active:scale-95"
                 onClick={() => setPendingDelete(true)}
               >
                 <Trash2 className="size-4" aria-hidden="true" /> Delete

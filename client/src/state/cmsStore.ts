@@ -264,6 +264,20 @@ if (typeof window !== "undefined" && window.localStorage.getItem(MIGRATION_KEY) 
 
 function commit(): void {
   persist(db);
+  // Publish new references: most mutations edit items in place, so without
+  // fresh object/array identities React bails out (setState same ref) and
+  // memos keyed on collections never recompute — leaving e.g. just-deleted
+  // items visible until a manual refresh. Re-snapshotting here makes every
+  // committed change (delete/restore/publish/hide/…) render immediately.
+  db = {
+    semesters: [...db.semesters],
+    subjects: [...db.subjects],
+    topics: [...db.topics],
+    resources: [...db.resources],
+    books: [...db.books],
+    notices: [...db.notices],
+    activity: [...db.activity],
+  };
   for (const l of listeners) l(db);
 }
 
@@ -334,6 +348,23 @@ export function restoreEntity(entity: CmsEntity, id: string): void {
   delete item.deletedAt;
   logActivity(entity, "restore", labelOf(entity, item));
   commit();
+}
+
+/** Restore every soft-deleted item across all entities. Single commit so
+ *  the UI reflects all restores instantly. Returns the restored count. */
+export function restoreAll(): number {
+  const entities: CmsEntity[] = ["semester", "subject", "topic", "resource", "notice", "book"];
+  let count = 0;
+  for (const e of entities) {
+    for (const item of collection(e)) {
+      if (!item.deletedAt) continue;
+      delete item.deletedAt;
+      logActivity(e, "restore", labelOf(e, item));
+      count++;
+    }
+  }
+  if (count > 0) commit();
+  return count;
 }
 
 /** Permanent delete with cascades to children. */

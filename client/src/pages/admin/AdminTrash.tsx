@@ -11,7 +11,7 @@ import { Button } from "../../components/common/Button";
 import { Badge } from "../../components/common/Badge";
 import { StatusBadge } from "../../components/admin/StatusBadge";
 import { useCms } from "../../state/CmsProvider";
-import { restoreEntity, purgeEntity, emptyTrash, getSettings } from "../../state/cmsStore";
+import { restoreEntity, restoreAll, purgeEntity, emptyTrash, getSettings } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { cx, formatDate, formatFileSize, formatRelativeTime } from "../../lib/utils";
 import type { CmsEntity, Semester, Subject } from "../../types";
@@ -118,6 +118,7 @@ export default function AdminTrash() {
   const [entityFilter, setEntityFilter] = useState<EntityFilter>("all");
   const [pendingPurge, setPendingPurge] = useState<TrashItem | null>(null);
   const [pendingEmpty, setPendingEmpty] = useState(false);
+  const [pendingRestoreAll, setPendingRestoreAll] = useState(false);
 
   /** Every soft-deleted item across the store, newest first. */
   const items: TrashItem[] = useMemo(() => {
@@ -241,9 +242,19 @@ export default function AdminTrash() {
         ]}
         actions={
           items.length > 0 ? (
-            <Button variant="danger" onClick={requestEmpty}>
-              <Trash2 className="size-4" aria-hidden="true" /> Empty Trash
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                title="Restore all trashed items"
+                className="transition-transform active:scale-95"
+                onClick={() => setPendingRestoreAll(true)}
+              >
+                <RotateCcw className="size-4" aria-hidden="true" /> Restore All
+              </Button>
+              <Button variant="danger" onClick={requestEmpty}>
+                <Trash2 className="size-4" aria-hidden="true" /> Empty Trash
+              </Button>
+            </div>
           ) : (
             <Badge tone="neutral">Empty</Badge>
           )
@@ -300,8 +311,7 @@ export default function AdminTrash() {
                   return (
                     <tr
                       key={`${item.entity}-${item.id}`}
-                      onClick={() => restore(item)}
-                      className="cursor-pointer transition-colors hover:bg-surface-hover"
+                      className="transition-colors hover:bg-surface-hover"
                     >
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
@@ -380,7 +390,6 @@ export default function AdminTrash() {
                 <Card
                   key={`${item.entity}-${item.id}`}
                   className="p-4"
-                  onClick={() => restore(item)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
@@ -456,6 +465,20 @@ export default function AdminTrash() {
         onConfirm={() => {
           if (pendingPurge) purgeNow(pendingPurge);
           setPendingPurge(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingRestoreAll}
+        title="Restore all"
+        message={`All ${items.length} trashed item${items.length === 1 ? "" : "s"} will be restored to ${items.length === 1 ? "its" : "their"} original location${items.length === 1 ? "" : "s"}.`}
+        confirmLabel="Restore all"
+        onCancel={() => setPendingRestoreAll(false)}
+        onConfirm={() => {
+          const count = restoreAll();
+          toast(count === 1 ? 'Restored 1 item' : `Restored ${count} items`);
+          setEntityFilter("all");
+          setPendingRestoreAll(false);
         }}
       />
 
