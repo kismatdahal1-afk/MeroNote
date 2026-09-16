@@ -33,20 +33,23 @@ interface SemesterStatusChipProps {
   className?: string;
 }
 
-/** Compact status pill with icon + text. */
+/** Compact status pill: icon-only on mobile (room for the semester name),
+ *  icon + text from sm up. Desktop rendering is unchanged. */
 export function SemesterStatusChip({ status, className }: SemesterStatusChipProps) {
   const meta = STATUS_META[status];
   const Icon = meta.icon;
   return (
     <span
+      title={meta.label}
       className={cx(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold",
+        "inline-flex shrink-0 items-center gap-0 rounded-full px-1.5 py-1 text-xs font-bold sm:gap-1.5 sm:px-2.5",
         meta.classes,
         className,
       )}
     >
       <Icon className="size-3.5" aria-hidden="true" />
-      {meta.label}
+      <span className="hidden sm:inline">{meta.label}</span>
+      <span className="sr-only sm:hidden">{meta.label}</span>
     </span>
   );
 }

@@ -20,11 +20,12 @@ const TYPE_FILTERS: { value: NoticeType | "all"; label: string }[] = [
 ];
 
 export default function Notices() {
-  useCmsSync();
+  const cmsDb = useCmsSync();
   const [query, setQuery] = useState("");
   const [type, setType] = useState<NoticeType | "all">("all");
 
-  const notices = useMemo(() => getStudentNotices(), []);
+  // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
+  const notices = useMemo(() => getStudentNotices(), [cmsDb]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

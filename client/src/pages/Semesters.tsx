@@ -45,7 +45,7 @@ export default function Semesters() {
 }
 
 export function SemesterSubjects() {
-  useCmsSync();
+  const cmsDb = useCmsSync();
   const { semesterId } = useParams<{ semesterId: string }>();
   const navigate = useNavigate();
   const { getStatus, setStatus } = useSemesterStatus();
@@ -55,7 +55,8 @@ export function SemesterSubjects() {
   const semester = getSemesterById(semesterId);
   const subjects = useMemo(
     () => (semester ? getSubjectsBySemester(semester.id) : []),
-    [semester],
+    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
+    [semester, cmsDb],
   );
   /** Semester resources, most recently added first. */
   const recentResources = useMemo(
@@ -65,7 +66,8 @@ export function SemesterSubjects() {
             (a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt),
           )
         : [],
-    [semester],
+    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
+    [semester, cmsDb],
   );
 
   const filteredSubjects = useMemo(() => {

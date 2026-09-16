@@ -24,10 +24,10 @@ export function SemesterCard({ semester }: SemesterCardProps) {
       aria-label={`Open ${semester.name}`}
       className="group block h-full rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
-      <Card interactive className="flex h-full min-h-[148px] flex-col p-4 transition-shadow group-hover:shadow-card-hover">
+      <Card interactive className="flex h-full min-h-[148px] flex-col p-3 transition-shadow group-hover:shadow-card-hover sm:p-4">
         {/* Header row: number block + status chip — same scale as Dashboard overview */}
-        <div className="flex items-start justify-between gap-2.5">
-          <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex items-start justify-between gap-2 sm:gap-2.5">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
             <div
               className={cx(
                 "flex size-8 shrink-0 items-center justify-center rounded-lg border text-sm font-bold leading-none",

@@ -12,11 +12,8 @@ import { Badge } from "../components/common/Badge";
 import { programInfo } from "../data/mock";
 import { useUser } from "../state/UserProvider";
 import {
-  getAllSemesters,
   getResourceById,
-  countCoreSubjects,
   getTrendingExamResources,
-  getAllResources,
 } from "../data/selectors";
 import { useLibrary } from "../state/LibraryProvider";
 import { getDashboardNotices } from "../state/cmsStore";
@@ -44,17 +41,16 @@ export default function Dashboard() {
     .slice(0, 2);
 
   const trending = getTrendingExamResources().slice(0, 3);
+  /** Logged-in user's downloaded-resource total: reads the user's library
+   *  (mock-backed for now), so it follows real user data once connected. */
   const completedDownloads = downloads.filter((d) => d.status === "completed").length;
-  const semesters = getAllSemesters();
-  /** Real CMS stats — no hardcoded counts. */
-  const totalResources = getAllResources().length;
   const notices = getDashboardNotices();
 
   const stats = [
-    { label: "Semesters", value: semesters.length, hint: "Syllabus & Past Qs", icon: GraduationCap },
-    { label: "Curriculum", value: countCoreSubjects(), hint: "Theory & Practicals", icon: BookOpen },
-    { label: "Archived", value: totalResources, hint: "Notes & Papers", icon: FileStack },
-    { label: "Saved", value: completedDownloads, hint: "Offline Ready", icon: HardDriveDownload },
+    { label: "Semesters", value: "8", hint: "Syllabus & Qs", icon: GraduationCap },
+    { label: "Subjects", value: "45+", hint: "Theory & Lab", icon: BookOpen },
+    { label: "Archived", value: "60+", hint: "Notes & Papers", icon: FileStack },
+    { label: "Downloaded", value: completedDownloads, hint: "Offline Ready", icon: HardDriveDownload },
   ];
 
   /** Quick-nav badges match the Favorite/Bookmark "All" totals (resources + subjects). */
@@ -70,13 +66,22 @@ export default function Dashboard() {
           so growing it never pushes or squeezes the greeting text. */}
       <header className="relative mb-5 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          <p
+            className="font-display animate-fade-up text-2xl font-bold tracking-tight text-foreground motion-reduce:animate-none sm:text-3xl"
+            style={{ animationDelay: "0ms" }}
+          >
             {getGreeting()},
           </p>
-          <p className="font-display mt-0.5 text-2xl font-bold tracking-tight text-primary sm:text-3xl">
+          <p
+            className="font-display animate-fade-up mt-0.5 text-2xl font-bold tracking-tight text-primary motion-reduce:animate-none sm:text-3xl"
+            style={{ animationDelay: "70ms" }}
+          >
             {name.split(" ")[0]}
           </p>
-          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-sm font-medium text-muted-foreground">
+          <p
+            className="animate-fade-up mt-1 flex flex-wrap items-center gap-x-1.5 text-sm font-medium text-muted-foreground motion-reduce:animate-none"
+            style={{ animationDelay: "140ms" }}
+          >
             <span aria-hidden="true" className="sm:hidden">TU</span>
             <span className="hidden sm:inline">{programInfo.university}</span>
             <span aria-hidden="true">•</span>
@@ -98,7 +103,7 @@ export default function Dashboard() {
 
       {/* Exam countdown */}
       <div className="mb-3.5">
-        <ExamCard />
+        <ExamCard startDelay={210} />
       </div>
 
       {/* Notices & reminders — admin-managed, loaded from the CMS store */}

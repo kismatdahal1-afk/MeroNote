@@ -17,7 +17,7 @@ import { useCmsSync } from "../components/common/CmsSync";
 type SortKey = "recent" | "oldest" | "title" | "size";
 
 export default function Downloads() {
-  useCmsSync();
+  const cmsDb = useCmsSync();
   const { downloads, removeDownload, totalDownloadSize } = useLibrary();
   const { toast } = useToast();
   const semesters = getAllSemesters();
@@ -36,7 +36,8 @@ export default function Downloads() {
         .filter((e): e is { dl: (typeof downloads)[number]; resource: NonNullable<ReturnType<typeof getResourceById>> } =>
           Boolean(e.resource),
         ),
-    [downloads],
+    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
+    [downloads, cmsDb],
   );
 
   const subjectOptions = useMemo(

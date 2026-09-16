@@ -62,7 +62,7 @@ function byNewest(a: Resource, b: Resource): number {
 }
 
 export default function SubjectDetail() {
-  useCmsSync();
+  const cmsDb = useCmsSync();
   const { subjectId } = useParams<{ subjectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -78,11 +78,13 @@ export default function SubjectDetail() {
 
   const topics = useMemo(
     () => (subject ? getTopicsBySubject(subject.id) : []),
-    [subject],
+    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
+    [subject, cmsDb],
   );
   const allResources = useMemo(
     () => (subject ? getResourcesBySubject(subject.id) : []),
-    [subject],
+    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
+    [subject, cmsDb],
   );
 
   /**
