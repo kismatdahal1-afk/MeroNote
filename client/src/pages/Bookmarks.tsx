@@ -218,7 +218,7 @@ export default function Bookmarks() {
                   </h2>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {subjects.map((s) => (
-                      <SubjectCard key={s.id} subject={s} />
+                      <SubjectCard key={s.id} subject={s} via="bookmarks" />
                     ))}
                   </div>
                 </section>

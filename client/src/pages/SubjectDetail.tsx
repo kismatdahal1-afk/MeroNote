@@ -1,5 +1,5 @@
 ﻿import { useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { ErrorState, EmptyState } from "../components/common/States";
 import { BackButton } from "../components/common/BackButton";
@@ -13,6 +13,7 @@ import {
   getTopicsBySubject,
   getResourcesBySubject,
 } from "../data/selectors";
+import { entryPointFromState, entryRootFor } from "../lib/resourceNavigation";
 import {
   ALL_RESOURCE_TYPES,
   RESOURCE_TYPE_CONFIG,
@@ -65,6 +66,13 @@ export default function SubjectDetail() {
   const cmsDb = useCmsSync();
   const { subjectId } = useParams<{ subjectId: string }>();
   const navigate = useNavigate();
+  const { state } = useLocation();
+  /** Favorite/Bookmark entry: the subject was opened from a saved list, so
+   *  the breadcrumb and resource links keep that entry context. */
+  const entry = entryPointFromState(state);
+  const entryRoot =
+    entry === "favorites" || entry === "bookmarks" ? entryRootFor(entry) : undefined;
+  const subjectVia = entryRoot ? entry : undefined;
   const { toast } = useToast();
   const {
     isFavoriteSubject,
@@ -151,34 +159,58 @@ export default function SubjectDetail() {
   return (
     <div>
       <div className="mb-1 -ml-1 sm:-ml-1">
-        <BackButton label="Back to semester" />
+        <BackButton
+          label={entryRoot ? `Back to ${entryRoot.label.toLowerCase()}s` : "Back to semester"}
+          fallbackTo={entryRoot ? entryRoot.to : "/dashboard"}
+        />
       </div>
 
       <nav aria-label="Breadcrumb" className="mb-2">
         <ol className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground md:text-sm">
-          <li className="flex items-center gap-1">
-            <Link
-              to="/semesters"
-              className="rounded px-1 py-0.5 font-medium hover:text-primary"
-            >
-              Semester
-            </Link>
-          </li>
-          <li className="flex items-center gap-1">
-            <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
-            <Link
-              to={`/semesters/${semester.id}`}
-              className="rounded px-1 py-0.5 font-medium hover:text-primary"
-            >
-              {semester.name}
-            </Link>
-          </li>
-          <li className="flex items-center gap-1">
-            <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
-            <span aria-current="page" className="font-semibold text-foreground">
-              {subject.name}
-            </span>
-          </li>
+          {entryRoot ? (
+            <>
+              <li className="flex items-center gap-1">
+                <Link
+                  to={entryRoot.to}
+                  className="rounded px-1 py-0.5 font-medium hover:text-primary"
+                >
+                  {entryRoot.label}
+                </Link>
+              </li>
+              <li className="flex items-center gap-1">
+                <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
+                <span aria-current="page" className="font-semibold text-foreground">
+                  {subject.name}
+                </span>
+              </li>
+            </>
+          ) : (
+            <>
+              <li className="flex items-center gap-1">
+                <Link
+                  to="/semesters"
+                  className="rounded px-1 py-0.5 font-medium hover:text-primary"
+                >
+                  Semester
+                </Link>
+              </li>
+              <li className="flex items-center gap-1">
+                <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
+                <Link
+                  to={`/semesters/${semester.id}`}
+                  className="rounded px-1 py-0.5 font-medium hover:text-primary"
+                >
+                  {semester.name}
+                </Link>
+              </li>
+              <li className="flex items-center gap-1">
+                <ChevronRight className="size-3.5 shrink-0" aria-hidden="true" />
+                <span aria-current="page" className="font-semibold text-foreground">
+                  {subject.name}
+                </span>
+              </li>
+            </>
+          )}
         </ol>
       </nav>
 
@@ -210,12 +242,12 @@ export default function SubjectDetail() {
                 {/* Mobile: existing compact rows. Desktop: Resources-page card grid. */}
                 <ul className="space-y-2.5 sm:hidden">
                   {resources.map((r) => (
-                    <SubjectResourceRow key={r.id} resource={r} />
+                    <SubjectResourceRow key={r.id} resource={r} via={subjectVia} />
                   ))}
                 </ul>
                 <div className="hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
                   {resources.map((r) => (
-                    <ResourceCard key={r.id} resource={r} showContext={false} />
+                    <ResourceCard key={r.id} resource={r} showContext={false} via={subjectVia} />
                   ))}
                 </div>
               </SubjectResourceGroup>
@@ -232,12 +264,12 @@ export default function SubjectDetail() {
               {/* Mobile: existing compact rows. Desktop: Resources-page card grid. */}
               <ul className="space-y-2.5 sm:hidden">
                 {resources.map((r) => (
-                  <SubjectResourceRow key={r.id} resource={r} />
+                  <SubjectResourceRow key={r.id} resource={r} via={subjectVia} />
                 ))}
               </ul>
               <div className="hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
                 {resources.map((r) => (
-                  <ResourceCard key={r.id} resource={r} showContext={false} />
+                  <ResourceCard key={r.id} resource={r} showContext={false} via={subjectVia} />
                 ))}
               </div>
             </SubjectResourceGroup>

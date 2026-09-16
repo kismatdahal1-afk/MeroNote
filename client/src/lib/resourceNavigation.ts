@@ -36,6 +36,14 @@ export function entryRootFor(
 }
 
 /**
+ * Entries whose trail inserts the resource's subject between the root and
+ * the resource (saved-list flows: Favorite / Bookmark).
+ */
+export function entryShowsSubject(entry: ResourceEntryPoint): boolean {
+  return entry === "bookmarks" || entry === "favorites";
+}
+
+/**
  * Sidebar / mobile-nav highlight for pages that belong to a section other
  * than their URL prefix:
  * - Subject pages (/subjects/:id) live inside the Semester flow, so they
@@ -52,7 +60,14 @@ export function studentNavHighlight(
   pathname: string,
   state: unknown,
 ): string | undefined {
-  if (pathname.startsWith("/subjects/")) return "/semesters";
+  // Subject pages keep the entry section lit (Favorite / Bookmark), else
+  // they live inside the Semester flow.
+  if (pathname.startsWith("/subjects/")) {
+    const subjectEntry = entryPointFromState(state);
+    return entryShowsSubject(subjectEntry)
+      ? entryRootFor(subjectEntry)?.to
+      : "/semesters";
+  }
   const shared =
     pathname.startsWith("/resources/") || pathname.startsWith("/reader/");
   if (!shared) return undefined;

@@ -2,7 +2,7 @@ import { useParams, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { getResourceById, getSemesterById, getSubjectById } from "../../data/selectors";
-import { entryPointFromState, entryRootFor, adminEntryPointFromState, adminEntryRootFor } from "../../lib/resourceNavigation";
+import { entryPointFromState, entryRootFor, entryShowsSubject, adminEntryPointFromState, adminEntryRootFor } from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 import { BackButton } from "../common/BackButton";
@@ -141,6 +141,14 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
         ) : entryRoot ? (
           <>
             <Link to={entryRoot.to} className="shrink-0 rounded px-1 py-0.5 hover:text-primary">{entryRoot.label}</Link>
+            {entryShowsSubject(entry) && subject && (
+              <span className="inline-flex min-w-0 items-center gap-0.5">
+                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+                <span className="whitespace-normal rounded px-1 py-0.5">
+                  {subject.name}
+                </span>
+              </span>
+            )}
             <span className="inline-flex min-w-0 items-center gap-0.5">
               <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
               <Link
@@ -180,9 +188,14 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
               </span>
             )}
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-            <span aria-current="page" className="min-w-0 whitespace-normal rounded px-1 py-0.5 font-semibold text-foreground">
+            <Link
+              to={`${baseRoute}/${resource.id}`}
+              className="min-w-0 whitespace-normal rounded px-1 py-0.5 hover:text-primary"
+            >
               {resource.title}
-            </span>
+            </Link>
+            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
         )
       }

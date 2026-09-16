@@ -3,12 +3,16 @@ import { ChevronRight, Heart, Bookmark } from "lucide-react";
 import type { Resource } from "../../types";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import { cx, formatFileSize } from "../../lib/utils";
+import type { ResourceEntryPoint } from "../../lib/resourceNavigation";
 import { IconButton } from "../common/IconButton";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 
 interface SubjectResourceRowProps {
   resource: Resource;
+  /** Navigation entry point forwarded to the detail page (keeps the
+   *  Bookmark → Subject → Resource trail when set). */
+  via?: ResourceEntryPoint;
 }
 
 /**
@@ -24,7 +28,7 @@ interface SubjectResourceRowProps {
  * action; on mobile the row splits into two rows — icon + title +
  * Favorite/Bookmark on the first row, a full-width Open action below.
  */
-export function SubjectResourceRow({ resource }: SubjectResourceRowProps) {
+export function SubjectResourceRow({ resource, via }: SubjectResourceRowProps) {
   const {
     markOpened,
     getProgress,
@@ -70,6 +74,7 @@ export function SubjectResourceRow({ resource }: SubjectResourceRowProps) {
       <div className="flex w-full items-center gap-3">
         <Link
           to={`/resources/${resource.id}`}
+          state={via ? { via } : undefined}
           onClick={() => markOpened(resource.id)}
           aria-label={`Open ${resource.title}`}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -135,6 +140,7 @@ export function SubjectResourceRow({ resource }: SubjectResourceRowProps) {
 
       <Link
         to={`/resources/${resource.id}`}
+        state={via ? { via } : undefined}
         onClick={() => markOpened(resource.id)}
         aria-label={`Open ${resource.title}`}
         className="mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:hidden"

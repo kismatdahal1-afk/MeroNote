@@ -15,7 +15,7 @@ import { ResourceEditorModal } from "../components/admin/ResourceEditorModal";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { getResourceById, getSubjectById, getSemesterById } from "../data/selectors";
 import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
-import { entryPointFromState, entryRootFor, adminEntryPointFromState, adminEntryRootFor } from "../lib/resourceNavigation";
+import { entryPointFromState, entryRootFor, entryShowsSubject, adminEntryPointFromState, adminEntryRootFor } from "../lib/resourceNavigation";
 import { cx, formatFileSize, formatDate } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
@@ -151,10 +151,16 @@ export default function ResourceDetail() {
                 { label: resource.title },
               ]
             : entryRoot
-              ? [
-                  { label: entryRoot.label, to: entryRoot.to },
-                  { label: resource.title },
-                ]
+              ? entryShowsSubject(entry) && subject
+                ? [
+                    { label: entryRoot.label, to: entryRoot.to },
+                    { label: subject.name },
+                    { label: resource.title },
+                  ]
+                : [
+                    { label: entryRoot.label, to: entryRoot.to },
+                    { label: resource.title },
+                  ]
               : [
                 { label: "Semester", to: "/semesters" },
                 ...(semester ? [{ label: semester.name, to: `/semesters/${semester.id}` }] : []),

@@ -5,10 +5,11 @@ import { Card } from "../common/PageHeader";
 import { Badge } from "../common/Badge";
 import { IconButton } from "../common/IconButton";
 import { countResourcesBySubject } from "../../data/selectors";
+import type { ResourceEntryPoint } from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 
-export function SubjectCard({ subject }: { subject: Subject }) {
+export function SubjectCard({ subject, via }: { subject: Subject; via?: ResourceEntryPoint }) {
   const count = countResourcesBySubject(subject.id);
   const { isFavoriteSubject, toggleFavoriteSubject, isSubjectBookmarked, toggleBookmarkSubject } =
     useLibrary();
@@ -32,6 +33,7 @@ export function SubjectCard({ subject }: { subject: Subject }) {
       {/* Stretched link — makes the whole card clickable */}
       <Link
         to={`/subjects/${subject.id}`}
+        state={via ? { via } : undefined}
         aria-label={`Open ${subject.name}`}
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />

@@ -7,9 +7,13 @@ import { HeaderSearch } from "../common/SearchBar";
 import { IconButton } from "../common/IconButton";
 
 export function BrandMark({ subtitle = false }: { subtitle?: boolean }) {
+  const { role } = useUser();
+  const isAdmin = role === "ADMIN";
+  const homePath = isAdmin ? "/admin" : "/dashboard";
+
   return (
     <Link
-      to="/dashboard"
+      to={homePath}
       className="flex items-center gap-2.5 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       aria-label="Mero Note home"
     >
