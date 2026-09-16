@@ -6,6 +6,7 @@ import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import { ProgressBar } from "../common/ProgressBar";
 import { cx, formatFileSize } from "../../lib/utils";
 import { getSubjectById, getSemesterById } from "../../data/selectors";
+import type { ResourceEntryPoint } from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 import { IconButton } from "../common/IconButton";
@@ -14,9 +15,12 @@ interface ResourceCardProps {
   resource: Resource;
   /** show subject/semester line (used on dashboard/search results) */
   showContext?: boolean;
+  /** Navigation entry point for the detail/reader breadcrumb.
+   *  Omitted inside Semester flows, which keep the Semester trail. */
+  via?: ResourceEntryPoint;
 }
 
-export function ResourceCard({ resource, showContext = true }: ResourceCardProps) {
+export function ResourceCard({ resource, showContext = true, via }: ResourceCardProps) {
   const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, getProgress } = useLibrary();
   const { toast } = useToast();
 
@@ -57,6 +61,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
       {/* Stretched link — makes the whole card clickable */}
       <Link
         to={`/resources/${resource.id}`}
+        state={via ? { via } : undefined}
         aria-label={`Open ${resource.title}`}
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
@@ -102,6 +107,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
       </div>
       <Link
         to={`/resources/${resource.id}`}
+        state={via ? { via } : undefined}
         aria-label={`Open ${resource.title}`}
         className="relative z-10 mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:hidden"
       >
@@ -188,6 +194,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
         <div className="flex items-center gap-1">
           <Link
             to={`/reader/${resource.id}`}
+            state={via ? { via } : undefined}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
             aria-label={`Open ${resource.title} in reader`}
           >

@@ -237,7 +237,6 @@ export default function AdminTrash() {
         title="Trash"
         subtitle="Recover deleted content, or remove it permanently."
         breadcrumbs={[
-          { label: "Admin", to: "/admin" },
           { label: "Trash" },
         ]}
         actions={

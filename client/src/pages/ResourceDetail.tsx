@@ -15,18 +15,20 @@ import { ResourceEditorModal } from "../components/admin/ResourceEditorModal";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { getResourceById, getSubjectById, getSemesterById } from "../data/selectors";
 import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
+import { entryPointFromState, entryRootFor, adminEntryPointFromState, adminEntryRootFor } from "../lib/resourceNavigation";
 import { cx, formatFileSize, formatDate } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
-import { setResourceHidden, softDelete, getDb } from "../state/cmsStore";
+import { setResourceHidden, softDelete } from "../state/cmsStore";
 import { useCmsSync } from "../components/common/CmsSync";
 
 /**
  * THE canonical Resource Detail page — shared by the student panel
- * (/resources/:id) and the admin panel (/admin/resources/:id, and topic
- * clicks from Admin → Topics). Admin context (detected from the route)
- * only adds a compact management strip: Edit / Hide-Unhide / Delete.
- * Everything else — header, details, quick info, reader — is identical.
+ * (/resources/:id) and the admin panel (/admin/resources/:id, opened from
+ * Admin → Semesters, Resources, or Drafts). Admin context (detected from
+ * the route) only adds a compact management strip: Edit / Hide-Unhide /
+ * Delete. Everything else — header, details, quick info, reader — is
+ * identical.
  */
 export default function ResourceDetail() {
   useCmsSync();
@@ -41,12 +43,18 @@ export default function ResourceDetail() {
 
   const isAdmin = pathname.startsWith("/admin");
   const readerRoute = isAdmin ? "/admin/reader" : "/reader";
-  /** Admin navigation context: "topics" when opened from Admin → Topics,
-   *  so the breadcrumb reflects where the admin came from. */
+  /** Navigation context marker forwarded through location state, so the
+   *  breadcrumb and nav highlight reflect where the admin came from. */
   const via = (state as { via?: string } | null)?.via;
-  /** Student navigation context: "downloads" when opened from Downloads,
-   *  so the breadcrumb reflects the actual entry point. */
-  const fromDownloads = !isAdmin && via === "downloads";
+  /** Student navigation context: the breadcrumb mirrors the actual entry
+   *  point (Resources / Favorite / Bookmark / Downloads). Without state
+   *  (direct URL, refresh) it falls back to the Semester trail. */
+  const entry = entryPointFromState(state);
+  const entryRoot = !isAdmin ? entryRootFor(entry) : undefined;
+  /** Admin navigation context: Semesters / Resources / Drafts entry point.
+   *  Stateless visits (direct URL, refresh) fall back to Resources. */
+  const adminEntry = adminEntryPointFromState(state);
+  const adminRoot = adminEntryRootFor(adminEntry);
 
   const resource = getResourceById(resourceId);
 
@@ -72,11 +80,6 @@ export default function ResourceDetail() {
 
   const subject = getSubjectById(resource.subjectId);
   const semester = getSemesterById(resource.semesterId);
-  /** Topic the resource is linked to (resource.topicId) — used for the
-   *  Topics-context breadcrumb: Admin → Topics → Subject → Topic. */
-  const topic = resource.topicId
-    ? getDb().topics.find((t) => t.id === resource.topicId && !t.deletedAt)
-    : undefined;
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
   const TypeIcon = typeConfig.icon;
   const favorite = isFavorite(resource.id);
@@ -86,8 +89,8 @@ export default function ResourceDetail() {
 
   const openReader = () => {
     markOpened(resource.id);
-    // Forward the navigation source (via:"topics") so the sidebar keeps
-    // highlighting Topics while the reader is open.
+    // Forward the navigation source (via) so the sidebar keeps
+    // highlighting the section the admin came from.
     navigate(`${readerRoute}/${resource.id}`, { state: { via } });
   };
 
@@ -120,8 +123,8 @@ export default function ResourceDetail() {
     // Return one level back to the exact parent context the item was opened
     // from (same target as the Back button) — never to an unrelated page.
     const fallback = isAdmin
-      ? (via === "topics" ? "/admin/semesters" : "/admin/resources")
-      : (fromDownloads ? "/downloads" : "/resources");
+      ? adminRoot.to
+      : (entryRoot ? entryRoot.to : "/resources");
     const idx = window.history.state?.idx;
     if (typeof idx === "number" && idx > 0) navigate(-1);
     else navigate(fallback, { replace: true });
@@ -132,7 +135,7 @@ export default function ResourceDetail() {
       <div className="mb-1 -ml-1 sm:-ml-1">
         <BackButton
           label="Back"
-          fallbackTo={isAdmin ? (via === "topics" ? "/admin/semesters" : "/admin/resources") : (fromDownloads ? "/downloads" : "/resources")}
+          fallbackTo={isAdmin ? adminRoot.to : (entryRoot ? entryRoot.to : "/resources")}
         />
       </div>
       <PageHeader
@@ -141,24 +144,15 @@ export default function ResourceDetail() {
         compactBreadcrumb={!isAdmin}
         breadcrumbs={
           isAdmin
-            ? via === "topics"
+            ? [
+                { label: "Admin", to: "/admin" },
+                { label: adminRoot.label, to: adminRoot.to },
+                ...(adminEntry === "semesters" && semester ? [{ label: semester.name }] : []),
+                { label: resource.title },
+              ]
+            : entryRoot
               ? [
-                  { label: "Admin", to: "/admin" },
-                  { label: "Semesters", to: "/admin/semesters" },
-                  ...(semester ? [{ label: semester.name }] : []),
-                  ...(subject ? [{ label: subject.name }] : []),
-                  ...(topic ? [{ label: topic.title }] : []),
-                ]
-              : [
-                  { label: "Admin", to: "/admin" },
-                  { label: "Resources", to: "/admin/resources" },
-                  ...(subject ? [{ label: subject.name }] : []),
-                  ...(topic ? [{ label: topic.title }] : []),
-                ]
-            : fromDownloads
-              ? [
-                  { label: "Downloads", to: "/downloads" },
-                  ...(subject ? [{ label: subject.name }] : []),
+                  { label: entryRoot.label, to: entryRoot.to },
                   { label: resource.title },
                 ]
               : [

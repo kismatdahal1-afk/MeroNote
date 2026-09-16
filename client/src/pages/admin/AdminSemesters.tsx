@@ -130,7 +130,7 @@ export default function AdminSemesters() {
   };
 
   const handleResourceClick = (resource: Resource) => {
-    navigate(`/admin/resources/${resource.id}`, { state: { via: "topics" } });
+    navigate(`/admin/resources/${resource.id}`, { state: { via: "semesters" } });
   };
 
   const sortedSemesters = [...semesters].sort((a, b) => a.order - b.order);

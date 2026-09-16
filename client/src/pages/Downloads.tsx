@@ -73,8 +73,8 @@ export default function Downloads() {
     return map;
   }, [entries, semesterId, subjectId]);
 
-  const completedCount = downloads.filter((d) => d.status === "completed").length;
-  const activeCount = downloads.filter((d) => d.status === "downloading").length;
+  const completedCount = entries.filter((e) => e.dl.status === "completed").length;
+  const activeCount = entries.filter((e) => e.dl.status === "downloading").length;
 
   return (
     <div>

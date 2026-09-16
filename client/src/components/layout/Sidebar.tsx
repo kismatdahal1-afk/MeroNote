@@ -2,6 +2,7 @@ import { LayoutDashboard, GraduationCap, Heart, Bookmark, Download, FileStack, S
 import type { LucideIcon } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cx } from "../../lib/utils";
+import { studentNavHighlight, adminNavHighlight } from "../../lib/resourceNavigation";
 import { useUser } from "../../state/UserProvider";
 
 interface NavItem {
@@ -70,16 +71,16 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { pathname, state } = useLocation();
   const inAdmin = role === "ADMIN" && pathname.startsWith("/admin");
   const items = inAdmin ? ADMIN_NAV : PRIMARY_NAV;
-/** Shared Admin pages (detail /admin/resources/:id, reader
-    *  /admin/reader/:id) opened from Admin → Semesters carry via:"topics" in
-    *  history state — keep Semesters highlighted through the whole flow,
-    *  including while the PDF reader is open. */
+  /** Shared pages keep their owning section highlighted: subject pages stay
+    *  under Semesters; shared Admin detail (/admin/resources/:id) and reader
+    *  (/admin/reader/:id) keep the Admin entry point (Semesters / Resources /
+    *  Drafts) lit; shared student detail (/resources/:id) and reader
+    *  (/reader/:id) keep the student entry point lit through the whole flow,
+    *  including while reading. */
   const activeOverride =
-    inAdmin &&
-    (pathname.startsWith("/admin/resources/") || pathname.startsWith("/admin/reader/")) &&
-    (state as { via?: string } | null)?.via === "topics"
-      ? "/admin/semesters"
-      : undefined;
+    inAdmin
+      ? adminNavHighlight(pathname, state)
+      : studentNavHighlight(pathname, state);
 
   return (
     <nav aria-label={inAdmin ? "Admin navigation" : "Main navigation"} className="flex flex-col gap-1">

@@ -432,7 +432,7 @@ export default function AdminNotices() {
                       </p>
                     </div>
                     {n.subtext && (
-                      <p className="mt-1.5 break-words text-[13px] leading-relaxed text-muted-foreground/80">
+                      <p className="mt-1.5 truncate text-[13px] leading-relaxed text-muted-foreground/80">
                         {n.subtext}
                       </p>
                     )}

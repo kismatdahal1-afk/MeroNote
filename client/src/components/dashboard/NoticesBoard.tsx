@@ -33,10 +33,12 @@ const ANNOUNCER_LABEL: Record<NoticeWithState["announcer"], string> = {
 };
 
 /** One notice row with its computed day state (X days remaining / Today / Past).
- *  Shared by the dashboard board and the full student Notices page.
+ *  Shared by the dashboard boards (student + admin) and the full student
+ *  Notices page. The description always shows a single truncated line —
+ *  the full text is available in the detail popup.
  *  Clicking a row opens the portrait-style detail popup.
  *  `compact` renders a slightly shorter row for the dashboard preview. */
-export function NoticeRow({ notice, compact = false, singleLineSubtext = false }: { notice: NoticeWithState; compact?: boolean; singleLineSubtext?: boolean }) {
+export function NoticeRow({ notice, compact = false }: { notice: NoticeWithState; compact?: boolean }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const DayIcon = notice.dayState === "today" ? CalendarCheck : notice.dayState === "upcoming" ? CalendarClock : CalendarX;
   return (
@@ -88,13 +90,7 @@ export function NoticeRow({ notice, compact = false, singleLineSubtext = false }
           {ANNOUNCER_LABEL[notice.announcer] ?? notice.announcer}
         </p>
         {notice.subtext && (
-          <p
-            className={
-              singleLineSubtext
-                ? "mt-1 truncate text-xs font-medium leading-relaxed text-muted-foreground"
-                : "mt-1 break-words line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground"
-            }
-          >
+          <p className="mt-1 truncate text-xs font-medium leading-relaxed text-muted-foreground">
             {notice.subtext}
           </p>
         )}

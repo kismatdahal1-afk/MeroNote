@@ -5,7 +5,7 @@ import {
   LibraryBig, Pencil, Plus, Trash2, X,
 } from "lucide-react";
 import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
-import { SearchBar } from "../../components/common/SearchBar";
+import { SearchBar, useSearchQuery } from "../../components/common/SearchBar";
 import { IconButton } from "../../components/common/IconButton";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
 import { EmptyState } from "../../components/common/States";
@@ -27,7 +27,9 @@ export default function AdminResources() {
   const db = useCms();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
+  /** Search text lives in the URL (shared hook with the student Resources
+   *  page), so the portal-aware header search can deep-link here with ?q=. */
+  const [query, updateQuery] = useSearchQuery();
   const [type, setType] = useState<ResourceType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [semesterId, setSemesterId] = useState("");
@@ -85,7 +87,7 @@ export default function AdminResources() {
     semesterId !== "";
 
   const clearFilters = () => {
-    setQuery("");
+    updateQuery("");
     setType("all");
     setStatusFilter("all");
     setSemesterId("");
@@ -148,8 +150,9 @@ export default function AdminResources() {
         <SearchBar
           placeholder="Search resources..."
           className="w-full sm:max-w-md sm:flex-1"
-          onSubmit={setQuery}
-          onChange={setQuery}
+          initialValue={query}
+          onSubmit={updateQuery}
+          onChange={updateQuery}
         />
         <div className="flex gap-3 sm:flex-wrap">
           <Select
@@ -227,7 +230,7 @@ export default function AdminResources() {
                     return (
                       <tr
                         key={r.id}
-                        onClick={() => navigate(`/admin/resources/${r.id}`)}
+                        onClick={() => navigate(`/admin/resources/${r.id}`, { state: { via: "resources" } })}
                         className="cursor-pointer transition-colors hover:bg-surface-hover"
                       >
                         <td className="px-4 py-3.5">
@@ -238,6 +241,7 @@ export default function AdminResources() {
                             <div className="min-w-0 flex-1">
                               <Link
                                 to={`/admin/resources/${r.id}`}
+                                state={{ via: "resources" }}
                                 title={r.title}
                                 onClick={(e) => e.stopPropagation()}
                                 className="block truncate font-semibold text-foreground hover:text-primary"
@@ -314,7 +318,7 @@ export default function AdminResources() {
               const typeConfig = RESOURCE_TYPE_CONFIG[r.type];
               const TypeIcon = typeConfig.icon;
               return (
-                <Card key={r.id} className="cursor-pointer p-4" onClick={() => navigate(`/admin/resources/${r.id}`)}>
+                <Card key={r.id} className="cursor-pointer p-4" onClick={() => navigate(`/admin/resources/${r.id}`, { state: { via: "resources" } })}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
@@ -323,6 +327,7 @@ export default function AdminResources() {
                       <div className="min-w-0">
                         <Link
                           to={`/admin/resources/${r.id}`}
+                          state={{ via: "resources" }}
                           onClick={(e) => e.stopPropagation()}
                           className="truncate text-sm font-bold text-foreground hover:text-primary"
                         >

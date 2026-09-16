@@ -28,6 +28,7 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
       {/* Stretched link — makes the whole card clickable */}
       <Link
         to={`/resources/${resource.id}`}
+        state={{ via: "bookmarks" }}
         aria-label={`Open ${resource.title}`}
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
@@ -61,6 +62,7 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
         </div>
         <Link
           to={`/resources/${resource.id}`}
+          state={{ via: "bookmarks" }}
           aria-label={`Open ${resource.title}`}
           className="mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
@@ -121,6 +123,7 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
         </span>
         <Link
           to={`/reader/${resource.id}`}
+          state={{ via: "bookmarks" }}
           onClick={() => markOpened(resource.id)}
           className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
           aria-label={`Open ${resource.title} at page ${bookmark.page}`}

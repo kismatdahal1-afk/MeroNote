@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cx } from "../../lib/utils";
+import { studentNavHighlight, adminNavHighlight } from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useUser } from "../../state/UserProvider";
 
@@ -48,7 +49,7 @@ const ADMIN_MOBILE_NAV: Omit<MobileNavItem, "badge">[] = [
 export function MobileNav() {
   const { downloads, bookmarks } = useLibrary();
   const { role } = useUser();
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation();
 
   const isAdminPortal = role === "ADMIN" && pathname.startsWith("/admin");
 
@@ -62,6 +63,15 @@ export function MobileNav() {
         if (it.to === "/bookmarks") return { ...it, badge: bookmarks.length };
         return { ...it, badge: 0 };
       });
+
+  // Shared detail/reader pages keep their entry point highlighted. The bar
+  // has no Favorites (student) or Drafts (admin) tab, so those entries keep
+  // default URL matching here.
+  const highlightOverride = isAdminPortal
+    ? adminNavHighlight(pathname, state)
+    : studentNavHighlight(pathname, state);
+  const overrideApplies =
+    !!highlightOverride && items.some((it) => it.to === highlightOverride);
 
   return (
     <nav
@@ -77,30 +87,33 @@ export function MobileNav() {
             className={({ isActive }) =>
               cx(
                 "relative flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-[11px] font-semibold",
-                isActive ? "text-primary" : "text-muted-foreground",
+                (overrideApplies ? to === highlightOverride : isActive) ? "text-primary" : "text-muted-foreground",
               )
             }
           >
-            {({ isActive }) => (
-              <>
-                <span className="relative">
-                  <Icon className="size-5" aria-hidden="true" />
-                  {badge > 0 && (
-                    <span
-                      aria-label={`${badge} ${label}`}
-                      className="absolute -right-2 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground"
-                    >
-                      {badge}
-                    </span>
-                  )}
-                </span>
-                <span>{label}</span>
-                <span
-                  aria-hidden="true"
-                  className={cx("h-0.5 w-6 rounded-full", isActive ? "bg-primary" : "bg-transparent")}
-                />
-              </>
-            )}
+            {({ isActive: routerActive }) => {
+              const active = overrideApplies ? to === highlightOverride : routerActive;
+              return (
+                <>
+                  <span className="relative">
+                    <Icon className="size-5" aria-hidden="true" />
+                    {badge > 0 && (
+                      <span
+                        aria-label={`${badge} ${label}`}
+                        className="absolute -right-2 -top-1.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground"
+                      >
+                        {badge}
+                      </span>
+                    )}
+                  </span>
+                  <span>{label}</span>
+                  <span
+                    aria-hidden="true"
+                    className={cx("h-0.5 w-6 rounded-full", active ? "bg-primary" : "bg-transparent")}
+                  />
+                </>
+              );
+            }}
           </NavLink>
         ))}
       </div>

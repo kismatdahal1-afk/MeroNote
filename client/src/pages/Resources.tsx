@@ -4,7 +4,7 @@ import { PageHeader } from "../components/common/PageHeader";
 import { ResourceCard } from "../components/cards/ResourceCard";
 import { EmptyState } from "../components/common/States";
 import { Select } from "../components/common/Field";
-import { SearchBar } from "../components/common/SearchBar";
+import { SearchBar, useSearchQuery } from "../components/common/SearchBar";
 import { FilterChips } from "../components/resources/FilterChips";
 import {
   getAllSemesters,
@@ -23,20 +23,11 @@ export default function Resources() {
   const all = getAllResources();
   const allSubjects = getAllSubjects();
   const [params, setParams] = useSearchParams();
-  const query = params.get("q") ?? "";
+  const [query, updateQuery] = useSearchQuery();
 
   const [subjectId, setSubjectId] = useState("");
   const [type, setType] = useState<ResourceType | "all">("all");
   const [sort, setSort] = useState<SortKey>("recent");
-
-  const updateQuery = (q: string) => {
-    setParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (q) next.set("q", q);
-      else next.delete("q");
-      return next;
-    }, { replace: true });
-  };
 
   const subjectOptions = useMemo(
     () =>
@@ -162,7 +153,7 @@ export default function Resources() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {filtered.map((r) => (
-            <ResourceCard key={r.id} resource={r} />
+            <ResourceCard key={r.id} resource={r} via="resources" />
           ))}
         </div>
       )}

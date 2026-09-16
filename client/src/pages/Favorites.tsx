@@ -219,9 +219,9 @@ export default function Favorites() {
                     Resources ({filtered.length})
                   </h2>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    {filtered.map((r) => (
-                      <ResourceCard key={r.id} resource={r} />
-                    ))}
+                      {filtered.map((r) => (
+                        <ResourceCard key={r.id} resource={r} via="favorites" />
+                      ))}
                   </div>
                 </section>
               )}

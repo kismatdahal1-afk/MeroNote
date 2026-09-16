@@ -1,6 +1,6 @@
 ﻿import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { GraduationCap, BookOpen, FileStack, Search, SlidersHorizontal, CalendarDays, CalendarClock } from "lucide-react";
+import { GraduationCap, BookOpen, FileStack, Search, SlidersHorizontal } from "lucide-react";
 import { SemesterCard } from "../components/cards/SemesterCard";
 import { SubjectCard } from "../components/cards/SubjectCard";
 import { ResourceCard } from "../components/cards/ResourceCard";
@@ -11,9 +11,7 @@ import { ActiveSemesterBanner } from "../components/semesters/ActiveSemesterBann
 import { SemesterStatusControl, type SemesterStatusKind } from "../components/semesters/SemesterStatus";
 import { StatPill as SemesterStatPill } from "../components/semesters/StatPill";
 import { FilterChips } from "../components/resources/FilterChips";
-import { useSemesterStatus, type SemesterTermDates } from "../state/SemesterStatusProvider";
-import { calculateSemesterProgress } from "../lib/semesterProgress";
-import { ProgressBar } from "../components/common/ProgressBar";
+import { useSemesterStatus } from "../state/SemesterStatusProvider";
 import {
   getSemesterById,
   getSubjectsBySemester,
@@ -50,7 +48,7 @@ export function SemesterSubjects() {
   useCmsSync();
   const { semesterId } = useParams<{ semesterId: string }>();
   const navigate = useNavigate();
-  const { getStatus, setStatus, getDates, setDates } = useSemesterStatus();
+  const { getStatus, setStatus } = useSemesterStatus();
   const [query, setQuery] = useState("");
   const [type, setType] = useState<ResourceType | "all">("all");
 
@@ -118,24 +116,8 @@ export function SemesterSubjects() {
   const ongoing = status === "ongoing";
   const showingAll = !query.trim() && type === "all";
 
-  // Term dates for the ongoing semester (local editing state).
-  const storedDates = getDates(semester.id);
-  const [startDate, setStartDate] = useState(storedDates?.startDate ?? "");
-  const [endDate, setEndDate] = useState(storedDates?.endDate ?? "");
-  const datesValid = Boolean(startDate && endDate && endDate > startDate);
-  const progress = datesValid
-    ? calculateSemesterProgress(startDate, endDate)
-    : { totalDays: 0, elapsedDays: 0, remainingDays: 0, percentage: 0, isComplete: false };
-
   const handleStatusChange = (next: SemesterStatusKind) => {
     setStatus(semester.id, next);
-    // Re-seed local date fields when switching into Ongoing.
-    if (next === "ongoing" && !storedDates) {
-      const today = new Date().toISOString().slice(0, 10);
-      const end = new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 10);
-      setStartDate(today);
-      setEndDate(end);
-    }
   };
 
   return (
@@ -159,111 +141,35 @@ export function SemesterSubjects() {
         }
       />
 
-      {/* Semester quick facts + status management */}
-      <Card className="mb-6 p-5 sm:p-6">
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <SemesterStatPill
-            icon={<GraduationCap className="size-3" aria-hidden="true" />}
-            label="Program"
-            value="BSc CSIT"
-          />
-          <SemesterStatPill
-            icon={<FileStack className="size-3" aria-hidden="true" />}
-            label="Subjects"
-            value={subjects.length}
-          />
-          <SemesterStatPill
-            icon={<BookOpen className="size-3" aria-hidden="true" />}
-            label="Resources"
-            value={recentResources.length}
-          />
-          <SemesterStatPill
-            icon={<GraduationCap className="size-3" aria-hidden="true" />}
-            label="Credits"
-            value={semester.credits}
-          />
-        </div>
-
-        {/* Ongoing term dates + automatically derived progress */}
-        {ongoing && (
-          <div className="mt-5 border-t border-border pt-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
-              <label className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-48">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Start date
-                </span>
-                <input
-                  type="date"
-                  value={startDate}
-                  max={endDate || undefined}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-9 rounded-lg border border-border-strong bg-surface px-3 text-sm font-medium text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
-                />
-              </label>
-              <label className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-48">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  End date
-                </span>
-                <input
-                  type="date"
-                  value={endDate}
-                  min={startDate || undefined}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="h-9 rounded-lg border border-border-strong bg-surface px-3 text-sm font-medium text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => datesValid && setDates(semester.id, { startDate, endDate } as SemesterTermDates)}
-                disabled={!datesValid || (storedDates?.startDate === startDate && storedDates?.endDate === endDate)}
-                className={
-                  "h-9 shrink-0 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-40 " +
-                  (datesValid ? "" : "opacity-40")
-                }
-              >
-                Save Dates
-              </button>
-            </div>
-            {!startDate || !endDate || !datesValid ? (
-              !startDate || !endDate ? (
-                <p className="mt-2.5 text-xs font-medium text-muted-foreground">
-                  Set start and end dates to track semester progress.
-                </p>
-              ) : (
-                <p role="alert" className="mt-2.5 text-xs font-medium text-error">
-                  End date must be after start date.
-                </p>
-              )
-            ) : (
-              <div className="mt-4">
-                <ProgressBar value={progress.percentage / 100} label={`${semester.name} progress`} />
-                <div className="mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                  <SemesterStatPill
-                    icon={<CalendarDays className="size-3" aria-hidden="true" />}
-                    label="Total days"
-                    value={`${progress.totalDays}d`}
-                  />
-                  <SemesterStatPill
-                    icon={<CalendarClock className="size-3" aria-hidden="true" />}
-                    label="Elapsed"
-                    value={`${progress.elapsedDays}d`}
-                  />
-                  <SemesterStatPill
-                    icon={<CalendarClock className="size-3" aria-hidden="true" />}
-                    label="Remaining"
-                    value={`${progress.remainingDays}d`}
-                  />
-                  <SemesterStatPill
-                    icon={<CalendarDays className="size-3" aria-hidden="true" />}
-                    label="Progress"
-                    value={`${Math.round(progress.percentage)}%`}
-                  />
-                </div>
-              </div>
-            )}
+      {/* Semester facts — the ongoing semester reuses the shared library banner */}
+      {ongoing ? (
+        <ActiveSemesterBanner semesterId={semester.id} showLauncher={false} />
+      ) : (
+        <Card className="mb-6 p-5 sm:p-6">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <SemesterStatPill
+              icon={<GraduationCap className="size-3" aria-hidden="true" />}
+              label="Program"
+              value="BSc CSIT"
+            />
+            <SemesterStatPill
+              icon={<FileStack className="size-3" aria-hidden="true" />}
+              label="Subjects"
+              value={subjects.length}
+            />
+            <SemesterStatPill
+              icon={<BookOpen className="size-3" aria-hidden="true" />}
+              label="Resources"
+              value={recentResources.length}
+            />
+            <SemesterStatPill
+              icon={<GraduationCap className="size-3" aria-hidden="true" />}
+              label="Credits"
+              value={semester.credits}
+            />
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {/* Compact search */}
       <form

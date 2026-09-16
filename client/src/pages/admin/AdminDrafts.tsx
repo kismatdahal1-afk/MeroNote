@@ -383,7 +383,7 @@ export default function AdminDrafts() {
    *  notices open their edit modal; semester/subject drafts have no detail
    *  view, so clicking them does nothing. */
   const openDraft = (row: DraftRow) => {
-    if (row.kind === "resource") navigate(`/admin/resources/${row.resource.id}`);
+    if (row.kind === "resource") navigate(`/admin/resources/${row.resource.id}`, { state: { via: "drafts" } });
     else if (row.kind === "topic") openTopicEdit(row.topic);
     else if (row.kind === "notice") openNoticeEdit(row.notice);
   };
@@ -560,6 +560,7 @@ export default function AdminDrafts() {
                               {row.kind === "resource" ? (
                                 <Link
                                   to={`/admin/resources/${row.resource.id}`}
+                                  state={{ via: "drafts" }}
                                   onClick={(e) => e.stopPropagation()}
                                   className="truncate font-semibold text-foreground hover:text-primary"
                                 >
@@ -662,9 +663,10 @@ export default function AdminDrafts() {
                       </div>
                       <div className="min-w-0">
                         {row.kind === "resource" ? (
-                          <Link
-                            to={`/admin/resources/${row.resource.id}`}
-                            onClick={(e) => e.stopPropagation()}
+                            <Link
+                              to={`/admin/resources/${row.resource.id}`}
+                              state={{ via: "drafts" }}
+                              onClick={(e) => e.stopPropagation()}
                             className="truncate text-sm font-bold text-foreground hover:text-primary"
                           >
                             {row.title}

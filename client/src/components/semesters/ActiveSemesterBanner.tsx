@@ -13,6 +13,9 @@ import { cx } from "../../lib/utils";
 
 interface ActiveSemesterBannerProps {
   semesterId: string;
+  /** Show the "Continue Studying" launcher. Hidden on the semester
+   *  details page itself, where it would link to the current page. */
+  showLauncher?: boolean;
 }
 
 /** yyyy-mm-dd for date inputs, relative to today. */
@@ -21,11 +24,12 @@ function toDateInputValue(d: Date): string {
 }
 
 /**
- * "Current semester" banner for the Semester Library.
+ * "Current semester" banner, shared by the Semester Library and the
+ * ongoing semester's details page so both show the same banner.
  * Renders ONLY for the single semester the user marked Ongoing. All progress
  * numbers derive from the user-chosen start/end dates — nothing is hardcoded.
  */
-export function ActiveSemesterBanner({ semesterId }: ActiveSemesterBannerProps) {
+export function ActiveSemesterBanner({ semesterId, showLauncher = true }: ActiveSemesterBannerProps) {
   useCmsSync();
   const { getStatus, getDates, setDates } = useSemesterStatus();
   const semester = getSemesterById(semesterId);
@@ -105,17 +109,19 @@ export function ActiveSemesterBanner({ semesterId }: ActiveSemesterBannerProps) 
         </div>
 
         {/* Launcher */}
-        <Link
-          to={`/semesters/${semesterId}`}
-          className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          <Play className="size-4 fill-current" aria-hidden="true" />
-          Continue Studying
-        </Link>
+        {showLauncher && (
+          <Link
+            to={`/semesters/${semesterId}`}
+            className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-6 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            <Play className="size-4 fill-current" aria-hidden="true" />
+            Continue Studying
+          </Link>
+        )}
       </div>
 
       {/* Term date inputs (editable while ongoing) */}
-      <div className="flex flex-col gap-3 border-t border-border bg-surface-muted/40 px-5 py-3.5 sm:flex-row sm:items-end sm:gap-6 sm:px-6">
+      <div className="grid grid-cols-2 gap-3 border-t border-border bg-surface-muted/40 px-5 py-3.5 sm:flex sm:flex-row sm:items-end sm:gap-6 sm:px-6">
         <label className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-52">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Start date
@@ -145,7 +151,7 @@ export function ActiveSemesterBanner({ semesterId }: ActiveSemesterBannerProps) 
           onClick={save}
           disabled={!datesValid || (stored?.startDate === startDate && stored?.endDate === endDate)}
           className={cx(
-            "h-9 shrink-0 rounded-lg px-4 text-sm font-bold transition-colors",
+            "col-span-2 h-9 shrink-0 rounded-lg px-4 text-sm font-bold transition-colors",
             "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
             "disabled:pointer-events-none disabled:opacity-40",
             "bg-primary text-primary-foreground hover:bg-primary-hover",
@@ -154,7 +160,7 @@ export function ActiveSemesterBanner({ semesterId }: ActiveSemesterBannerProps) 
           Save Dates
         </button>
         {!datesValid && (
-          <p role="alert" className="text-xs font-medium text-error sm:mb-2">
+          <p role="alert" className="col-span-2 text-xs font-medium text-error sm:mb-2">
             End date must be after start date.
           </p>
         )}

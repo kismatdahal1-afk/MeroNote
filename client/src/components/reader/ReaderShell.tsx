@@ -2,30 +2,35 @@ import { useParams, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { getResourceById, getSemesterById, getSubjectById } from "../../data/selectors";
+import { entryPointFromState, entryRootFor, adminEntryPointFromState, adminEntryRootFor } from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 import { BackButton } from "../common/BackButton";
 import { useCmsSync } from "../common/CmsSync";
 import { PdfViewer } from "./PdfViewer";
-import { getDb } from "../../state/cmsStore";
 
 /**
  * Student PDF Reader page shell (Phase 2).
  * Delegates all viewer chrome/behavior to the shared PdfViewer so the
  * Phase 6 PDF.js integration drops in once for student + admin views.
  * When `admin` is set, back/details links stay inside the admin flow.
- * The admin navigation source (via:"topics") is forwarded so the sidebar
- * keeps highlighting the section the admin came from.
+ * The admin navigation source (entry-point state) is forwarded so the
+ * sidebar keeps highlighting the section the admin came from.
  */
 export function ReaderShell({ admin = false }: { admin?: boolean }) {
   useCmsSync();
   const { resourceId } = useParams<{ resourceId: string }>();
   const { state } = useLocation();
   const via = (state as { via?: string } | null)?.via;
-  /** Student navigation context: "downloads" when the reader was opened
-   *  from the Downloads page, so the breadcrumb reflects the actual
-   *  entry point instead of the library hierarchy. */
-  const fromDownloads = !admin && via === "downloads";
+  /** Student navigation context: the breadcrumb mirrors the actual entry
+   *  point (Resources / Favorite / Bookmark / Downloads). Without state
+   *  (direct URL, refresh) it falls back to the Semester trail. */
+  const entry = entryPointFromState(state);
+  const entryRoot = !admin ? entryRootFor(entry) : undefined;
+  /** Admin navigation context: Semesters / Resources / Drafts entry point.
+   *  Stateless visits (direct URL, refresh) fall back to Resources. */
+  const adminEntry = adminEntryPointFromState(state);
+  const adminRoot = adminEntryRootFor(adminEntry);
   const resource = getResourceById(resourceId);
   const { toast } = useToast();
   const { getProgress, setReadingProgress, addBookmark, getBookmark, getDownload, startDownload, markOpened } = useLibrary();
@@ -39,7 +44,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           <p className="text-lg font-bold text-foreground">Resource not found</p>
           <div className="mt-3 flex justify-center">
             <BackButton
-              fallbackTo={admin ? (via === "topics" ? "/admin/semesters" : "/admin/resources") : "/dashboard"}
+              fallbackTo={admin ? adminRoot.to : "/dashboard"}
               label="Go back"
             />
           </div>
@@ -64,7 +69,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
 
   const subject = getSubjectById(resource.subjectId);
   const semester = getSemesterById(resource.semesterId);
-  const topic = resource.topicId ? getDb().topics.find((t) => t.id === resource.topicId && !t.deletedAt) : undefined;
   const bookmarked = Boolean(getBookmark(resource.id));
   const download = getDownload(resource.id);
   const totalPages = resource.pageCount;
@@ -104,49 +108,23 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           <>
             <Link to="/admin" className="rounded px-1 py-0.5 hover:text-primary">Admin</Link>
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-{via === "topics" ? (
-                  <Link to="/admin/semesters" state={detailState} className="rounded px-1 py-0.5 hover:text-primary">
-                    Semesters
-                  </Link>
-                ) : (
+            {adminEntry === "drafts" ? (
+              <Link to="/admin/drafts" className="rounded px-1 py-0.5 hover:text-primary">Draft</Link>
+            ) : adminEntry === "semesters" ? (
+              <Link to="/admin/semesters" state={detailState} className="rounded px-1 py-0.5 hover:text-primary">
+                Semesters
+              </Link>
+            ) : (
               <Link to="/admin/resources" className="rounded px-1 py-0.5 hover:text-primary">
                 Resources
               </Link>
             )}
-            {semester && via === "topics" && (
+            {adminEntry === "semesters" && semester && (
               <>
                 <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-                <Link
-                  to="/admin/semesters"
-                  state={detailState}
-                  className="max-w-[10rem] truncate rounded px-1 py-0.5 hover:text-primary"
-                >
+                <span className="max-w-[10rem] truncate rounded px-1 py-0.5">
                   {semester.name}
-                </Link>
-              </>
-            )}
-            {subject && (
-              <>
-                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-                <Link
-                  to={via === "topics" ? "/admin/semesters" : "/admin/resources"}
-                  state={detailState}
-                  className="max-w-[12rem] truncate rounded px-1 py-0.5 hover:text-primary"
-                >
-                  {subject.name}
-                </Link>
-              </>
-            )}
-            {topic && (
-              <>
-                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-                <Link
-                  to={`${baseRoute}/${resource.id}`}
-                  state={detailState}
-                  className="max-w-[12rem] truncate rounded px-1 py-0.5 hover:text-primary"
-                >
-                  {topic.title}
-                </Link>
+                </span>
               </>
             )}
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
@@ -160,14 +138,18 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
-        ) : fromDownloads ? (
+        ) : entryRoot ? (
           <>
-            <Link to="/downloads" className="shrink-0 rounded px-1 py-0.5 hover:text-primary">Downloads</Link>
+            <Link to={entryRoot.to} className="shrink-0 rounded px-1 py-0.5 hover:text-primary">{entryRoot.label}</Link>
             <span className="inline-flex min-w-0 items-center gap-0.5">
               <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-              <span className="whitespace-normal rounded px-1 py-0.5">
-                {subject ? subject.name : resource.title}
-              </span>
+              <Link
+                to={`${baseRoute}/${resource.id}`}
+                state={{ via: entry }}
+                className="whitespace-normal rounded px-1 py-0.5 hover:text-primary"
+              >
+                {resource.title}
+              </Link>
             </span>
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
@@ -207,7 +189,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       toolbarLeading={
         <BackButton
           iconOnly
-          fallbackTo={fromDownloads ? "/downloads" : `${baseRoute}/${resource.id}`}
+          fallbackTo={entryRoot ? entryRoot.to : `${baseRoute}/${resource.id}`}
           label="Back to resource"
           className="text-foreground/75 hover:bg-surface-hover hover:text-foreground"
         />

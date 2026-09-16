@@ -112,7 +112,7 @@ export default function Notices() {
             {filtered.length} notice{filtered.length === 1 ? "" : "s"} · pinned first
           </div>
           {filtered.map((n) => (
-            <NoticeRow key={n.id} notice={n} singleLineSubtext />
+            <NoticeRow key={n.id} notice={n} />
           ))}
         </Card>
       )}

@@ -56,7 +56,7 @@ export function ContinueReadingSection({ resource }: { resource: Resource | null
         </div>
       </div>
 
-      <p className="mt-2.5 line-clamp-2 text-xs font-medium leading-relaxed text-muted-foreground">
+      <p className="mt-2.5 truncate text-xs font-medium leading-relaxed text-muted-foreground">
         {resource.description}
       </p>
 
