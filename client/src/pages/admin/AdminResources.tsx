@@ -1,7 +1,7 @@
 ﻿import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  CheckCircle2, EyeOff, FileEdit, FileText, Layers,
+  CheckCircle2, ChevronRight, EyeOff, FileEdit,
   LibraryBig, Pencil, Plus, Trash2, X,
 } from "lucide-react";
 import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
@@ -311,70 +311,70 @@ export default function AdminResources() {
             </div>
           </Card>
 
-          {/* ── Mobile cards ──────────────────────────────────── */}
+          {/* ── Mobile cards: student ResourceCard pattern + admin actions ── */}
           <div className="space-y-3 md:hidden">
             {filtered.map((r) => {
               const { semester, subject } = contextOf(r);
               const typeConfig = RESOURCE_TYPE_CONFIG[r.type];
               const TypeIcon = typeConfig.icon;
+              const openDetail = () => navigate(`/admin/resources/${r.id}`, { state: { via: "resources" } });
               return (
-                <Card key={r.id} className="cursor-pointer p-4" onClick={() => navigate(`/admin/resources/${r.id}`, { state: { via: "resources" } })}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
-                        <TypeIcon className="size-5" aria-hidden="true" />
-                      </div>
-                      <div className="min-w-0">
-                        <Link
-                          to={`/admin/resources/${r.id}`}
-                          state={{ via: "resources" }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="truncate text-sm font-bold text-foreground hover:text-primary"
-                        >
-                          {r.title}
-                        </Link>
-                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                          {semester?.name ?? "—"} · {subject?.name ?? "—"}
-                        </p>
-                      </div>
+                <Card key={r.id} className="cursor-pointer p-4" onClick={openDetail}>
+                  <div className="flex items-center gap-2.5">
+                    <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
+                      <TypeIcon className="size-4.5" aria-hidden="true" />
                     </div>
-                    <StatusBadge status={r.status} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="min-w-0 flex-1 line-clamp-1 text-sm font-bold leading-snug text-foreground">
+                          {r.title}
+                        </p>
+                        <span className="shrink-0">
+                          <StatusBadge status={r.status} />
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
+                        {resourceTypeLabel(r.type)} · {r.pageCount} pages · {formatFileSize(r.fileSize)}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground/80">
+                        {[semester?.name, subject?.name].filter(Boolean).join(" · ") || "—"}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-0.5">
+                      <IconButton
+                        icon={Pencil}
+                        label={`Edit ${r.title}`}
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditing(r);
+                          setFormOpen(true);
+                        }}
+                      />
+                      <IconButton
+                        icon={Trash2}
+                        label={`Delete ${r.title}`}
+                        size="sm"
+                        variant="danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          requestDelete(r);
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className={cx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", typeConfig.badgeClass)}>
-                      {resourceTypeLabel(r.type)}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                      <FileText className="size-3.5" aria-hidden="true" />
-                      {formatFileSize(r.fileSize)} · {r.pageCount}p
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                      <Layers className="size-3.5" aria-hidden="true" />
-                      {formatRelativeTime(r.uploadedAt)}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex items-center justify-end gap-1.5 border-t border-border pt-3">
-                    <IconButton
-                      icon={Pencil}
-                      label={`Edit ${r.title}`}
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditing(r);
-                        setFormOpen(true);
-                      }}
-                    />
-                    <IconButton
-                      icon={Trash2}
-                      label={`Delete ${r.title}`}
-                      size="sm"
-                      variant="danger"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        requestDelete(r);
-                      }}
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    aria-label={`Open ${r.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDetail();
+                    }}
+                    className="mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    Open
+                    <ChevronRight className="size-3.5" aria-hidden="true" />
+                  </button>
                 </Card>
               );
             })}
