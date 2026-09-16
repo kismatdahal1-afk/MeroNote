@@ -5,21 +5,17 @@ import { SubjectCard } from "../components/cards/SubjectCard";
 import { EmptyState } from "../components/common/States";
 import { Select } from "../components/common/Field";
 import { SearchBar } from "../components/common/SearchBar";
-import { FilterChips } from "../components/resources/FilterChips";
+import { FilterChips, type TypeFilter } from "../components/resources/FilterChips";
 import { getAllSemesters, getResourceById, getSubjectById, getAllSubjects } from "../data/selectors";
 import { useLibrary } from "../state/LibraryProvider";
+import { matchesQuery } from "../lib/utils";
 import type { ResourceType } from "../types";
 import { useCmsSync } from "../components/common/CmsSync";
 
 type SortKey = "recent" | "title" | "pages";
 
-/** True when the text matches any of the fields (case-insensitive). */
-function matches(text: string, query: string): boolean {
-  return text.toLowerCase().includes(query.trim().toLowerCase());
-}
-
 export default function Favorites() {
-  useCmsSync();
+  const cmsDb = useCmsSync();
   const { favorites, favoriteSubjects } = useLibrary();
   const semesters = getAllSemesters();
   const allSubjects = getAllSubjects();
@@ -27,7 +23,7 @@ export default function Favorites() {
   const [query, setQuery] = useState("");
   const [semesterId, setSemesterId] = useState("");
   const [subjectId, setSubjectId] = useState("");
-  const [type, setType] = useState<ResourceType | "all">("all");
+  const [type, setType] = useState<TypeFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
   const allSubjectsFav = useMemo(
@@ -35,7 +31,8 @@ export default function Favorites() {
       favoriteSubjects
         .map((id) => getSubjectById(id))
         .filter((s): s is NonNullable<typeof s> => Boolean(s)),
-    [favoriteSubjects],
+    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
+    [favoriteSubjects, cmsDb],
   );
 
   const allResources = useMemo(
@@ -43,7 +40,7 @@ export default function Favorites() {
       favorites
         .map((id) => getResourceById(id))
         .filter((r): r is NonNullable<typeof r> => Boolean(r)),
-    [favorites],
+    [favorites, cmsDb],
   );
 
   const searchedSubjects = useMemo(() => {
@@ -51,10 +48,10 @@ export default function Favorites() {
     if (!q) return allSubjectsFav;
     return allSubjectsFav.filter(
       (s) =>
-        matches(s.name, q) ||
-        matches(s.code, q) ||
-        matches(s.description, q) ||
-        s.hotTopics.some((t) => matches(t, q)),
+        matchesQuery(s.name, q) ||
+        matchesQuery(s.code, q) ||
+        matchesQuery(s.description, q) ||
+        s.hotTopics.some((t) => matchesQuery(t, q)),
     );
   }, [allSubjectsFav, query]);
 
@@ -63,15 +60,20 @@ export default function Favorites() {
     if (!q) return allResources;
     return allResources.filter(
       (r) =>
-        matches(r.title, q) ||
-        matches(r.description, q) ||
-        r.tags.some((t) => matches(t, q)),
+        matchesQuery(r.title, q) ||
+        matchesQuery(r.description, q) ||
+        r.tags.some((t) => matchesQuery(t, q)),
     );
   }, [allResources, query]);
 
   const subjects = useMemo(
-    () => searchedSubjects.filter((s) => !semesterId || s.semesterId === semesterId),
-    [searchedSubjects, semesterId],
+    () =>
+      searchedSubjects.filter(
+        (s) =>
+          (!semesterId || s.semesterId === semesterId) &&
+          (!subjectId || s.id === subjectId),
+      ),
+    [searchedSubjects, semesterId, subjectId],
   );
 
   const subjectOptions = useMemo(
@@ -79,14 +81,14 @@ export default function Favorites() {
       semesterId
         ? allSubjects.filter((s) => s.semesterId === semesterId)
         : allSubjects,
-    [semesterId],
+    [semesterId, allSubjects],
   );
 
   const filtered = useMemo(() => {
     let list = searchedResources;
     if (semesterId) list = list.filter((r) => r.semesterId === semesterId);
     if (subjectId) list = list.filter((r) => r.subjectId === subjectId);
-    if (type !== "all") list = list.filter((r) => r.type === type);
+    if (type !== "all" && type !== "subjects") list = list.filter((r) => r.type === type);
     const sorted = [...list];
     if (sort === "title") sorted.sort((a, b) => a.title.localeCompare(b.title));
     if (sort === "pages") sorted.sort((a, b) => b.pageCount - a.pageCount);
@@ -104,8 +106,11 @@ export default function Favorites() {
     return map;
   }, [searchedResources, semesterId, subjectId]);
 
-  const isEmpty = favoriteSubjects.length === 0 && allResources.length === 0;
-  const noMatches = !isEmpty && subjects.length === 0 && filtered.length === 0;
+  const isEmpty = allSubjectsFav.length === 0 && allResources.length === 0;
+  /** "subjects" shows only subjects; a resource type shows only that type; "all" shows both. */
+  const showSubjectsSection = (type === "all" || type === "subjects") && subjects.length > 0;
+  const showResourcesSection = type !== "subjects" && filtered.length > 0;
+  const noMatches = !isEmpty && !showSubjectsSection && !showResourcesSection;
 
   return (
     <div>
@@ -173,7 +178,14 @@ export default function Favorites() {
           </div>
 
           <div className="mb-5">
-            <FilterChips selected={type} counts={counts} onChange={setType} />
+            <FilterChips
+              selected={type}
+              counts={counts}
+              showSubjects
+              subjectsCount={allSubjectsFav.length}
+              allCount={allSubjectsFav.length + allResources.length}
+              onChange={setType}
+            />
           </div>
 
           {noMatches ? (
@@ -183,7 +195,7 @@ export default function Favorites() {
             />
           ) : (
             <>
-              {subjects.length > 0 && (
+              {showSubjectsSection && (
                 <section className="mb-8" aria-labelledby="fav-subjects-heading">
                   <h2
                     id="fav-subjects-heading"
@@ -198,7 +210,7 @@ export default function Favorites() {
                   </div>
                 </section>
               )}
-              {filtered.length > 0 && (
+              {showResourcesSection && (
                 <section aria-labelledby="fav-resources-heading">
                   <h2
                     id="fav-resources-heading"

@@ -6,22 +6,24 @@ import { EmptyState } from "../components/common/States";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { Select } from "../components/common/Field";
 import { SearchBar } from "../components/common/SearchBar";
-import { FilterChips } from "../components/resources/FilterChips";
+import { FilterChips, type TypeFilter } from "../components/resources/FilterChips";
 import { getAllSemesters, getResourceById, getSubjectById, getAllSubjects } from "../data/selectors";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
-import type { ResourceType } from "../types";
+import { matchesQuery } from "../lib/utils";
+import type { Bookmark, Resource, ResourceType } from "../types";
 import { useCmsSync } from "../components/common/CmsSync";
 
 type SortKey = "recent" | "title" | "pages";
 
-/** True when the text matches any of the fields (case-insensitive). */
-function matches(text: string, query: string): boolean {
-  return text.toLowerCase().includes(query.trim().toLowerCase());
+/** One saved page: the bookmark plus its resolved resource. */
+interface BookmarkEntry {
+  bm: Bookmark;
+  resource: Resource;
 }
 
 export default function Bookmarks() {
-  useCmsSync();
+  const cmsDb = useCmsSync();
   const { bookmarks, removeBookmark, bookmarkedSubjects } = useLibrary();
   const { toast } = useToast();
   const semesters = getAllSemesters();
@@ -31,7 +33,7 @@ export default function Bookmarks() {
   const [query, setQuery] = useState("");
   const [semesterId, setSemesterId] = useState("");
   const [subjectId, setSubjectId] = useState("");
-  const [type, setType] = useState<ResourceType | "all">("all");
+  const [type, setType] = useState<TypeFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
   const allSavedSubjects = useMemo(
@@ -39,17 +41,16 @@ export default function Bookmarks() {
       bookmarkedSubjects
         .map((id) => getSubjectById(id))
         .filter((s): s is NonNullable<typeof s> => Boolean(s)),
-    [bookmarkedSubjects],
+    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
+    [bookmarkedSubjects, cmsDb],
   );
 
-  const entries = useMemo(
+  const entries: BookmarkEntry[] = useMemo(
     () =>
       bookmarks
         .map((bm) => ({ bm, resource: getResourceById(bm.resourceId) }))
-        .filter((e): e is { bm: (typeof bookmarks)[number]; resource: NonNullable<ReturnType<typeof getResourceById>> } =>
-          Boolean(e.resource),
-        ),
-    [bookmarks],
+        .filter((e): e is BookmarkEntry => Boolean(e.resource)),
+    [bookmarks, cmsDb],
   );
 
   const searchedSubjects = useMemo(() => {
@@ -57,10 +58,10 @@ export default function Bookmarks() {
     if (!q) return allSavedSubjects;
     return allSavedSubjects.filter(
       (s) =>
-        matches(s.name, q) ||
-        matches(s.code, q) ||
-        matches(s.description, q) ||
-        s.hotTopics.some((t) => matches(t, q)),
+        matchesQuery(s.name, q) ||
+        matchesQuery(s.code, q) ||
+        matchesQuery(s.description, q) ||
+        s.hotTopics.some((t) => matchesQuery(t, q)),
     );
   }, [allSavedSubjects, query]);
 
@@ -69,16 +70,21 @@ export default function Bookmarks() {
     if (!q) return entries;
     return entries.filter(
       ({ bm, resource }) =>
-        matches(resource.title, q) ||
-        matches(resource.description, q) ||
-        resource.tags.some((t) => matches(t, q)) ||
-        matches(bm.note, q),
+        matchesQuery(resource.title, q) ||
+        matchesQuery(resource.description, q) ||
+        resource.tags.some((t) => matchesQuery(t, q)) ||
+        matchesQuery(bm.note, q),
     );
   }, [entries, query]);
 
   const subjects = useMemo(
-    () => searchedSubjects.filter((s) => !semesterId || s.semesterId === semesterId),
-    [searchedSubjects, semesterId],
+    () =>
+      searchedSubjects.filter(
+        (s) =>
+          (!semesterId || s.semesterId === semesterId) &&
+          (!subjectId || s.id === subjectId),
+      ),
+    [searchedSubjects, semesterId, subjectId],
   );
 
   const subjectOptions = useMemo(
@@ -86,14 +92,14 @@ export default function Bookmarks() {
       semesterId
         ? allSubjects.filter((s) => s.semesterId === semesterId)
         : allSubjects,
-    [semesterId],
+    [semesterId, allSubjects],
   );
 
   const filtered = useMemo(() => {
     let list = searchedEntries;
     if (semesterId) list = list.filter((e) => e.resource.semesterId === semesterId);
     if (subjectId) list = list.filter((e) => e.resource.subjectId === subjectId);
-    if (type !== "all") list = list.filter((e) => e.resource.type === type);
+    if (type !== "all" && type !== "subjects") list = list.filter((e) => e.resource.type === type);
     const sorted = [...list];
     if (sort === "title")
       sorted.sort((a, b) => a.resource.title.localeCompare(b.resource.title));
@@ -113,8 +119,11 @@ export default function Bookmarks() {
     return map;
   }, [searchedEntries, semesterId, subjectId]);
 
-  const isEmpty = bookmarkedSubjects.length === 0 && entries.length === 0;
-  const noMatches = !isEmpty && subjects.length === 0 && filtered.length === 0;
+  const isEmpty = allSavedSubjects.length === 0 && entries.length === 0;
+  /** "subjects" shows only subjects; a resource type shows only that type; "all" shows both. */
+  const showSubjectsSection = (type === "all" || type === "subjects") && subjects.length > 0;
+  const showResourcesSection = type !== "subjects" && filtered.length > 0;
+  const noMatches = !isEmpty && !showSubjectsSection && !showResourcesSection;
 
   return (
     <div>
@@ -182,7 +191,14 @@ export default function Bookmarks() {
           </div>
 
           <div className="mb-5">
-            <FilterChips selected={type} counts={counts} onChange={setType} />
+            <FilterChips
+              selected={type}
+              counts={counts}
+              showSubjects
+              subjectsCount={allSavedSubjects.length}
+              allCount={allSavedSubjects.length + entries.length}
+              onChange={setType}
+            />
           </div>
 
           {noMatches ? (
@@ -192,7 +208,7 @@ export default function Bookmarks() {
             />
           ) : (
             <>
-              {subjects.length > 0 && (
+              {showSubjectsSection && (
                 <section className="mb-8" aria-labelledby="bm-subjects-heading">
                   <h2
                     id="bm-subjects-heading"
@@ -207,7 +223,7 @@ export default function Bookmarks() {
                   </div>
                 </section>
               )}
-              {filtered.length > 0 && (
+              {showResourcesSection && (
                 <section aria-labelledby="bm-pages-heading">
                   <h2
                     id="bm-pages-heading"

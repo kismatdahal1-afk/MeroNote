@@ -22,6 +22,10 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const { resourceId } = useParams<{ resourceId: string }>();
   const { state } = useLocation();
   const via = (state as { via?: string } | null)?.via;
+  /** Student navigation context: "downloads" when the reader was opened
+   *  from the Downloads page, so the breadcrumb reflects the actual
+   *  entry point instead of the library hierarchy. */
+  const fromDownloads = !admin && via === "downloads";
   const resource = getResourceById(resourceId);
   const { toast } = useToast();
   const { getProgress, setReadingProgress, addBookmark, getBookmark, getDownload, startDownload, markOpened } = useLibrary();
@@ -156,6 +160,18 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
+        ) : fromDownloads ? (
+          <>
+            <Link to="/downloads" className="shrink-0 rounded px-1 py-0.5 hover:text-primary">Downloads</Link>
+            <span className="inline-flex min-w-0 items-center gap-0.5">
+              <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+              <span className="whitespace-normal rounded px-1 py-0.5">
+                {subject ? subject.name : resource.title}
+              </span>
+            </span>
+            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
+          </>
         ) : (
           <>
             <Link to="/semesters" className="shrink-0 rounded px-1 py-0.5 hover:text-primary">Semester</Link>
@@ -191,7 +207,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       toolbarLeading={
         <BackButton
           iconOnly
-          fallbackTo={`${baseRoute}/${resource.id}`}
+          fallbackTo={fromDownloads ? "/downloads" : `${baseRoute}/${resource.id}`}
           label="Back to resource"
           className="text-foreground/75 hover:bg-surface-hover hover:text-foreground"
         />

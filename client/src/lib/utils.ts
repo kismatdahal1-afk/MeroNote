@@ -71,3 +71,8 @@ export function daysUntil(iso: string): number {
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+/** Case-insensitive substring match used by the Favorite/Bookmark search boxes. */
+export function matchesQuery(text: string, query: string): boolean {
+  return text.toLowerCase().includes(query.trim().toLowerCase());
+}

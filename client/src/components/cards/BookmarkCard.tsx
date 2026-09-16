@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Bookmark as BookmarkIcon, Trash2, Play } from "lucide-react";
+import { Bookmark as BookmarkIcon, Trash2, Play, ChevronRight } from "lucide-react";
 import type { Bookmark, Resource } from "../../types";
 import { Card } from "../common/PageHeader";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
@@ -24,13 +24,53 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
   const semester = getSemesterById(resource.semesterId);
 
   return (
-    <Card interactive className="group relative flex h-full flex-col p-5">
+    <Card interactive className="group relative flex h-full flex-col p-4 sm:p-5">
       {/* Stretched link — makes the whole card clickable */}
       <Link
         to={`/resources/${resource.id}`}
         aria-label={`Open ${resource.title}`}
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
+      {/* Mobile compact row — every non-Subject item uses the resource-row pattern. */}
+      <div className="relative z-10 sm:hidden">
+        <div className="flex items-center gap-2.5">
+          <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
+            <TypeIcon className="size-4.5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-1 text-sm font-bold leading-snug text-foreground">
+              {resource.title}
+            </p>
+            <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
+              {typeConfig.label} · Page {bookmark.page} · {formatDate(bookmark.createdAt)}
+            </p>
+            {(subject || semester) && (
+              <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground/80">
+                {[subject?.name, semester?.name].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+          <IconButton
+            icon={Trash2}
+            label={`Remove bookmark for ${resource.title}`}
+            size="sm"
+            variant="danger"
+            onClick={() => onRemove(bookmark.id)}
+            className="shrink-0"
+          />
+        </div>
+        <Link
+          to={`/resources/${resource.id}`}
+          aria-label={`Open ${resource.title}`}
+          className="mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          Open
+          <ChevronRight className="size-3.5" aria-hidden="true" />
+        </Link>
+      </div>
+
+      {/* Desktop card body — unchanged, hidden on mobile. */}
+      <div className="hidden sm:contents">
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
@@ -88,6 +128,7 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
           <Play className="size-3.5 fill-current" aria-hidden="true" />
           Read
         </Link>
+      </div>
       </div>
     </Card>
   );

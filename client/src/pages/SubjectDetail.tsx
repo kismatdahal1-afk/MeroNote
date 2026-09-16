@@ -6,6 +6,7 @@ import { BackButton } from "../components/common/BackButton";
 import { SubjectHeader } from "../components/subjects/SubjectHeader";
 import { SubjectResourceGroup } from "../components/subjects/SubjectResourceGroup";
 import { SubjectResourceRow } from "../components/subjects/SubjectResourceRow";
+import { ResourceCard } from "../components/cards/ResourceCard";
 import {
   getSubjectById,
   getSemesterById,
@@ -204,11 +205,17 @@ export default function SubjectDetail() {
                 count={resources.length}
                 tone={toneForType(type)}
               >
-                <ul className="space-y-2.5">
+                {/* Mobile: existing compact rows. Desktop: Resources-page card grid. */}
+                <ul className="space-y-2.5 sm:hidden">
                   {resources.map((r) => (
                     <SubjectResourceRow key={r.id} resource={r} />
                   ))}
                 </ul>
+                <div className="hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
+                  {resources.map((r) => (
+                    <ResourceCard key={r.id} resource={r} showContext={false} />
+                  ))}
+                </div>
               </SubjectResourceGroup>
             );
           })}
@@ -220,11 +227,17 @@ export default function SubjectDetail() {
               count={resources.length}
               tone="secondary"
             >
-              <ul className="space-y-2.5">
+              {/* Mobile: existing compact rows. Desktop: Resources-page card grid. */}
+              <ul className="space-y-2.5 sm:hidden">
                 {resources.map((r) => (
                   <SubjectResourceRow key={r.id} resource={r} />
                 ))}
               </ul>
+              <div className="hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
+                {resources.map((r) => (
+                  <ResourceCard key={r.id} resource={r} showContext={false} />
+                ))}
+              </div>
             </SubjectResourceGroup>
           ))}
         </>

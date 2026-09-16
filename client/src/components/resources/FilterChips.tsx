@@ -3,17 +3,37 @@ import { cx } from "../../lib/utils";
 import { ALL_RESOURCE_TYPES, RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import type { ResourceType } from "../../types";
 
-interface FilterChipsProps {
-  selected: ResourceType | "all";
+/** Filter value for resource-type chips. Favorites/Bookmarks also allow "subjects". */
+export type TypeFilter = ResourceType | "all" | "subjects";
+
+interface FilterChipsProps<T extends TypeFilter> {
+  selected: T;
   counts?: Partial<Record<ResourceType, number>>;
-  onChange: (type: ResourceType | "all") => void;
+  /** When true, a "Subjects" chip is shown right after "All" (Favorites/Bookmarks only). */
+  showSubjects?: boolean;
+  /** Total number of saved subjects (unfiltered) — shown on the Subjects chip. */
+  subjectsCount?: number;
+  /** Total saved items (subjects + resources) — shown on the All chip when provided. */
+  allCount?: number;
+  onChange: (type: T) => void;
 }
 
-export function FilterChips({ selected, counts, onChange }: FilterChipsProps) {
-  const chips = useMemo(
-    () => ["all", ...ALL_RESOURCE_TYPES] as const,
-    [],
+export function FilterChips<T extends TypeFilter>({
+  selected,
+  counts,
+  showSubjects = false,
+  subjectsCount,
+  allCount,
+  onChange,
+}: FilterChipsProps<T>) {
+  const chips = useMemo<(TypeFilter)[]>(
+    () => ["all", ...(showSubjects ? ["subjects" as TypeFilter] : []), ...ALL_RESOURCE_TYPES],
+    [showSubjects],
   );
+
+  const resourceTotal = counts
+    ? Object.values(counts).reduce<number>((sum, n) => sum + (n ?? 0), 0)
+    : 0;
 
   return (
     <div
@@ -23,16 +43,22 @@ export function FilterChips({ selected, counts, onChange }: FilterChipsProps) {
     >
       {chips.map((chip) => {
         const isActive = selected === chip;
+        const allLabel =
+          showSubjects && allCount !== undefined
+            ? `All (${allCount})`
+            : `All${counts ? ` (${resourceTotal})` : ""}`;
         const label =
           chip === "all"
-            ? `All${counts ? ` (${Object.values(counts).reduce((a, b) => a! + b!, 0)})` : ""}`
-            : RESOURCE_TYPE_CONFIG[chip].label + (counts?.[chip] ? ` (${counts[chip]})` : "");
+            ? allLabel
+            : chip === "subjects"
+              ? `Subjects${subjectsCount ? ` (${subjectsCount})` : ""}`
+              : RESOURCE_TYPE_CONFIG[chip].label + (counts?.[chip] ? ` (${counts[chip]})` : "");
         return (
           <button
             key={chip}
             type="button"
             aria-pressed={isActive}
-            onClick={() => onChange(chip)}
+            onClick={() => onChange(chip as T)}
             className={cx(
               "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",

@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -68,15 +69,106 @@ interface LibraryContextValue {
 
 const LibraryContext = createContext<LibraryContextValue | null>(null);
 
+/**
+ * Persistence for the save-lists (frontend only — same pattern as the theme,
+ * user, CMS and semester-status providers). Without this, every browser
+ * refresh resets favorites/bookmarks to seeds and wipes ALL saved subjects
+ * (which have no seeds), on both desktop and mobile.
+ */
+const STORAGE_KEYS = {
+  favorites: "meronote.library.favorites.v1",
+  favoriteSubjects: "meronote.library.favoriteSubjects.v1",
+  bookmarks: "meronote.library.bookmarks.v1",
+  bookmarkedSubjects: "meronote.library.bookmarkedSubjects.v1",
+} as const;
+
+function readStored<T>(key: string, fallback: T, validate: (raw: unknown) => T | null): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return validate(JSON.parse(raw)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStored(key: string, value: unknown): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* storage unavailable (private mode / quota) — keep in-memory behavior */
+  }
+}
+
+function asStringArray(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter((v): v is string => typeof v === "string");
+}
+
+function asBookmarkArray(raw: unknown): Bookmark[] | null {
+  if (!Array.isArray(raw)) return null;
+  const now = new Date().toISOString();
+  const list: Bookmark[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const rec = item as Record<string, unknown>;
+    if (typeof rec.id !== "string" || typeof rec.resourceId !== "string") continue;
+    list.push({
+      id: rec.id,
+      resourceId: rec.resourceId,
+      page:
+        typeof rec.page === "number" && Number.isFinite(rec.page) && rec.page > 0
+          ? Math.floor(rec.page)
+          : 1,
+      note: typeof rec.note === "string" ? rec.note : "",
+      createdAt: typeof rec.createdAt === "string" ? rec.createdAt : now,
+    });
+  }
+  return list;
+}
+
 export function LibraryProvider({ children }: { children: ReactNode }) {
-  const [favorites, setFavorites] = useState<string[]>(seedFavorites);
-  const [favoriteSubjects, setFavoriteSubjects] = useState<string[]>([]);
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>(seedBookmarks);
-  const [bookmarkedSubjects, setBookmarkedSubjects] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>(() =>
+    readStored(STORAGE_KEYS.favorites, seedFavorites, asStringArray),
+  );
+  const [favoriteSubjects, setFavoriteSubjects] = useState<string[]>(() =>
+    readStored(STORAGE_KEYS.favoriteSubjects, [], asStringArray),
+  );
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>(() =>
+    readStored(STORAGE_KEYS.bookmarks, seedBookmarks, asBookmarkArray),
+  );
+  const [bookmarkedSubjects, setBookmarkedSubjects] = useState<string[]>(() =>
+    readStored(STORAGE_KEYS.bookmarkedSubjects, [], asStringArray),
+  );
   const [downloads, setDownloads] = useState<DownloadItem[]>(seedDownloads);
   const [recent, setRecent] = useState<RecentEntry[]>(seedRecent);
   const [progress, setProgress] = useState<ReadingProgress[]>(seedProgress);
   const nextId = useRef(100);
+
+  /* Write-through: every save/unsave survives reloads on desktop and mobile. */
+  useEffect(() => {
+    writeStored(STORAGE_KEYS.favorites, favorites);
+  }, [favorites]);
+  useEffect(() => {
+    writeStored(STORAGE_KEYS.favoriteSubjects, favoriteSubjects);
+  }, [favoriteSubjects]);
+  useEffect(() => {
+    writeStored(STORAGE_KEYS.bookmarks, bookmarks);
+  }, [bookmarks]);
+  useEffect(() => {
+    writeStored(STORAGE_KEYS.bookmarkedSubjects, bookmarkedSubjects);
+  }, [bookmarkedSubjects]);
+
+  /* Keep generated bookmark ids unique across reloads (stored ids stay reserved). */
+  useEffect(() => {
+    const max = bookmarks.reduce((m, b) => {
+      const match = /^bm-(\d+)$/.exec(b.id);
+      return match ? Math.max(m, Number(match[1])) : m;
+    }, 0);
+    if (max >= nextId.current) nextId.current = max + 1;
+  }, []);
 
   const isFavorite = useCallback(
     (resourceId: string) => favorites.includes(resourceId),

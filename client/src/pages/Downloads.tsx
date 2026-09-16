@@ -83,58 +83,37 @@ export default function Downloads() {
         subtitle="Files saved on this device for offline reading."
       />
 
-      {/* Storage Overview — prominent */}
+      {/* Download History — prominent */}
       <Card className="bg-hero-gradient mb-4 p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:gap-8">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2.5">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-muted text-primary">
-                <HardDrive className="size-5" aria-hidden="true" />
-              </span>
-              <h2 className="text-base font-bold text-foreground">Storage Overview</h2>
-            </div>
-            <p className="mt-3 text-3xl font-bold tracking-tight text-foreground">
-              {formatFileSize(totalDownloadSize)}
-              <span className="ml-2 text-sm font-semibold text-muted-foreground">
-                of downloads stored
-              </span>
-            </p>
-            <div className="mt-3">
-              <ProgressBar
-                value={entries.length > 0 ? completedCount / entries.length : 0}
-                label="Completed downloads"
-                className="h-2"
-              />
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs font-medium text-muted-foreground">
-                <span>
-                  <span className="font-bold text-foreground">{completedCount}</span> files
-                  downloaded
-                </span>
-                {activeCount > 0 && (
-                  <span>
-                    <span className="font-bold text-foreground">{activeCount}</span> in progress
-                  </span>
-                )}
-                <span>
-                  Temporary cache <span className="font-bold text-foreground">0 B</span>
-                </span>
-              </div>
-            </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-muted text-primary">
+              <HardDrive className="size-5" aria-hidden="true" />
+            </span>
+            <h2 className="text-base font-bold text-foreground">Download History</h2>
           </div>
-          <div className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-2 lg:w-72 lg:grid-cols-2">
-            <div className="card-glow rounded-xl border border-border bg-surface p-3.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Downloaded
-              </p>
-              <p className="mt-1 text-2xl font-bold text-foreground">{completedCount}</p>
-              <p className="text-xs font-medium text-muted-foreground">files on device</p>
-            </div>
-            <div className="card-glow rounded-xl border border-border bg-surface p-3.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Cache
-              </p>
-              <p className="mt-1 text-2xl font-bold text-foreground">0 B</p>
-              <p className="text-xs font-medium text-muted-foreground">temporary</p>
+          <p className="mt-3 text-2xl font-bold tabular-nums tracking-tight text-foreground">
+            {formatFileSize(totalDownloadSize)}
+            <span className="ml-2 text-sm font-semibold text-muted-foreground">
+              downloaded
+            </span>
+          </p>
+          <div className="mt-3">
+            <ProgressBar
+              value={entries.length > 0 ? completedCount / entries.length : 0}
+              label="Completed downloads"
+              className="h-2"
+            />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs font-medium text-muted-foreground">
+              <span>
+                <span className="font-bold text-foreground">{completedCount}</span> files
+                downloaded
+              </span>
+              {activeCount > 0 && (
+                <span>
+                  <span className="font-bold text-foreground">{activeCount}</span> in progress
+                </span>
+              )}
             </div>
           </div>
         </div>

@@ -44,6 +44,9 @@ export default function ResourceDetail() {
   /** Admin navigation context: "topics" when opened from Admin → Topics,
    *  so the breadcrumb reflects where the admin came from. */
   const via = (state as { via?: string } | null)?.via;
+  /** Student navigation context: "downloads" when opened from Downloads,
+   *  so the breadcrumb reflects the actual entry point. */
+  const fromDownloads = !isAdmin && via === "downloads";
 
   const resource = getResourceById(resourceId);
 
@@ -116,7 +119,9 @@ export default function ResourceDetail() {
     toast("Resource moved to trash");
     // Return one level back to the exact parent context the item was opened
     // from (same target as the Back button) — never to an unrelated page.
-    const fallback = isAdmin ? (via === "topics" ? "/admin/semesters" : "/admin/resources") : "/resources";
+    const fallback = isAdmin
+      ? (via === "topics" ? "/admin/semesters" : "/admin/resources")
+      : (fromDownloads ? "/downloads" : "/resources");
     const idx = window.history.state?.idx;
     if (typeof idx === "number" && idx > 0) navigate(-1);
     else navigate(fallback, { replace: true });
@@ -127,7 +132,7 @@ export default function ResourceDetail() {
       <div className="mb-1 -ml-1 sm:-ml-1">
         <BackButton
           label="Back"
-          fallbackTo={isAdmin ? (via === "topics" ? "/admin/semesters" : "/admin/resources") : "/resources"}
+          fallbackTo={isAdmin ? (via === "topics" ? "/admin/semesters" : "/admin/resources") : (fromDownloads ? "/downloads" : "/resources")}
         />
       </div>
       <PageHeader
@@ -150,7 +155,13 @@ export default function ResourceDetail() {
                   ...(subject ? [{ label: subject.name }] : []),
                   ...(topic ? [{ label: topic.title }] : []),
                 ]
-            : [
+            : fromDownloads
+              ? [
+                  { label: "Downloads", to: "/downloads" },
+                  ...(subject ? [{ label: subject.name }] : []),
+                  { label: resource.title },
+                ]
+              : [
                 { label: "Semester", to: "/semesters" },
                 ...(semester ? [{ label: semester.name, to: `/semesters/${semester.id}` }] : []),
                 ...(subject ? [{ label: subject.name, to: `/subjects/${subject.id}` }] : []),
