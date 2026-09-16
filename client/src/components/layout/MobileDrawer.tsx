@@ -21,7 +21,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col border-r border-border bg-surface shadow-xl">
+      <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col border-r border-border bg-surface shadow-xl dark:border-[#20242B] dark:bg-[#0D1015]">
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">

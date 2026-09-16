@@ -47,8 +47,8 @@ export function AppLayout() {
 
   return (
     <div className="bg-hero-gradient min-h-screen">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-surface lg:flex">
+      {/* Desktop sidebar — dark tint comes from the dark-mode sidebar tokens */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-surface dark:border-[#20242B] dark:bg-[#0D1015] lg:flex">
         <div className="flex h-16 items-center border-b border-border px-5">
           <BrandMark subtitle />
         </div>

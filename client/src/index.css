@@ -7,10 +7,9 @@
 /* ============================================================
    MERO NOTE — GLOBAL DESIGN TOKENS
    Light: warm cream (#FFF1DE base) — unchanged.
-   Dark: pure black (#000000) foundation with a smooth dark-navy
-   gradient glow rising through the page. Frosted navy-slate cards
-   glow brighter than the page; platinum typography, bright-blue
-   accents, emerald verified, amber exam notices.
+   Dark: soft black (#080A0D) foundation, neutral charcoal surfaces,
+   subtle borders, platinum typography, selective cyan accents,
+   emerald verified, amber exam notices.
    ============================================================ */
 
 :root {
@@ -66,40 +65,38 @@
 }
 
 .dark {
-  /* Foundation: pure black — #000000 page base with a smooth dark
-     navy gradient glow rising through the page. Cards sit brighter. */
-  --color-background: #000000;
-  --color-hero: #000000;
-  /* Frosted navy-slate surfaces — tuned brighter than the pure
-     black page so every card reads as a lifted, glowing panel. */
-  --color-surface: rgba(24, 32, 54, 0.62);
-  --color-surface-muted: rgba(30, 38, 62, 0.5);
-  --color-surface-hover: rgba(38, 48, 78, 0.66);
+  /* Foundation: soft black — lifted from absolute black for comfort.
+     Hierarchy comes from dark surface brightness, not saturated color. */
+  --color-background: #080a0d;
+  --color-hero: #080a0d;
+  /* Neutral charcoal surfaces — default card, elevated card, hover. */
+  --color-surface: #1b212b;
+  --color-surface-muted: #202734;
+  --color-surface-hover: #26303d;
 
-  /* Typography — platinum / cool chalk */
+  /* Typography — primary / secondary / muted */
   --color-foreground: #f1f5f9;
   --color-muted-foreground: #94a3b8;
 
-  /* Hairline borders — consistent light-on-dark edges */
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-border-strong: rgba(255, 255, 255, 0.16);
+  /* Hairline borders — subtle card edge / stronger input edge */
+  --color-border: #1c2129;
+  --color-border-strong: #252c36;
 
-  /* Primary — bright blue (sky-400 family). Light enough for
-     text/links on black (≈8:1), paired with a deep-blue foreground
-     so filled buttons keep strong contrast. */
-  --color-primary: #38bdf8;
-  --color-primary-hover: #7dd3fc;
+  /* Primary accent — selective cyan. Deep tinted foreground so filled
+     buttons keep strong contrast on the accent. */
+  --color-primary: #22b8f0;
+  --color-primary-hover: #38c6f5;
   --color-primary-foreground: #082f49;
-  --color-primary-muted: rgba(56, 189, 248, 0.16);
-  --color-primary-muted-hover: rgba(56, 189, 248, 0.26);
+  --color-primary-muted: #102a38;
+  --color-primary-muted-hover: rgba(34, 184, 240, 0.22);
 
   /* Secondary — pale sky-blue chip/text treatment (solid: doubles as text) */
   --color-secondary: #bae6fd;
   --color-secondary-hover: #d0effe;
   --color-secondary-foreground: #082f49;
 
-  /* Accent — bright blue info tone */
-  --color-accent: #7dd3fc;
+  /* Accent — cyan info tone (aligns with primary) */
+  --color-accent: #22b8f0;
   --color-accent-foreground: #082f49;
 
   /* States — emerald offline/verified, amber exam notices */
@@ -123,7 +120,7 @@
 }
 
 /* Reader chrome — follows the app theme: warm cream in light mode,
-   atmospheric obsidian in dark mode (focused study zone). */
+   soft-black charcoal in dark mode (focused study zone). */
 .reader-bar {
   --color-background: #efe9e0;
   --color-surface: #fffdf8;
@@ -142,20 +139,20 @@
 }
 
 .dark .reader-bar {
-  /* Focused study zone — pure black base, lifted navy-glass chrome. */
-  --color-background: #000000;
-  --color-surface: rgba(24, 32, 54, 0.62);
-  --color-surface-muted: rgba(30, 38, 62, 0.5);
-  --color-surface-hover: rgba(38, 48, 78, 0.66);
+  /* Focused study zone — same charcoal system as the main shell. */
+  --color-background: #080a0d;
+  --color-surface: #1b212b;
+  --color-surface-muted: #202734;
+  --color-surface-hover: #26303d;
   --color-foreground: #f1f5f9;
   --color-muted-foreground: #94a3b8;
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-border-strong: rgba(255, 255, 255, 0.16);
-  --color-primary: #38bdf8;
-  --color-primary-hover: #7dd3fc;
+  --color-border: #1c2129;
+  --color-border-strong: #252c36;
+  --color-primary: #22b8f0;
+  --color-primary-hover: #38c6f5;
   --color-primary-foreground: #082f49;
-  --color-primary-muted: rgba(56, 189, 248, 0.16);
-  --color-primary-muted-hover: rgba(56, 189, 248, 0.26);
+  --color-primary-muted: #102a38;
+  --color-primary-muted-hover: rgba(34, 184, 240, 0.22);
   --color-scrim: rgba(0, 0, 0, 0.7);
 }
 
@@ -304,17 +301,16 @@ body {
 }
 
 .dark .bg-hero-gradient {
-  background-color: #000000;
+  background-color: #080a0d;
   background-image:
     radial-gradient(
       140% 55% circle at 50% -12%,
-      rgba(21, 34, 68, 0.85),
-      rgba(10, 17, 36, 0.4) 45%,
+      rgba(255, 255, 255, 0.04),
       transparent 70%
     ),
     radial-gradient(
       120% 45% circle at 50% 112%,
-      rgba(17, 28, 58, 0.7),
+      rgba(255, 255, 255, 0.02),
       transparent 65%
     );
   background-repeat: no-repeat;
@@ -332,37 +328,21 @@ body {
   -webkit-backdrop-filter: blur(14px);
 }
 
-/* Dark-mode card corner glow — cards glow brighter than the pure
-   black page. Four stacked light layers concentrated at the
-   top-left corner: a tiny near-white core (the light source), a
-   tight bright-blue hotspot, the wide navy sheen, and a soft ambient
-   bloom rising from the bottom edge — painted over the frosted
-   navy tint so every card reads as a lit glass panel floating on
-   the black background.
+/* Dark-mode card sheen — a whisper of neutral top-light so charcoal
+   cards lift gently off the soft-black page. No saturated color:
+   hierarchy comes from surface brightness, accents stay selective.
    Opt-in via .card-glow (cards only — never inputs/buttons/chrome).
    Hero cards keep their own gradient via the :not() guard. */
 .dark .card-glow:not(.bg-hero-gradient) {
   background-image:
     radial-gradient(
-      5rem 3.5rem circle at 0 0,
-      rgba(224, 242, 254, 0.4),
-      transparent 60%
-    ),
-    radial-gradient(
-      11rem 7rem circle at 0 0,
-      rgba(56, 189, 248, 0.38),
-      rgba(56, 189, 248, 0.12) 50%,
-      transparent 70%
-    ),
-    radial-gradient(
       40rem 15rem circle at 0 0,
-      rgba(108, 132, 196, 0.3),
-      rgba(108, 132, 196, 0.1) 45%,
+      rgba(255, 255, 255, 0.045),
       transparent 65%
     ),
     radial-gradient(
       120% 60% circle at 50% 115%,
-      rgba(99, 110, 190, 0.16),
+      rgba(255, 255, 255, 0.03),
       transparent 60%
     );
   background-repeat: no-repeat;
@@ -377,12 +357,12 @@ body {
   background: var(--color-primary-muted);
 }
 
-/* Dark-mode native form controls — bright-blue accent for checkboxes,
+/* Dark-mode native form controls — cyan accent for checkboxes,
    number spinners, date-picker calendars and autofill so raw inputs
-   match the frosted-obsidian material. Dark-only; light is untouched. */
+   match the charcoal material. Dark-only; light is untouched. */
 .dark input[type="checkbox"],
 .dark input[type="radio"] {
-  accent-color: #38bdf8;
+  accent-color: #22b8f0;
 }
 
 .dark input:autofill,
@@ -390,12 +370,12 @@ body {
 .dark select:autofill {
   -webkit-text-fill-color: #f1f5f9;
   caret-color: #f1f5f9;
-  box-shadow: 0 0 0 1000px rgba(15, 20, 36, 0.92) inset;
+  box-shadow: 0 0 0 1000px rgba(27, 33, 43, 0.95) inset;
   transition: background-color 8888s ease-in-out 0s;
 }
 
 .dark option {
-  background-color: #0a0f1f;
+  background-color: #1b212b;
   color: #f1f5f9;
 }
 
@@ -406,20 +386,19 @@ body {
   cursor: pointer;
 }
 
-/* Dark reader page — pure black base with the same smooth dark-navy
-   glow (fixed) as the main shell for a focused study zone. */
+/* Dark reader page — soft-black base with the same whisper of neutral
+   top-light as the main shell for a focused study zone. */
 .dark .reader-bar.bg-background {
   background-color: transparent;
   background-image:
     radial-gradient(
       140% 55% circle at 50% -12%,
-      rgba(21, 34, 68, 0.85),
-      rgba(10, 17, 36, 0.4) 45%,
+      rgba(255, 255, 255, 0.04),
       transparent 70%
     ),
     radial-gradient(
       120% 45% circle at 50% 112%,
-      rgba(17, 28, 58, 0.7),
+      rgba(255, 255, 255, 0.02),
       transparent 65%
     );
   background-repeat: no-repeat;
