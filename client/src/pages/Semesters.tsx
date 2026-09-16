@@ -146,8 +146,9 @@ export function SemesterSubjects() {
       <PageHeader
         title={semester.name}
         subtitle={semester.description}
+        compactBreadcrumb
         breadcrumbs={[
-          { label: "Semesters", to: "/semesters" },
+          { label: "Semester", to: "/semesters" },
           { label: semester.name },
         ]}
         actions={

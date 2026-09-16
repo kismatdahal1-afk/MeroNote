@@ -1,4 +1,4 @@
-import { LayoutDashboard, BookMarked, GraduationCap, Heart, Bookmark, Download, FileStack, Settings, Bell, FileEdit, Trash2 } from "lucide-react";
+import { LayoutDashboard, GraduationCap, Heart, Bookmark, Download, FileStack, Settings, Bell, FileEdit, Trash2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cx } from "../../lib/utils";
@@ -14,7 +14,6 @@ interface NavItem {
 const PRIMARY_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/semesters", label: "Semesters", icon: GraduationCap },
-  { to: "/subjects", label: "Subjects", icon: BookMarked },
   { to: "/resources", label: "Resources", icon: FileStack },
   { to: "/favorites", label: "Favorites", icon: Heart },
   { to: "/bookmarks", label: "Bookmarks", icon: Bookmark },

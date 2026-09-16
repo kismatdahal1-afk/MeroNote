@@ -131,7 +131,7 @@ export function searchResources(query: string): Resource[] {
   });
 }
 
-/** All subjects visible to students (used by Subjects page). */
+/** All subjects visible to students (used by semester, favorites, bookmarks, downloads). */
 export function getAllSubjects(): Subject[] {
   return visible(getDb().subjects);
 }

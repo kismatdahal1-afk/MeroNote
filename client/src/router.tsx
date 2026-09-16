@@ -9,7 +9,6 @@ const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
 const Semesters = lazy(() => import("./pages/Semesters"));
 const SemesterSubjects = lazy(() => import("./pages/Semesters").then((m) => ({ default: m.SemesterSubjects })));
-const Subjects = lazy(() => import("./pages/Subjects"));
 const Resources = lazy(() => import("./pages/Resources"));
 const SubjectDetail = lazy(() => import("./pages/SubjectDetail"));
 const ResourceDetail = lazy(() => import("./pages/ResourceDetail"));
@@ -58,7 +57,6 @@ export const router = createBrowserRouter([
           { path: "dashboard", element: <Dashboard /> },
           { path: "semesters", element: withSuspense(<Semesters />) },
           { path: "semesters/:semesterId", element: withSuspense(<SemesterSubjects />) },
-          { path: "subjects", element: withSuspense(<Subjects />) },
           { path: "subjects/:subjectId", element: withSuspense(<SubjectDetail />) },
           { path: "resources", element: withSuspense(<Resources />) },
           { path: "resources/:resourceId", element: withSuspense(<ResourceDetail />) },

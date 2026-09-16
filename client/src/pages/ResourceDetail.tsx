@@ -133,6 +133,7 @@ export default function ResourceDetail() {
       <PageHeader
         title={resource.title}
         subtitle={resource.description}
+        compactBreadcrumb={!isAdmin}
         breadcrumbs={
           isAdmin
             ? via === "topics"
@@ -150,10 +151,10 @@ export default function ResourceDetail() {
                   ...(topic ? [{ label: topic.title }] : []),
                 ]
             : [
-                { label: "Semesters", to: "/semesters" },
+                { label: "Semester", to: "/semesters" },
                 ...(semester ? [{ label: semester.name, to: `/semesters/${semester.id}` }] : []),
                 ...(subject ? [{ label: subject.name, to: `/subjects/${subject.id}` }] : []),
-                { label: typeConfig.label },
+                { label: resource.title },
               ]
         }
         actions={

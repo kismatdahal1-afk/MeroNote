@@ -156,7 +156,37 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
-        ) : undefined
+        ) : (
+          <>
+            <Link to="/semesters" className="shrink-0 rounded px-1 py-0.5 hover:text-primary">Semester</Link>
+            {semester && (
+              <span className="inline-flex min-w-0 items-center gap-0.5">
+                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+                <Link
+                  to={`/semesters/${semester.id}`}
+                  className="rounded px-1 py-0.5 hover:text-primary"
+                >
+                  {semester.name}
+                </Link>
+              </span>
+            )}
+            {subject && (
+              <span className="inline-flex min-w-0 items-center gap-0.5">
+                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+                <Link
+                  to={`/subjects/${subject.id}`}
+                  className="whitespace-normal rounded px-1 py-0.5 hover:text-primary"
+                >
+                  {subject.name}
+                </Link>
+              </span>
+            )}
+            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <span aria-current="page" className="min-w-0 whitespace-normal rounded px-1 py-0.5 font-semibold text-foreground">
+              {resource.title}
+            </span>
+          </>
+        )
       }
       toolbarLeading={
         <BackButton
