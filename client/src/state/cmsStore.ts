@@ -112,6 +112,7 @@ function seedDb(): CmsDb {
       date: new Date(Date.now() + 24 * 24 * 60 * 60 * 1000).toISOString(),
       priority: "high",
       status: "published",
+      publishedAt: nowIso(),
       showOnDashboard: true,
       pinned: true,
       createdAt: nowIso(),
@@ -126,6 +127,7 @@ function seedDb(): CmsDb {
       date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
       priority: "normal",
       status: "published",
+      publishedAt: nowIso(),
       showOnDashboard: true,
       pinned: false,
       createdAt: nowIso(),
@@ -140,6 +142,7 @@ function seedDb(): CmsDb {
       date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
       priority: "low",
       status: "published",
+      publishedAt: nowIso(),
       showOnDashboard: true,
       pinned: false,
       createdAt: nowIso(),
@@ -200,12 +203,18 @@ function loadDb(): CmsDb {
         }
         return r;
       });
-      // Migrate notices: drop unused semester/subject, ensure announcer exists
+      // Migrate notices: drop unused semester/subject, ensure announcer exists,
+      // repair legacy "hidden" status (Hide system removed) back to published,
+      // and backfill the system-generated published timestamp.
       const migratedNotices = (parsed.notices as any[]).map((n) => {
-        const { semesterId: _sem, subjectId: _sub, announcer, ...rest } = n;
+        const { semesterId: _sem, subjectId: _sub, announcer, status, publishedAt, createdAt, ...rest } = n;
+        const finalStatus = status === "hidden" ? "published" : (status ?? "published");
         return {
           ...rest,
           announcer: announcer ?? "administration",
+          status: finalStatus,
+          createdAt,
+          publishedAt: publishedAt ?? (finalStatus === "published" ? createdAt : undefined),
         };
       });
       return {
@@ -892,7 +901,7 @@ export interface NoticeDraft {
   announcer: Notice["announcer"];
   date: string;
   priority: Notice["priority"];
-  status: Notice["status"];
+  status: "draft" | "published";
   showOnDashboard: boolean;
   pinned: boolean;
 }
@@ -907,6 +916,7 @@ export function createNotice(draft: NoticeDraft): Notice {
     date: draft.date,
     priority: draft.priority,
     status: draft.status,
+    publishedAt: draft.status === "published" ? nowIso() : undefined,
     showOnDashboard: draft.showOnDashboard,
     pinned: draft.pinned,
     createdAt: nowIso(),
@@ -921,7 +931,11 @@ export function createNotice(draft: NoticeDraft): Notice {
 export function updateNotice(id: string, patch: Partial<NoticeDraft>): void {
   const item = db.notices.find((n) => n.id === id);
   if (!item) return;
+  const wasPublished = item.status === "published";
   Object.assign(item, patch, { updatedAt: nowIso() });
+  if (patch.status === "published" && (!wasPublished || !item.publishedAt)) {
+    item.publishedAt = nowIso();
+  }
   logActivity("notice", "update", item.heading);
   commit();
 }
@@ -929,8 +943,12 @@ export function updateNotice(id: string, patch: Partial<NoticeDraft>): void {
 export function setNoticeStatus(id: string, status: Notice["status"]): void {
   const item = db.notices.find((n) => n.id === id);
   if (!item) return;
+  const wasPublished = item.status === "published";
   item.status = status;
   item.updatedAt = nowIso();
+  if (status === "published" && (!wasPublished || !item.publishedAt)) {
+    item.publishedAt = nowIso();
+  }
   logActivity("notice", status === "published" ? "publish" : "unpublish", item.heading);
   commit();
 }
@@ -946,6 +964,7 @@ export function branchNoticeToDraft(id: string, patch: Partial<NoticeDraft>): No
     createdAt: item.createdAt,
     updatedAt: nowIso(),
     status: "draft",
+    publishedAt: undefined,
   };
   db.notices = [...db.notices, copyItem];
   logActivity("notice", "create", copyItem.heading);
@@ -959,26 +978,6 @@ export function toggleNoticePinned(id: string): void {
   item.pinned = !item.pinned;
   item.updatedAt = nowIso();
   commit();
-}
-
-/** Auto-expire notices: when "Auto-Expire Notices" is ON, notices whose
- *  date is in the past are moved to "hidden" so they stop behaving as
- *  active notices. Nothing is deleted. Idempotent — only commits when
- *  at least one notice changed. */
-export function expireNotices(): void {
-  if (!settings.notices.autoExpireNotices) return;
-  const now = Date.now();
-  let changed = false;
-  for (const n of db.notices) {
-    if (n.deletedAt) continue;
-    if (Number.isNaN(Date.parse(n.date))) continue;
-    if (new Date(n.date).getTime() < now && n.status === "published") {
-      n.status = "hidden";
-      n.updatedAt = nowIso();
-      changed = true;
-    }
-  }
-  if (changed) commit();
 }
 
 /* ------------------------------------------------------------------ */
@@ -1090,7 +1089,6 @@ function noticeSort(a: NoticeWithState, b: NoticeWithState): number {
 
 /** Student dashboard notices: published, visible-on-dashboard, alive. */
 export function getDashboardNotices(): NoticeWithState[] {
-  expireNotices();
   return db.notices
     .filter((n) => !n.deletedAt && n.status === "published" && n.showOnDashboard)
     .map(noticeWithState)
@@ -1101,7 +1099,6 @@ export function getDashboardNotices(): NoticeWithState[] {
     any type, regardless of the dashboard-visibility flag). Same sort
     as the dashboard board — pinned first, then priority, then today/upcoming, past. */
 export function getStudentNotices(): NoticeWithState[] {
-  expireNotices();
   return db.notices
     .filter((n) => !n.deletedAt && n.status === "published")
     .map(noticeWithState)

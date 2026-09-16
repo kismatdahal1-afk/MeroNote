@@ -178,7 +178,10 @@ export interface Notice {
   /** ISO date the notice refers to (exam day, deadline, event…). */
   date: string;
   priority: NoticePriority;
-  status: PublishStatus;
+  /** Draft notices stay in Admin; only Published reach student views. */
+  status: "draft" | "published";
+  /** System-generated timestamp of when the notice was (first) published. */
+  publishedAt?: string;
   /** Show on the student dashboard. */
   showOnDashboard: boolean;
   /** Pinned notices stay at the top of the dashboard list. */

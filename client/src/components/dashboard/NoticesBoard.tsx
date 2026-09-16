@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Pin, Bell, CalendarClock, CalendarCheck, CalendarX } from "lucide-react";
 import type { NoticeWithState } from "../../types";
 import { Card } from "../common/PageHeader";
 import { Badge } from "../common/Badge";
+import { NoticeDetailModal } from "../notices/NoticeDetailModal";
 import { cx, formatDate } from "../../lib/utils";
 
 const TYPE_TONE: Record<NoticeWithState["type"], "error" | "warning" | "primary" | "accent" | "neutral"> = {
@@ -31,13 +33,29 @@ const ANNOUNCER_LABEL: Record<NoticeWithState["announcer"], string> = {
 };
 
 /** One notice row with its computed day state (X days remaining / Today / Past).
- *  Shared by the dashboard board and the full student Notices page. */
-export function NoticeRow({ notice }: { notice: NoticeWithState }) {
+ *  Shared by the dashboard board and the full student Notices page.
+ *  Clicking a row opens the portrait-style detail popup.
+ *  `compact` renders a slightly shorter row for the dashboard preview. */
+export function NoticeRow({ notice, compact = false }: { notice: NoticeWithState; compact?: boolean }) {
+  const [detailOpen, setDetailOpen] = useState(false);
   const DayIcon = notice.dayState === "today" ? CalendarCheck : notice.dayState === "upcoming" ? CalendarClock : CalendarX;
   return (
+    <>
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open notice: ${notice.heading}`}
+      onClick={() => setDetailOpen(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setDetailOpen(true);
+        }
+      }}
       className={cx(
-        "flex items-start gap-3 p-4 transition-colors",
+        "flex cursor-pointer items-start gap-3 transition-colors hover:bg-surface-hover",
+        compact ? "px-4 py-2.5" : "p-4",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary",
         notice.pinned && "bg-primary-muted/40",
       )}
     >
@@ -65,7 +83,7 @@ export function NoticeRow({ notice }: { notice: NoticeWithState }) {
           </Badge>
           {notice.priority === "high" && <Badge tone={PRIORITY_TONE[notice.priority]}>High priority</Badge>}
         </div>
-        <p className="mt-1.5 break-words text-sm font-bold leading-snug text-foreground">{notice.heading}</p>
+        <p className={cx("break-words text-sm font-bold leading-snug text-foreground", compact ? "mt-1" : "mt-1.5")}>{notice.heading}</p>
         <p className="mt-0.5 break-words text-[11px] font-medium leading-tight text-muted-foreground/60">
           {ANNOUNCER_LABEL[notice.announcer] ?? notice.announcer}
         </p>
@@ -95,6 +113,8 @@ export function NoticeRow({ notice }: { notice: NoticeWithState }) {
         </p>
       </div>
     </div>
+    <NoticeDetailModal notice={notice} open={detailOpen} onClose={() => setDetailOpen(false)} />
+    </>
   );
 }
 
@@ -126,7 +146,7 @@ export function NoticesBoard({
       <Card className="divide-y divide-border">
         {/* Dashboard preview — the 2 most recent notices; full list on /notices */}
         {notices.slice(0, 2).map((n) => (
-          <NoticeRow key={n.id} notice={n} />
+          <NoticeRow key={n.id} notice={n} compact />
         ))}
       </Card>
     </section>

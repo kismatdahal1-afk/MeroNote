@@ -490,16 +490,13 @@ export function ResourceEditorModal({
           </fieldset>
         </div>
 
-        {/* BOTTOM — Cancel / Save as Draft / Save & Publish */}
+        {/* BOTTOM — status-driven primary action + Cancel (only 2 buttons) */}
         <div className="mt-5 flex flex-col-reverse gap-2.5 border-t border-border pt-4 sm:flex-row sm:justify-end">
           <Button variant="ghost" onClick={onClose} type="button">
             Cancel
           </Button>
-          <Button variant="outline" type="button" onClick={() => save("draft")}>
-            Save as Draft
-          </Button>
           <Button type="submit">
-            {form.status === "hidden" ? "Save as Hidden" : form.status === "draft" ? "Save Draft" : "Save & Publish"}
+            {form.status === "hidden" ? "Save as Hidden" : form.status === "draft" ? "Save as Draft" : "Save & Publish"}
           </Button>
         </div>
       </form>

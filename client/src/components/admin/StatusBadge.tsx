@@ -8,17 +8,20 @@ export function StatusBadge({ status }: { status: PublishStatus }) {
   return <Badge tone="neutral">Hidden</Badge>;
 }
 
-/** Editable status chip buttons — click to cycle/publish actions are wired by parent. */
+/** Editable status chip buttons — click to cycle/publish actions are wired by parent.
+ *  Pass `options` to restrict the choices (e.g. notices allow only Draft/Published). */
 export function StatusToggleGroup({
   value,
   onChange,
   size = "sm",
+  options = ["published", "draft", "hidden"],
 }: {
   value: PublishStatus;
   onChange: (next: PublishStatus) => void;
   size?: "sm" | "md";
+  options?: PublishStatus[];
 }) {
-  const options: PublishStatus[] = ["published", "draft", "hidden"];
+  const optionsList = options;
   const tone = (opt: PublishStatus) =>
     opt === value
       ? opt === "published"
@@ -29,7 +32,7 @@ export function StatusToggleGroup({
       : "border border-border-strong bg-surface text-muted-foreground hover:bg-surface-hover";
   return (
     <div role="group" aria-label="Publish status" className="inline-flex overflow-hidden rounded-lg">
-      {options.map((opt) => (
+      {optionsList.map((opt) => (
         <button
           key={opt}
           type="button"

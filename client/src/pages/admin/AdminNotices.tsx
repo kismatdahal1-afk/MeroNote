@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Pin, PinOff, Trash2, Pencil, Plus, Search } from "lucide-react";
 import { PageHeader, Card } from "../../components/common/PageHeader";
 import { Input, Select, Textarea } from "../../components/common/Field";
@@ -7,12 +7,13 @@ import { IconButton } from "../../components/common/IconButton";
 import { Modal } from "../../components/common/Modal";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
 import { EmptyState } from "../../components/common/States";
-import { StatusBadge } from "../../components/admin/StatusBadge";
+import { StatusBadge, StatusToggleGroup } from "../../components/admin/StatusBadge";
+import { NoticeDetailModal } from "../../components/notices/NoticeDetailModal";
 import { Badge } from "../../components/common/Badge";
 import { useCms } from "../../state/CmsProvider";
 import {
   createNotice, updateNotice, branchNoticeToDraft, toggleNoticePinned,
-  deleteEntity, expireNotices, getSettings, noticeWithState,
+  deleteEntity, getSettings, noticeWithState,
 } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { cx, formatDate } from "../../lib/utils";
@@ -98,11 +99,7 @@ export default function AdminNotices() {
   const [form, setForm] = useState<NoticeFormState>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<keyof NoticeFormState, string>>>({});
   const [pendingDelete, setPendingDelete] = useState<Notice | null>(null);
-
-  // Apply "Auto-Expire Notices" whenever the page loads.
-  useEffect(() => {
-    expireNotices();
-  }, []);
+  const [detail, setDetail] = useState<Notice | null>(null);
 
   const notices = useMemo(
     () =>
@@ -136,7 +133,6 @@ export default function AdminNotices() {
   }, [notices, query, typeFilter]);
 
   const openForm = () => {
-    expireNotices();
     setEditing(null);
     setForm(emptyForm());
     setErrors({});
@@ -324,7 +320,11 @@ export default function AdminNotices() {
                   {filtered.map((n) => {
                     const withState = noticeWithState(n);
                     return (
-                      <tr key={n.id} className="transition-colors hover:bg-surface-hover">
+                      <tr
+                        key={n.id}
+                        onClick={() => setDetail(n)}
+                        className="cursor-pointer transition-colors hover:bg-surface-hover"
+                      >
                         <td className="max-w-sm px-4 py-3">
                           <div className="flex items-center gap-2">
                             {n.pinned && (
@@ -377,20 +377,29 @@ export default function AdminNotices() {
                               label={n.pinned ? `Unpin ${n.heading}` : `Pin ${n.heading}`}
                               size="sm"
                               variant={n.pinned ? "active" : "default"}
-                              onClick={() => toggleNoticePinned(n.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleNoticePinned(n.id);
+                              }}
                             />
                             <IconButton
                               icon={Pencil}
                               label={`Edit ${n.heading}`}
                               size="sm"
-                              onClick={() => openEdit(n)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEdit(n);
+                              }}
                             />
                             <IconButton
                               icon={Trash2}
                               label={`Delete ${n.heading}`}
                               size="sm"
                               variant="danger"
-                              onClick={() => requestDelete(n)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                requestDelete(n);
+                              }}
                             />
                           </div>
                         </td>
@@ -409,7 +418,8 @@ export default function AdminNotices() {
               return (
                 <div
                   key={n.id}
-                  className="w-full max-w-full overflow-hidden rounded-xl border border-border bg-surface p-4 shadow-sm"
+                  onClick={() => setDetail(n)}
+                  className="w-full max-w-full cursor-pointer overflow-hidden rounded-xl border border-border bg-surface p-4 shadow-sm transition-colors hover:bg-surface-hover"
                 >
                   {/* Notice heading + subtext (same hierarchy as table) */}
                   <div className="min-w-0">
@@ -474,15 +484,29 @@ export default function AdminNotices() {
                         label={n.pinned ? `Unpin ${n.heading}` : `Pin ${n.heading}`}
                         size="sm"
                         variant={n.pinned ? "active" : "default"}
-                        onClick={() => toggleNoticePinned(n.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleNoticePinned(n.id);
+                        }}
                       />
-                      <IconButton icon={Pencil} label={`Edit ${n.heading}`} size="sm" onClick={() => openEdit(n)} />
+                      <IconButton
+                        icon={Pencil}
+                        label={`Edit ${n.heading}`}
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(n);
+                        }}
+                      />
                       <IconButton
                         icon={Trash2}
                         label={`Delete ${n.heading}`}
                         size="sm"
                         variant="danger"
-                        onClick={() => requestDelete(n)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          requestDelete(n);
+                        }}
                       />
                     </div>
                   </div>
@@ -500,7 +524,7 @@ export default function AdminNotices() {
         title={editing ? "Edit Notice" : "Add Notice"}
         className="max-w-lg"
       >
-        <form onSubmit={(e: FormEvent) => { e.preventDefault(); save("published"); }} noValidate className="mt-2 space-y-4">
+        <form onSubmit={(e: FormEvent) => { e.preventDefault(); save(form.status); }} noValidate className="mt-2 space-y-4">
             <Input
               id="notice-heading"
               label="Title"
@@ -536,7 +560,7 @@ export default function AdminNotices() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
                 id="notice-date"
-                label="Date"
+                label="Notice Date"
                 type="date"
                 value={form.date}
                 onChange={(e) => set("date", e.target.value)}
@@ -574,17 +598,27 @@ export default function AdminNotices() {
                 Pin to Dashboard
               </label>
             </div>
+            <div className="space-y-1.5">
+              <span className="block text-sm font-semibold text-foreground">Status</span>
+              <div className="flex h-10 items-center">
+                <StatusToggleGroup
+                  value={form.status}
+                  onChange={(s) => {
+                    if (s === "draft" || s === "published") set("status", s);
+                  }}
+                  options={["draft", "published"]}
+                  size="md"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {form.status === "draft"
+                  ? "Drafts stay in Admin only."
+                  : "Published notices appear to students."}
+              </p>
+            </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button type="submit" className="w-full sm:w-auto sm:flex-1 whitespace-nowrap">
-                {editing ? "Save changes" : "Save & Publish"}
-              </Button>
-              <Button
-                variant="secondary"
-                type="button"
-                onClick={() => save("draft")}
-                className="w-full sm:w-auto sm:flex-1 whitespace-nowrap"
-              >
-                Save as Draft
+                {form.status === "draft" ? "Save Draft" : "Save & Publish"}
               </Button>
               <Button variant="outline" type="button" onClick={closeForm} className="w-full sm:w-auto sm:flex-1 whitespace-nowrap">
                 Cancel
@@ -592,6 +626,10 @@ export default function AdminNotices() {
             </div>
           </form>
       </Modal>
+
+      {detail !== null && (
+        <NoticeDetailModal notice={detail} open onClose={() => setDetail(null)} />
+      )}
 
       <ConfirmDialog
         open={pendingDelete !== null}

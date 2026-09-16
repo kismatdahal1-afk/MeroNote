@@ -188,15 +188,15 @@ export default function AdminSettings() {
       <div className="mx-auto max-w-3xl space-y-4">
         {/* Profile — identical structure to Student Settings, admin identity */}
         <Card className="bg-hero-gradient p-6 sm:p-8">
-          <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-6">
+          <div className="flex flex-row items-center gap-4 sm:gap-6">
             <span
               aria-hidden="true"
               className="flex size-20 shrink-0 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground shadow-card sm:size-24 sm:text-3xl"
             >
               {initials}
             </span>
-            <div className="min-w-0 flex-1 text-center sm:text-left">
-              <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+            <div className="min-w-0 flex-1 text-left">
+              <div className="flex flex-wrap items-center justify-start gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                   {name}
                 </h1>
