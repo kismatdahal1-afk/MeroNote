@@ -8,7 +8,6 @@ import { StudySummaryGrid } from "../components/dashboard/StudySummaryGrid";
 import { ContinueReadingSection, DashboardSectionHeader } from "../components/dashboard/ContinueReadingSection";
 import { QuickNavigation, defaultQuickNav } from "../components/dashboard/QuickNavigation";
 import { RecentOpenedCard, TrendingResourceCard, TrendingTitle } from "../components/dashboard/TrendingResourceCard";
-import { Badge } from "../components/common/Badge";
 import { programInfo } from "../data/mock";
 import { useUser } from "../state/UserProvider";
 import {
@@ -108,7 +107,7 @@ export default function Dashboard() {
 
       {/* Notices & reminders — admin-managed, loaded from the CMS store */}
       <div className="mb-3.5">
-        <NoticesBoard notices={notices} />
+        <NoticesBoard notices={notices} plainLabels />
       </div>
 
       {/* Compact search — redirects to Resources page on Enter */}
@@ -193,10 +192,10 @@ export default function Dashboard() {
           meta={undefined}
         />
         <div className="mb-3 flex justify-end">
-          <Badge tone="primary">
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
             <BadgeCheck className="size-3" aria-hidden="true" />
             TU CSIT 2081
-          </Badge>
+          </span>
         </div>
         <div className="grid gap-3 lg:grid-cols-3">
           {trending.map((r) => (

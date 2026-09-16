@@ -25,6 +25,12 @@ export function ContinueReadingSection({ resource }: { resource: Resource | null
 
   const progress = getProgress(resource.id);
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
+  // Icon-only presentation: keep the assigned text color as the Lucide stroke
+  // color, with no colored rectangular background behind the icon.
+  const typeIconColor = typeConfig.badgeClass
+    .split(" ")
+    .filter((c) => !c.startsWith("bg-"))
+    .join(" ");
   const subject = getSubjectById(resource.subjectId);
   const lastPage = progress?.lastPage ?? 1;
   const ratio = progress?.progress ?? 0;
@@ -51,8 +57,8 @@ export function ContinueReadingSection({ resource }: { resource: Resource | null
             {subject?.name}
           </p>
         </div>
-        <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-xl", typeConfig.badgeClass)}>
-          <typeConfig.icon className="size-5" aria-hidden="true" />
+        <div className="flex size-10 shrink-0 items-center justify-center">
+          <typeConfig.icon className={cx("size-5", typeIconColor)} aria-hidden="true" />
         </div>
       </div>
 

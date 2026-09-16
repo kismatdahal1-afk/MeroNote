@@ -25,6 +25,27 @@ const PRIORITY_TONE: Record<NoticeWithState["priority"], "success" | "warning" |
   urgent: "error",
 };
 
+/** Plain-text color equivalents of the badge tones — used on student surfaces
+ *  so type words (announcement, high priority, …) show color only, with no
+ *  badge/pill background. Admin surfaces keep the default badge look. */
+const TYPE_TEXT: Record<NoticeWithState["type"], string> = {
+  exam: "text-error dark:text-warning",
+  deadline: "text-warning",
+  assignment: "text-warning",
+  event: "text-accent",
+  important: "text-error",
+  announcement: "text-primary",
+  reminder: "text-accent",
+  general: "text-muted-foreground",
+};
+
+const PRIORITY_TEXT: Record<NoticeWithState["priority"], string> = {
+  low: "text-success",
+  normal: "text-warning",
+  high: "text-error",
+  urgent: "text-error",
+};
+
 const ANNOUNCER_LABEL: Record<NoticeWithState["announcer"], string> = {
   administration: "Administration",
   "csit-department": "CSIT Department",
@@ -38,7 +59,7 @@ const ANNOUNCER_LABEL: Record<NoticeWithState["announcer"], string> = {
  *  the full text is available in the detail popup.
  *  Clicking a row opens the portrait-style detail popup.
  *  `compact` renders a slightly shorter row for the dashboard preview. */
-export function NoticeRow({ notice, compact = false }: { notice: NoticeWithState; compact?: boolean }) {
+export function NoticeRow({ notice, compact = false, plainLabels = false }: { notice: NoticeWithState; compact?: boolean; /** Student surfaces: plain colored text, no badge background. Admin keeps badges. */ plainLabels?: boolean }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const DayIcon = notice.dayState === "today" ? CalendarCheck : notice.dayState === "upcoming" ? CalendarClock : CalendarX;
   return (
@@ -77,13 +98,26 @@ export function NoticeRow({ notice, compact = false }: { notice: NoticeWithState
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
           {notice.pinned && <Pin className="size-3 fill-current text-primary" aria-label="Pinned" />}
-          <Badge
-            tone={TYPE_TONE[notice.type]}
-            className={notice.type === "exam" ? "dark:bg-warning-muted dark:text-warning" : undefined}
-          >
-            <span className="capitalize">{notice.type}</span>
-          </Badge>
-          {notice.priority === "high" && <Badge tone={PRIORITY_TONE[notice.priority]}>High priority</Badge>}
+          {plainLabels ? (
+            <span className={cx("text-xs font-semibold capitalize", TYPE_TEXT[notice.type])}>
+              {notice.type}
+            </span>
+          ) : (
+            <Badge
+              tone={TYPE_TONE[notice.type]}
+              className={notice.type === "exam" ? "dark:bg-warning-muted dark:text-warning" : undefined}
+            >
+              <span className="capitalize">{notice.type}</span>
+            </Badge>
+          )}
+          {notice.priority === "high" &&
+            (plainLabels ? (
+              <span className={cx("text-xs font-semibold", PRIORITY_TEXT[notice.priority])}>
+                High priority
+              </span>
+            ) : (
+              <Badge tone={PRIORITY_TONE[notice.priority]}>High priority</Badge>
+            ))}
         </div>
         <p className={cx("break-words text-sm font-bold leading-snug text-foreground", compact ? "mt-1" : "mt-1.5")}>{notice.heading}</p>
         <p className="mt-0.5 break-words text-[11px] font-medium leading-tight text-muted-foreground/60">
@@ -115,7 +149,7 @@ export function NoticeRow({ notice, compact = false }: { notice: NoticeWithState
         </p>
       </div>
     </div>
-    <NoticeDetailModal notice={notice} open={detailOpen} onClose={() => setDetailOpen(false)} />
+    <NoticeDetailModal notice={notice} open={detailOpen} onClose={() => setDetailOpen(false)} plainPriority={plainLabels} />
     </>
   );
 }
@@ -125,9 +159,12 @@ export function NoticeRow({ notice, compact = false }: { notice: NoticeWithState
 export function NoticesBoard({
   notices,
   seeAllTo = "/notices",
+  plainLabels = false,
 }: {
   notices: NoticeWithState[];
   seeAllTo?: string;
+  /** Student surfaces: plain colored text, no badge background. Admin keeps badges. */
+  plainLabels?: boolean;
 }) {
   if (notices.length === 0) return null;
 
@@ -148,7 +185,7 @@ export function NoticesBoard({
       <Card className="divide-y divide-border">
         {/* Dashboard preview — the 2 most recent notices; full list on /notices */}
         {notices.slice(0, 2).map((n) => (
-          <NoticeRow key={n.id} notice={n} compact />
+          <NoticeRow key={n.id} notice={n} compact plainLabels={plainLabels} />
         ))}
       </Card>
     </section>

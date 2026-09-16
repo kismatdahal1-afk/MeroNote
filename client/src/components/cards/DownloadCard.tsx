@@ -23,6 +23,12 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
 
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
   const TypeIcon = typeConfig.icon;
+  // Icon-only presentation: keep the assigned text color as the Lucide stroke
+  // color, with no colored rectangular background behind the icon.
+  const typeIconColor = typeConfig.badgeClass
+    .split(" ")
+    .filter((c) => !c.startsWith("bg-"))
+    .join(" ");
   const subject = getSubjectById(resource.subjectId);
   const semester = getSemesterById(resource.semesterId);
   const completed = download.status === "completed";
@@ -57,8 +63,8 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
           through to the stretched link, while real controls opt back in. */}
       <div className="pointer-events-none relative z-10 sm:hidden">
         <div className="flex items-center gap-2.5">
-          <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
-            <TypeIcon className="size-4.5" aria-hidden="true" />
+          <div className="flex size-9 shrink-0 items-center justify-center">
+            <TypeIcon className={cx("size-4.5", typeIconColor)} aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="line-clamp-1 text-sm font-bold leading-snug text-foreground">
@@ -128,10 +134,10 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
       <div className="hidden sm:contents">
       <div className="pointer-events-none relative z-10 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
-            <TypeIcon className="size-5" aria-hidden="true" />
+          <div className="flex size-10 shrink-0 items-center justify-center">
+            <TypeIcon className={cx("size-5", typeIconColor)} aria-hidden="true" />
           </div>
-          <span className={cx("inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold", typeConfig.badgeClass)}>
+          <span className={cx("text-xs font-semibold", typeIconColor)}>
             {typeConfig.label}
           </span>
         </div>

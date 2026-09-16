@@ -18,11 +18,14 @@ export function CourseMetadata({ code, credits, fullMarks, topicCount, resourceC
     { value: resourceCount, label: resourceCount === 1 ? "Resource" : "Resources" },
   ];
 
-  const renderItem = ({ value, label }: { value: string | number; label: string }) => (
+  const renderItem = (
+    { value, label }: { value: string | number; label: string },
+    valueClass = "font-bold text-foreground",
+  ) => (
     <div className="min-w-0">
       <dt className="sr-only">{label}</dt>
       <dd className="flex flex-col">
-        <span className="text-lg font-bold leading-tight text-foreground">{value}</span>
+        <span className={`text-lg leading-tight ${valueClass}`}>{value}</span>
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {label}
         </span>
@@ -32,7 +35,7 @@ export function CourseMetadata({ code, credits, fullMarks, topicCount, resourceC
 
   return (
     <dl className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-3">
-      {renderItem(codeItem)}
+      {renderItem(codeItem, "font-extrabold text-primary")}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         {statItems.map(({ value, label }) => (
           <Fragment key={label}>{renderItem({ value, label })}</Fragment>

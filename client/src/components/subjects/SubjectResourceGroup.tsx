@@ -11,13 +11,13 @@ interface SubjectResourceGroupProps {
   tone?: "primary" | "secondary" | "accent" | "success" | "warning" | "error";
 }
 
-const TONE_CONTAINER: Record<NonNullable<SubjectResourceGroupProps["tone"]>, string> = {
-  primary: "bg-primary-muted text-primary",
-  secondary: "bg-secondary/15 text-secondary",
-  accent: "bg-accent/15 text-accent",
-  success: "bg-success-muted text-success",
-  warning: "bg-warning-muted text-warning",
-  error: "bg-error-muted text-error",
+const TONE_TEXT: Record<NonNullable<SubjectResourceGroupProps["tone"]>, string> = {
+  primary: "text-primary",
+  secondary: "text-secondary",
+  accent: "text-accent",
+  success: "text-success",
+  warning: "text-warning",
+  error: "text-error",
 };
 
 /**
@@ -42,8 +42,8 @@ export function SubjectResourceGroup({
         {icon && (
           <span
             className={cx(
-              "flex size-7 shrink-0 items-center justify-center rounded-lg [&_svg]:size-4",
-              TONE_CONTAINER[tone],
+              "flex size-7 shrink-0 items-center justify-center [&_svg]:size-4",
+              TONE_TEXT[tone],
             )}
             aria-hidden="true"
           >

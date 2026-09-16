@@ -14,6 +14,12 @@ export function RecentOpenedCard({ resource }: { resource: Resource }) {
   const { getProgress, markOpened } = useLibrary();
   const progress = getProgress(resource.id);
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
+  // Icon-only / plain-text presentation: assigned color on the icon/text only,
+  // with no colored rectangular background, badge, or pill.
+  const typeIconColor = typeConfig.badgeClass
+    .split(" ")
+    .filter((c) => !c.startsWith("bg-"))
+    .join(" ");
   const subject = getSubjectById(resource.subjectId);
   const pct = Math.round((progress?.progress ?? 0) * 100);
 
@@ -28,7 +34,7 @@ export function RecentOpenedCard({ resource }: { resource: Resource }) {
       />
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={cx("inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold", typeConfig.badgeClass)}>
+          <p className={cx("text-[10px] font-bold", typeIconColor)}>
             {subject?.name}
           </p>
           <p className="mt-1.5 line-clamp-1 text-sm font-bold text-foreground group-hover:text-primary">
@@ -65,6 +71,12 @@ export function TrendingResourceCard({ resource }: { resource: Resource }) {
   const { getDownload, startDownload, markOpened } = useLibrary();
   const { toast } = useToast();
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
+  // Icon-only presentation: assigned color on the icon stroke only, with no
+  // colored rectangular background behind the icon.
+  const typeIconColor = typeConfig.badgeClass
+    .split(" ")
+    .filter((c) => !c.startsWith("bg-"))
+    .join(" ");
   const download = getDownload(resource.id);
 
   return (
@@ -77,8 +89,8 @@ export function TrendingResourceCard({ resource }: { resource: Resource }) {
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
       <div className="relative z-10 flex items-start gap-3">
-        <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
-          <typeConfig.icon className="size-4.5" aria-hidden="true" />
+        <div className="flex size-9 shrink-0 items-center justify-center">
+          <typeConfig.icon className={cx("size-4.5", typeIconColor)} aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="line-clamp-1 text-sm font-bold text-foreground group-hover:text-primary">

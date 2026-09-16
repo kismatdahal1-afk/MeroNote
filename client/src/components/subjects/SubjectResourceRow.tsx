@@ -75,13 +75,10 @@ export function SubjectResourceRow({ resource }: SubjectResourceRowProps) {
           className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <div
-            className={cx(
-              "flex size-10 shrink-0 items-center justify-center rounded-lg",
-              typeConfig.badgeClass,
-            )}
+            className="flex size-10 shrink-0 items-center justify-center"
             aria-hidden="true"
           >
-            <TypeIcon className="size-5" />
+            <TypeIcon className={cx("size-5", typeTextClass)} />
           </div>
 
           <div className="min-w-0 flex-1">

@@ -38,10 +38,13 @@ export function NoticeDetailModal({
   notice,
   open,
   onClose,
+  plainPriority = false,
 }: {
   notice: Notice | NoticeWithState;
   open: boolean;
   onClose: () => void;
+  /** Student surfaces: plain colored text, no badge background. Admin keeps badges. */
+  plainPriority?: boolean;
 }) {
   const withState = noticeWithState(notice);
   return (
@@ -80,9 +83,24 @@ export function NoticeDetailModal({
           <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground">
             {ANNOUNCER_LABEL[notice.announcer] ?? notice.announcer}
           </span>
-          <Badge tone={PRIORITY_TONE[notice.priority]}>
-            <span className="text-[10px]">{PRIORITY_LABEL[notice.priority]}</span>
-          </Badge>
+          {plainPriority ? (
+            <span
+              className={cx(
+                "text-xs font-semibold",
+                notice.priority === "low"
+                  ? "text-success"
+                  : notice.priority === "normal"
+                    ? "text-warning"
+                    : "text-error",
+              )}
+            >
+              {PRIORITY_LABEL[notice.priority]}
+            </span>
+          ) : (
+            <Badge tone={PRIORITY_TONE[notice.priority]}>
+              <span className="text-[10px]">{PRIORITY_LABEL[notice.priority]}</span>
+            </Badge>
+          )}
           <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground">
             {formatDate(notice.date)}{" "}
             <span

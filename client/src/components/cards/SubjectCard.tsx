@@ -38,7 +38,7 @@ export function SubjectCard({ subject }: { subject: Subject }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="neutral">{subject.code}</Badge>
+            <span className="text-xs font-extrabold text-primary">{subject.code}</span>
             {subject.category === "practical" && (
               <Badge tone="success">
                 <FlaskConical className="size-3" aria-hidden="true" />
