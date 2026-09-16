@@ -10,7 +10,7 @@ import { StatusToggleGroup } from "./StatusBadge";
 import { ALL_RESOURCE_TYPES, resourceTypeLabel } from "../../lib/resourceType";
 import { cx, formatFileSize } from "../../lib/utils";
 import { useCms } from "../../state/CmsProvider";
-import { createResource, updateResource, branchResourceToDraft, getAllTags } from "../../state/cmsStore";
+import { createResource, updateResource, branchResourceToDraft, getAllTags, getSettings, defaultNewResourceStatus } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 
 /**
@@ -47,6 +47,7 @@ interface FormState {
   paperDuration: string;
   featured: boolean;
   status: Resource["status"];
+  hidden?: boolean;
 }
 
 function emptyForm(defaultSemesterId?: string, defaultSubjectId?: string): FormState {
@@ -64,7 +65,8 @@ function emptyForm(defaultSemesterId?: string, defaultSubjectId?: string): FormS
     paperFullMarks: "",
     paperDuration: "",
     featured: false,
-    status: "published",
+    status: defaultNewResourceStatus(),
+    hidden: false,
   };
 }
 
@@ -84,6 +86,7 @@ function toForm(r: Resource): FormState {
     paperDuration: r.paperDurationMinutes ? String(r.paperDurationMinutes) : "",
     featured: r.featured,
     status: r.status,
+    hidden: r.hidden,
   };
 }
 
@@ -139,11 +142,14 @@ export function ResourceEditorModal({
 
   const validate = (): boolean => {
     const next: typeof errors = {};
+    const s = getSettings().contentDefaults;
     if (!form.title.trim()) next.title = "Title is required.";
-    if (!form.semesterId) next.semesterId = "Select a semester.";
-    if (!form.subjectId) next.subjectId = "Select a subject.";
+    if (s.requireDescription && !form.description.trim())
+      next.description = "Description is required.";
+    if (s.requireSemester && !form.semesterId) next.semesterId = "Select a semester.";
+    if (s.requireSubject && !form.subjectId) next.subjectId = "Select a subject.";
     if (form.type === "custom" && !form.customType.trim()) next.customType = "Enter custom type.";
-    if (!editing && !file) next.file = "Select a PDF file to upload.";
+    if (!editing && s.requirePdf && !file) next.file = "Select a PDF file to upload.";
     if (!form.pageCount || Number(form.pageCount) < 1) next.pageCount = "Enter the page count.";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -181,6 +187,7 @@ export function ResourceEditorModal({
       paperFullMarks: form.type === "past_paper" && form.paperFullMarks ? Number(form.paperFullMarks) : undefined,
       paperDurationMinutes: form.type === "past_paper" && form.paperDuration ? Number(form.paperDuration) : undefined,
       status,
+      hidden: form.hidden,
     };
 
     if (editing) {

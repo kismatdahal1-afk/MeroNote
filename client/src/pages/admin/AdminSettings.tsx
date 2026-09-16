@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   FileText,
-  Globe,
   AlertCircle,
   Trash2,
   RotateCcw,
@@ -20,23 +19,16 @@ import {
   resetDb,
   getSettings,
   updateContentDefaults,
-  updatePublishing,
   updateNotices,
   updateDraftTrash,
 } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { useUser } from "../../state/UserProvider";
-import type { PublishStatus, NoticeType, NoticePriority } from "../../types";
+import type { NoticeType, NoticePriority } from "../../types";
 
-const STATUS_OPTIONS: { value: PublishStatus; label: string }[] = [
+const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "draft", label: "Draft" },
   { value: "published", label: "Published" },
-  { value: "hidden", label: "Hidden" },
-];
-
-const VISIBILITY_OPTIONS: { value: "published" | "draft" | "hidden"; label: string }[] = [
-  { value: "published", label: "Published" },
-  { value: "draft", label: "Draft" },
   { value: "hidden", label: "Hidden" },
 ];
 
@@ -149,12 +141,12 @@ export default function AdminSettings() {
   const update = (section: keyof typeof settings, patch: object) => {
     const updaters = {
       contentDefaults: updateContentDefaults,
-      publishing: updatePublishing,
       notices: updateNotices,
       draftTrash: updateDraftTrash,
     };
     updaters[section](patch);
     setSettings(getSettings());
+    toast("Setting updated");
   };
 
   const s = settings;
@@ -190,7 +182,7 @@ export default function AdminSettings() {
     <div>
       <PageHeader
         title="Settings"
-        subtitle="Manage content, publishing, notice, draft and deletion preferences."
+        subtitle="Manage content, notice, draft and deletion preferences."
       />
 
       <div className="mx-auto max-w-3xl space-y-4">
@@ -242,22 +234,9 @@ export default function AdminSettings() {
                 options={STATUS_OPTIONS}
                 value={s.contentDefaults.defaultResourceStatus}
                 onChange={(v) =>
-                  update("contentDefaults", { defaultResourceStatus: v as PublishStatus })
+                  update("contentDefaults", { defaultResourceStatus: v as "draft" | "published" | "hidden" })
                 }
               />
-              <div className="pt-3">
-                <AdminDropdownRow
-                  title="Default Visibility"
-                  description="Visibility for new content"
-                  options={VISIBILITY_OPTIONS}
-                  value={s.contentDefaults.defaultVisibility}
-                  onChange={(v) =>
-                    update("contentDefaults", {
-                      defaultVisibility: v as "published" | "draft" | "hidden",
-                    })
-                  }
-                />
-              </div>
               <div className="pt-3">
                 <AdminToggleRow
                   title="Require Description"
@@ -302,53 +281,6 @@ export default function AdminSettings() {
           </Card>
         </section>
 
-        {/* Publishing — heading outside card */}
-        <section>
-          <div className="mb-3 px-1">
-            <SectionTitle icon={Globe}>Publishing</SectionTitle>
-            <p className="mt-1 ml-[28px] text-sm font-medium text-muted-foreground">
-              Control how content goes live and appears.
-            </p>
-          </div>
-          <Card className="p-5 sm:p-6">
-            <div className="space-y-3 divide-y divide-border">
-              <AdminToggleRow
-                title="Allow Direct Publishing"
-                description="Bypass draft stage and publish immediately"
-                checked={s.publishing.allowDirectPublishing}
-                onChange={(v) => update("publishing", { allowDirectPublishing: v })}
-              />
-              <div className="pt-3">
-                <AdminDropdownRow
-                  title="Default Publishing Status"
-                  description="Status assigned when direct publishing is off"
-                  options={STATUS_OPTIONS}
-                  value={s.publishing.defaultPublishingStatus}
-                  onChange={(v) =>
-                    update("publishing", { defaultPublishingStatus: v as PublishStatus })
-                  }
-                />
-              </div>
-              <div className="pt-3">
-                <AdminToggleRow
-                  title="Show Newly Published"
-                  description="Newly published resources appear immediately"
-                  checked={s.publishing.showNewlyPublished}
-                  onChange={(v) => update("publishing", { showNewlyPublished: v })}
-                />
-              </div>
-              <div className="pt-3">
-                <AdminToggleRow
-                  title="Allow Featured Content"
-                  description="Resources can be marked as featured"
-                  checked={s.publishing.allowFeatured}
-                  onChange={(v) => update("publishing", { allowFeatured: v })}
-                />
-              </div>
-            </div>
-          </Card>
-        </section>
-
         {/* Notice Settings — heading outside card */}
         <section>
           <div className="mb-3 px-1">
@@ -381,14 +313,6 @@ export default function AdminSettings() {
                   description="Notices expire automatically after their date"
                   checked={s.notices.autoExpireNotices}
                   onChange={(v) => update("notices", { autoExpireNotices: v })}
-                />
-              </div>
-              <div className="pt-3">
-                <AdminToggleRow
-                  title="Auto-Hide Expired"
-                  description="Expired notices are hidden from view"
-                  checked={s.notices.autoHideExpired}
-                  onChange={(v) => update("notices", { autoHideExpired: v })}
                 />
               </div>
               <div className="pt-3">
@@ -435,14 +359,6 @@ export default function AdminSettings() {
                   onChange={(v) => update("draftTrash", { confirmDeleteForever: v })}
                 />
               </div>
-              <div className="pt-3">
-                <AdminToggleRow
-                  title="Preserve Published Version"
-                  description="Keep the previous published version when editing"
-                  checked={s.draftTrash.preservePublishedVersion}
-                  onChange={(v) => update("draftTrash", { preservePublishedVersion: v })}
-                />
-              </div>
             </div>
           </Card>
         </section>
@@ -459,7 +375,6 @@ export default function AdminSettings() {
             <div className="divide-y divide-border">
               <DataRow label="Resources" value={db.resources.filter((r) => !r.deletedAt).length} />
               <DataRow label="Notices" value={db.notices.filter((n) => !n.deletedAt).length} />
-              <DataRow label="Books" value={db.books.filter((b) => !b.deletedAt).length} />
             </div>
             <p className="mt-4 text-xs font-medium text-muted-foreground">
               Content is stored in this browser (localStorage) until the real API + database

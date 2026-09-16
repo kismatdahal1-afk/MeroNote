@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Pin, PinOff, Trash2, Pencil, Plus, Search } from "lucide-react";
 import { PageHeader, Card } from "../../components/common/PageHeader";
 import { Input, Select, Textarea } from "../../components/common/Field";
@@ -12,7 +12,7 @@ import { Badge } from "../../components/common/Badge";
 import { useCms } from "../../state/CmsProvider";
 import {
   createNotice, updateNotice, branchNoticeToDraft, toggleNoticePinned,
-  softDelete, noticeWithState,
+  deleteEntity, expireNotices, getSettings, noticeWithState,
 } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { cx, formatDate } from "../../lib/utils";
@@ -73,17 +73,20 @@ interface NoticeFormState {
   pinned: boolean;
 }
 
-const emptyForm = (): NoticeFormState => ({
-  heading: "",
-  subtext: "",
-  type: "announcement",
-  announcer: "administration",
-  date: new Date().toISOString().slice(0, 10),
-  priority: "normal",
-  status: "published",
-  showOnDashboard: true,
-  pinned: false,
-});
+const emptyForm = (): NoticeFormState => {
+  const s = getSettings().notices;
+  return {
+    heading: "",
+    subtext: "",
+    type: s.defaultNoticeType,
+    announcer: "administration",
+    date: new Date().toISOString().slice(0, 10),
+    priority: s.defaultPriority,
+    status: "published",
+    showOnDashboard: s.showOnDashboard,
+    pinned: false,
+  };
+};
 
 export default function AdminNotices() {
   const db = useCms();
@@ -95,6 +98,11 @@ export default function AdminNotices() {
   const [form, setForm] = useState<NoticeFormState>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<keyof NoticeFormState, string>>>({});
   const [pendingDelete, setPendingDelete] = useState<Notice | null>(null);
+
+  // Apply "Auto-Expire Notices" whenever the page loads.
+  useEffect(() => {
+    expireNotices();
+  }, []);
 
   const notices = useMemo(
     () =>
@@ -128,6 +136,7 @@ export default function AdminNotices() {
   }, [notices, query, typeFilter]);
 
   const openForm = () => {
+    expireNotices();
     setEditing(null);
     setForm(emptyForm());
     setErrors({});
@@ -155,6 +164,23 @@ export default function AdminNotices() {
     setFormOpen(false);
     setEditing(null);
     setErrors({});
+  };
+
+  /** Delete honoring settings: skip the confirmation when
+   *  "Confirm Before Deleting" is OFF, and permanently delete when
+   *  "Move Deleted to Trash" is OFF. */
+  const requestDelete = (n: Notice) => {
+    const s = getSettings();
+    if (!s.contentDefaults.confirmDelete) {
+      deleteEntity("notice", n.id);
+      toast(
+        s.draftTrash.moveDeletedToTrash
+          ? "Notice moved to trash"
+          : "Notice permanently deleted",
+      );
+      return;
+    }
+    setPendingDelete(n);
   };
 
   const set = <K extends keyof NoticeFormState>(key: K, value: NoticeFormState[K]) => {
@@ -364,7 +390,7 @@ export default function AdminNotices() {
                               label={`Delete ${n.heading}`}
                               size="sm"
                               variant="danger"
-                              onClick={() => setPendingDelete(n)}
+                              onClick={() => requestDelete(n)}
                             />
                           </div>
                         </td>
@@ -456,7 +482,7 @@ export default function AdminNotices() {
                         label={`Delete ${n.heading}`}
                         size="sm"
                         variant="danger"
-                        onClick={() => setPendingDelete(n)}
+                        onClick={() => requestDelete(n)}
                       />
                     </div>
                   </div>
@@ -570,14 +596,22 @@ export default function AdminNotices() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete notice"
-        message={`"${pendingDelete?.heading}" will be moved to the trash. You can restore it from there.`}
+        message={
+          getSettings().draftTrash.moveDeletedToTrash
+            ? `"${pendingDelete?.heading}" will be moved to the trash. You can restore it from there.`
+            : `"${pendingDelete?.heading}" will be permanently deleted. This cannot be undone.`
+        }
         confirmLabel="Delete"
         danger
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => {
           if (pendingDelete) {
-            softDelete("notice", pendingDelete.id);
-            toast("Notice moved to trash");
+            deleteEntity("notice", pendingDelete.id);
+            toast(
+              getSettings().draftTrash.moveDeletedToTrash
+                ? "Notice moved to trash"
+                : "Notice permanently deleted",
+            );
           }
           setPendingDelete(null);
         }}

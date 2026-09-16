@@ -125,8 +125,10 @@ export interface Resource {
   paperYear?: number;
   paperFullMarks?: number;
   paperDurationMinutes?: number;
-  /** CMS publish status — drafts/hidden resources are not shown to students. */
+  /** CMS publish status — drafts are not shown to students. */
   status: PublishStatus;
+  /** If true, the resource stays published but is invisible to students. */
+  hidden: boolean;
   deletedAt?: string;
 }
 
@@ -190,7 +192,7 @@ export interface Notice {
 export interface ActivityEntry {
   id: string;
   entity: CmsEntity;
-  action: "create" | "update" | "delete" | "restore" | "publish" | "unpublish";
+  action: "create" | "update" | "delete" | "restore" | "publish" | "unpublish" | "hide";
   /** Human label of the affected item, e.g. "DSA Short Notes". */
   label: string;
   at: string;

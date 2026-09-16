@@ -9,7 +9,7 @@ import { CascadeSelects } from "./CascadeSelects";
 import { ALL_RESOURCE_TYPES, resourceTypeLabel } from "../../lib/resourceType";
 import { cx, formatFileSize } from "../../lib/utils";
 import { useCms } from "../../state/CmsProvider";
-import { createResource, updateResource, getAllTags } from "../../state/cmsStore";
+import { createResource, updateResource, getAllTags, getSettings, defaultNewResourceStatus } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 
 /**
@@ -89,7 +89,7 @@ export function ResourceFormModal({
           paperYear: "",
           paperFullMarks: "",
           paperDuration: "",
-          status: "published",
+          status: defaultNewResourceStatus(),
         },
   );
   const [errors, setErrors] = useState<Partial<Record<keyof FormState | "file", string>>>({});
@@ -124,7 +124,7 @@ export function ResourceFormModal({
             paperYear: "",
             paperFullMarks: "",
             paperDuration: "",
-            status: "published",
+            status: defaultNewResourceStatus(),
           },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,10 +144,13 @@ export function ResourceFormModal({
 
   const validate = (): boolean => {
     const next: typeof errors = {};
+    const s = getSettings().contentDefaults;
     if (!form.title.trim()) next.title = "Title is required.";
-    if (!form.semesterId) next.semesterId = "Select a semester.";
-    if (!form.subjectId) next.subjectId = "Select a subject.";
-    if (!editing && !file) next.file = "Select a PDF file to upload.";
+    if (s.requireDescription && !form.description.trim())
+      next.description = "Description is required.";
+    if (s.requireSemester && !form.semesterId) next.semesterId = "Select a semester.";
+    if (s.requireSubject && !form.subjectId) next.subjectId = "Select a subject.";
+    if (!editing && s.requirePdf && !file) next.file = "Select a PDF file to upload.";
     if (!form.pageCount || Number(form.pageCount) < 1) next.pageCount = "Enter the page count.";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -241,6 +244,7 @@ export function ResourceFormModal({
           placeholder="Short summary of the resource..."
           value={form.description}
           onChange={(e) => set("description", e.target.value)}
+          error={errors.description}
         />
 
         <div className="grid gap-4 sm:grid-cols-3">

@@ -15,7 +15,7 @@ import { FilterChips } from "../../components/resources/FilterChips";
 import { StatusBadge } from "../../components/admin/StatusBadge";
 import { ResourceEditorModal } from "../../components/admin/ResourceEditorModal";
 import { useCms } from "../../state/CmsProvider";
-import { softDelete } from "../../state/cmsStore";
+import { deleteEntity, getSettings } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { RESOURCE_TYPE_CONFIG, resourceTypeLabel } from "../../lib/resourceType";
 import { cx, formatFileSize, formatDate, formatRelativeTime } from "../../lib/utils";
@@ -45,9 +45,9 @@ export default function AdminResources() {
   const stats = useMemo(
     () => ({
       total: all.length,
-      published: all.filter((r) => r.status === "published").length,
+      published: all.filter((r) => r.status === "published" && !r.hidden).length,
       drafts: all.filter((r) => r.status === "draft").length,
-      hidden: all.filter((r) => r.status === "hidden").length,
+      hidden: all.filter((r) => r.hidden).length,
     }),
     [all],
   );
@@ -66,7 +66,8 @@ export default function AdminResources() {
     }
     if (semesterId) list = list.filter((r) => r.semesterId === semesterId);
     if (type !== "all") list = list.filter((r) => r.type === type);
-    if (statusFilter !== "all") list = list.filter((r) => r.status === statusFilter);
+    if (statusFilter === "hidden") list = list.filter((r) => r.hidden);
+    else if (statusFilter !== "all") list = list.filter((r) => !r.hidden && r.status === statusFilter);
     return list.sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt));
   }, [all, query, semesterId, type, statusFilter]);
 
@@ -93,6 +94,23 @@ export default function AdminResources() {
   const openCreate = () => {
     setEditing(null);
     setFormOpen(true);
+  };
+
+  /** Delete honoring settings:skip the confirmation when
+   *  "Confirm Before Deleting" is OFF, and permanently delete when
+   *  "Move Deleted to Trash" is OFF. */
+  const requestDelete = (r: Resource) => {
+    const s = getSettings();
+    if (!s.contentDefaults.confirmDelete) {
+      deleteEntity("resource", r.id);
+      toast(
+        s.draftTrash.moveDeletedToTrash
+          ? "Resource moved to trash"
+          : "Resource permanently deleted",
+      );
+      return;
+    }
+    setPendingDelete(r);
   };
 
   const contextOf = (r: Resource) => {
@@ -276,7 +294,7 @@ export default function AdminResources() {
                               variant="danger"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setPendingDelete(r);
+                                requestDelete(r);
                               }}
                             />
                           </div>
@@ -348,7 +366,7 @@ export default function AdminResources() {
                       variant="danger"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setPendingDelete(r);
+                        requestDelete(r);
                       }}
                     />
                   </div>
@@ -369,14 +387,22 @@ export default function AdminResources() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete resource"
-        message={`"${pendingDelete?.title}" will move to the trash. You can restore it from Trash, or delete it permanently there.`}
+        message={
+          getSettings().draftTrash.moveDeletedToTrash
+            ? `"${pendingDelete?.title}" will move to the trash. You can restore it from Trash, or delete it permanently there.`
+            : `"${pendingDelete?.title}" will be permanently deleted. This cannot be undone.`
+        }
         confirmLabel="Delete"
         danger
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => {
           if (pendingDelete) {
-            softDelete("resource", pendingDelete.id);
-            toast("Resource moved to trash");
+            deleteEntity("resource", pendingDelete.id);
+            toast(
+              getSettings().draftTrash.moveDeletedToTrash
+                ? "Resource moved to trash"
+                : "Resource permanently deleted",
+            );
           }
           setPendingDelete(null);
         }}

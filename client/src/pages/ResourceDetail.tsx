@@ -18,7 +18,7 @@ import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
 import { cx, formatFileSize, formatDate } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
-import { setResourceStatus, softDelete, getDb } from "../state/cmsStore";
+import { setResourceHidden, softDelete, getDb } from "../state/cmsStore";
 import { useCmsSync } from "../components/common/CmsSync";
 
 /**
@@ -53,6 +53,16 @@ export default function ResourceDetail() {
         title="Resource not found"
         message="This resource does not exist or has been removed."
         onRetry={() => navigate(isAdmin ? "/admin/resources" : "/resources")}
+      />
+    );
+  }
+
+  if (!isAdmin && resource.hidden) {
+    return (
+      <ErrorState
+        title="Resource hidden"
+        message="This resource is not available to students."
+        onRetry={() => navigate("/resources")}
       />
     );
   }
@@ -193,23 +203,23 @@ export default function ResourceDetail() {
               <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
                 <Pencil className="size-4" aria-hidden="true" /> Edit
               </Button>
-              {resource.status === "hidden" ? (
+              {resource.hidden ? (
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => {
-                    setResourceStatus(resource.id, "published");
-                    toast(`"${resource.title}" visible again`);
+                    setResourceHidden(resource.id, false);
+                    toast(`"${resource.title}" visible to students again`);
                   }}
                 >
-                  <Eye className="size-4" aria-hidden="true" /> Unhide
+                  <Eye className="size-4" aria-hidden="true" /> Show
                 </Button>
               ) : (
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => {
-                    setResourceStatus(resource.id, "hidden");
+                    setResourceHidden(resource.id, true);
                     toast(`"${resource.title}" hidden from students`);
                   }}
                 >

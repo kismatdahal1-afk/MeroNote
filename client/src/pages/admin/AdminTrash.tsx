@@ -11,7 +11,7 @@ import { Button } from "../../components/common/Button";
 import { Badge } from "../../components/common/Badge";
 import { StatusBadge } from "../../components/admin/StatusBadge";
 import { useCms } from "../../state/CmsProvider";
-import { restoreEntity, purgeEntity, emptyTrash } from "../../state/cmsStore";
+import { restoreEntity, purgeEntity, emptyTrash, getSettings } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { cx, formatDate, formatFileSize, formatRelativeTime } from "../../lib/utils";
 import type { CmsEntity, Semester, Subject } from "../../types";
@@ -196,6 +196,35 @@ export default function AdminTrash() {
     toast(`Restored "${item.label}"`);
   };
 
+  const purgeNow = (item: TrashItem) => {
+    purgeEntity(item.entity, item.id);
+    toast(`"${item.label}" permanently deleted`, "error");
+  };
+
+  /** Permanent delete honoring "Confirm Delete Forever". */
+  const requestPurge = (item: TrashItem) => {
+    if (!getSettings().draftTrash.confirmDeleteForever) {
+      purgeNow(item);
+      return;
+    }
+    setPendingPurge(item);
+  };
+
+  const emptyNow = () => {
+    emptyTrash();
+    toast("Trash emptied", "error");
+    setEntityFilter("all");
+  };
+
+  /** Empty-trash honoring "Confirm Delete Forever". */
+  const requestEmpty = () => {
+    if (!getSettings().draftTrash.confirmDeleteForever) {
+      emptyNow();
+      return;
+    }
+    setPendingEmpty(true);
+  };
+
   const purgeCascade =
     pendingPurge && (pendingPurge.entity === "semester" || pendingPurge.entity === "subject")
       ? " — everything inside it will be deleted too"
@@ -212,7 +241,7 @@ export default function AdminTrash() {
         ]}
         actions={
           items.length > 0 ? (
-            <Button variant="danger" onClick={() => setPendingEmpty(true)}>
+            <Button variant="danger" onClick={requestEmpty}>
               <Trash2 className="size-4" aria-hidden="true" /> Empty Trash
             </Button>
           ) : (
@@ -329,7 +358,7 @@ export default function AdminTrash() {
                             variant="danger"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setPendingPurge(item);
+                              requestPurge(item);
                             }}
                           />
                         </div>
@@ -400,7 +429,7 @@ export default function AdminTrash() {
                       variant="danger"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setPendingPurge(item);
+                        requestPurge(item);
                       }}
                     />
                   </div>
@@ -425,10 +454,7 @@ export default function AdminTrash() {
         danger
         onCancel={() => setPendingPurge(null)}
         onConfirm={() => {
-          if (pendingPurge) {
-            purgeEntity(pendingPurge.entity, pendingPurge.id);
-            toast(`"${pendingPurge.label}" permanently deleted`, "error");
-          }
+          if (pendingPurge) purgeNow(pendingPurge);
           setPendingPurge(null);
         }}
       />
@@ -446,10 +472,8 @@ export default function AdminTrash() {
         danger
         onCancel={() => setPendingEmpty(false)}
         onConfirm={() => {
-          emptyTrash();
-          toast("Trash emptied", "error");
+          emptyNow();
           setPendingEmpty(false);
-          setEntityFilter("all");
         }}
       />
     </div>

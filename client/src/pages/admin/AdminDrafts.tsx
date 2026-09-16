@@ -17,7 +17,7 @@ import { ResourceEditorModal } from "../../components/admin/ResourceEditorModal"
 import { useCms } from "../../state/CmsProvider";
 import {
   setResourceStatus, setNoticeStatus, setSemesterStatus, setSubjectStatus,
-  softDelete, updateTopic, updateNotice,
+  deleteEntity, getSettings, updateTopic, updateNotice,
 } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { RESOURCE_TYPE_CONFIG, resourceTypeLabel } from "../../lib/resourceType";
@@ -388,6 +388,35 @@ export default function AdminDrafts() {
     else if (row.kind === "notice") openNoticeEdit(row.notice);
   };
 
+  const deleteRow = (row: DraftRow) => {
+    deleteEntity(
+      row.kind,
+      row.kind === "resource"
+        ? row.resource.id
+        : row.kind === "topic"
+          ? row.topic.id
+          : row.kind === "notice"
+            ? row.notice.id
+            : row.kind === "semester"
+              ? row.semester.id
+              : row.subject.id,
+    );
+    toast(
+      getSettings().draftTrash.moveDeletedToTrash
+        ? "Draft moved to trash"
+        : "Draft permanently deleted",
+    );
+  };
+
+  /** Delete honoring "Confirm Before Deleting". */
+  const requestDelete = (row: DraftRow) => {
+    if (!getSettings().contentDefaults.confirmDelete) {
+      deleteRow(row);
+      return;
+    }
+    setPendingDelete(row);
+  };
+
   const publishRow = (row: DraftRow) => {
     if (row.kind === "resource") setResourceStatus(row.resource.id, "published");
     else if (row.kind === "topic") updateTopic(row.topic.id, { status: "published" });
@@ -601,7 +630,7 @@ export default function AdminDrafts() {
                               className="border border-border bg-surface"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setPendingDelete(row);
+                                requestDelete(row);
                               }}
                             />
                           </div>
@@ -700,7 +729,7 @@ export default function AdminDrafts() {
                         variant="danger"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setPendingDelete(row);
+                          requestDelete(row);
                         }}
                       />
                     </div>
@@ -919,26 +948,16 @@ export default function AdminDrafts() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete draft"
-        message={`"${pendingDelete?.title}" will move to the trash. You can restore it from Trash, or delete it permanently there.`}
+        message={
+          getSettings().draftTrash.moveDeletedToTrash
+            ? `"${pendingDelete?.title}" will move to the trash. You can restore it from Trash, or delete it permanently there.`
+            : `"${pendingDelete?.title}" will be permanently deleted. This cannot be undone.`
+        }
         confirmLabel="Delete"
         danger
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => {
-          if (pendingDelete) {
-            softDelete(
-              pendingDelete.kind,
-              pendingDelete.kind === "resource"
-                ? pendingDelete.resource.id
-                : pendingDelete.kind === "topic"
-                  ? pendingDelete.topic.id
-                  : pendingDelete.kind === "notice"
-                    ? pendingDelete.notice.id
-                    : pendingDelete.kind === "semester"
-                      ? pendingDelete.semester.id
-                      : pendingDelete.subject.id,
-            );
-            toast("Draft moved to trash");
-          }
+          if (pendingDelete) deleteRow(pendingDelete);
           setPendingDelete(null);
         }}
       />

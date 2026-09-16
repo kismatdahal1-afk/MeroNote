@@ -44,6 +44,20 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     );
   }
 
+  if (!admin && resource.hidden) {
+    return (
+      <div className="reader-bar flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="text-center">
+          <p className="text-lg font-bold text-foreground">Resource hidden</p>
+          <p className="mt-2 text-sm text-muted-foreground">This resource is not available to students.</p>
+          <div className="mt-3 flex justify-center">
+            <BackButton fallbackTo="/dashboard" label="Go back" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const subject = getSubjectById(resource.subjectId);
   const semester = getSemesterById(resource.semesterId);
   const topic = resource.topicId ? getDb().topics.find((t) => t.id === resource.topicId && !t.deletedAt) : undefined;

@@ -17,8 +17,8 @@ import { programInfo } from "./mock";
  */
 
 /** Entities visible to students: not deleted and published. */
-function visible<T extends { deletedAt?: string; status: string }>(list: T[]): T[] {
-  return list.filter((x) => !x.deletedAt && x.status === "published");
+function visible<T extends { deletedAt?: string; status: string; hidden?: boolean }>(list: T[]): T[] {
+  return list.filter((x) => !x.deletedAt && x.status === "published" && !x.hidden);
 }
 
 export function getAllSemesters(): Semester[] {

@@ -13,7 +13,7 @@ import { StatusBadge } from "../../components/admin/StatusBadge";
 import { useCms } from "../../state/CmsProvider";
 import {
   createSubject, updateSubject,
-  softDelete,
+  deleteEntity, getSettings,
 } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
 import { cx } from "../../lib/utils";
@@ -101,13 +101,26 @@ export default function AdminSemesters() {
   };
 
   const deleteSubject = (s: Subject) => {
+    if (!getSettings().contentDefaults.confirmDelete) {
+      deleteEntity("subject", s.id);
+      toast(
+        getSettings().draftTrash.moveDeletedToTrash
+          ? `"${s.name}" moved to trash`
+          : `"${s.name}" permanently deleted`,
+      );
+      return;
+    }
     setPendingDelete({ id: s.id, name: s.name, type: "subject" });
   };
 
   const confirmDelete = () => {
     if (!pendingDelete) return;
-    softDelete("subject", pendingDelete.id);
-    toast(`"${pendingDelete.name}" moved to trash`);
+    deleteEntity("subject", pendingDelete.id);
+    toast(
+      getSettings().draftTrash.moveDeletedToTrash
+        ? `"${pendingDelete.name}" moved to trash`
+        : `"${pendingDelete.name}" permanently deleted`,
+    );
     setPendingDelete(null);
   };
 

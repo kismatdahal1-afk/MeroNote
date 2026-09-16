@@ -98,6 +98,7 @@ function seedDb(): CmsDb {
     ...r,
     featured: false,
     status: "published" as const,
+    hidden: false,
   })) as Resource[];
 
   /** A couple of starter notices so the dashboard has real content. */
@@ -188,6 +189,17 @@ function loadDb(): CmsDb {
       const migratedResources = baseResources.map((r: any) =>
         r.type === "other" ? { ...r, type: "custom" } : r,
       );
+      // Migrate old hidden status: convert status:"hidden" to status:"published", hidden:true;
+      // ensure every resource has the hidden flag.
+      const migratedResourcesWithHidden = migratedResources.map((r: any) => {
+        if (r.status === "hidden" && !r.hasOwnProperty("hidden")) {
+          return { ...r, status: "published", hidden: true };
+        }
+        if (!r.hasOwnProperty("hidden")) {
+          return { ...r, hidden: false };
+        }
+        return r;
+      });
       // Migrate notices: drop unused semester/subject, ensure announcer exists
       const migratedNotices = (parsed.notices as any[]).map((n) => {
         const { semesterId: _sem, subjectId: _sub, announcer, ...rest } = n;
@@ -200,7 +212,7 @@ function loadDb(): CmsDb {
         semesters: parsed.semesters,
         subjects: parsed.subjects,
         topics: parsed.topics,
-        resources: migratedResources as typeof parsed.resources,
+        resources: migratedResourcesWithHidden as typeof parsed.resources,
         books: parsed.books ?? [],
         notices: migratedNotices as typeof parsed.notices,
         activity: parsed.activity ?? [],
@@ -257,9 +269,12 @@ export function getDb(): CmsDb {
   return db;
 }
 
-/** Reset to seeded state (used by Trash "empty trash" and dev resets). */
+/** Reset to seeded state (used by Settings reset and dev resets).
+ *  Also restores default settings so counts/UI stay in sync. */
 export function resetDb(): void {
   db = seedDb();
+  settings = { ...defaultSettings };
+  persistSettings(settings);
   commit();
 }
 
@@ -367,13 +382,30 @@ export function emptyTrash(entity?: CmsEntity): void {
   commit();
 }
 
+/** Delete honoring the "Move Deleted to Trash" setting:
+ *  ON → soft delete (recoverable in Trash), OFF → permanent delete. */
+export function deleteEntity(entity: CmsEntity, id: string): void {
+  if (settings.draftTrash.moveDeletedToTrash) {
+    softDelete(entity, id);
+  } else {
+    purgeEntity(entity, id);
+  }
+}
+
+/** Default status for newly created resources, honoring both
+ *  "Save as Draft by Default" (takes precedence) and
+ *  "Default Resource Status". */
+export function defaultNewResourceStatus(): "draft" | "published" | "hidden" {
+  if (settings.draftTrash.saveAsDraftByDefault) return "draft";
+  return settings.contentDefaults.defaultResourceStatus;
+}
+
 /* ------------------------------------------------------------------ */
 /* Settings                                                            */
 /* ------------------------------------------------------------------ */
 
 export interface ContentDefaults {
   defaultResourceStatus: "draft" | "published" | "hidden";
-  defaultVisibility: "published" | "draft" | "hidden";
   requireDescription: boolean;
   requireSemester: boolean;
   requireSubject: boolean;
@@ -381,18 +413,10 @@ export interface ContentDefaults {
   confirmDelete: boolean;
 }
 
-export interface PublishingSettings {
-  allowDirectPublishing: boolean;
-  defaultPublishingStatus: "draft" | "published" | "hidden";
-  showNewlyPublished: boolean;
-  allowFeatured: boolean;
-}
-
 export interface NoticeSettings {
   defaultNoticeType: "exam" | "deadline" | "assignment" | "event" | "important" | "general";
   defaultPriority: "normal" | "high" | "urgent";
   autoExpireNotices: boolean;
-  autoHideExpired: boolean;
   showOnDashboard: boolean;
 }
 
@@ -400,12 +424,10 @@ export interface DraftTrashSettings {
   saveAsDraftByDefault: boolean;
   moveDeletedToTrash: boolean;
   confirmDeleteForever: boolean;
-  preservePublishedVersion: boolean;
 }
 
 export interface AppSettings {
   contentDefaults: ContentDefaults;
-  publishing: PublishingSettings;
   notices: NoticeSettings;
   draftTrash: DraftTrashSettings;
 }
@@ -413,31 +435,22 @@ export interface AppSettings {
 const defaultSettings: AppSettings = {
   contentDefaults: {
     defaultResourceStatus: "draft",
-    defaultVisibility: "published",
     requireDescription: true,
     requireSemester: true,
     requireSubject: true,
     requirePdf: true,
     confirmDelete: true,
   },
-  publishing: {
-    allowDirectPublishing: false,
-    defaultPublishingStatus: "draft",
-    showNewlyPublished: true,
-    allowFeatured: true,
-  },
   notices: {
     defaultNoticeType: "general",
     defaultPriority: "normal",
     autoExpireNotices: true,
-    autoHideExpired: true,
     showOnDashboard: true,
   },
   draftTrash: {
     saveAsDraftByDefault: true,
     moveDeletedToTrash: true,
     confirmDeleteForever: true,
-    preservePublishedVersion: true,
   },
 };
 
@@ -449,7 +462,6 @@ function loadSettings(): AppSettings {
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
     return {
       contentDefaults: { ...defaultSettings.contentDefaults, ...parsed.contentDefaults },
-      publishing: { ...defaultSettings.publishing, ...parsed.publishing },
       notices: { ...defaultSettings.notices, ...parsed.notices },
       draftTrash: { ...defaultSettings.draftTrash, ...parsed.draftTrash },
     };
@@ -475,12 +487,6 @@ export function getSettings(): AppSettings {
 
 export function updateContentDefaults(patch: Partial<ContentDefaults>): void {
   settings = { ...settings, contentDefaults: { ...settings.contentDefaults, ...patch } };
-  persistSettings(settings);
-  commit();
-}
-
-export function updatePublishing(patch: Partial<PublishingSettings>): void {
-  settings = { ...settings, publishing: { ...settings.publishing, ...patch } };
   persistSettings(settings);
   commit();
 }
@@ -777,6 +783,7 @@ export interface ResourceDraft {
   paperFullMarks?: number;
   paperDurationMinutes?: number;
   status: Resource["status"];
+  hidden?: boolean;
 }
 
 /** Create a resource. When `draft.file` metadata (name/size) is present it is
@@ -799,6 +806,7 @@ export function createResource(draft: ResourceDraft): Resource {
     uploadedAt: nowIso(),
     updatedAt: nowIso(),
     featured: draft.featured ?? false,
+    hidden: draft.hidden ?? false,
     paperYear: draft.paperYear,
     paperFullMarks: draft.paperFullMarks,
     paperDurationMinutes: draft.paperDurationMinutes,
@@ -825,6 +833,20 @@ export function setResourceStatus(id: string, status: Resource["status"]): void 
   item.updatedAt = nowIso();
   logActivity("resource", status === "published" ? "publish" : "unpublish", item.title);
   commit();
+}
+
+export function setResourceHidden(id: string, hidden: boolean): void {
+  const item = db.resources.find((r) => r.id === id);
+  if (!item) return;
+  item.hidden = hidden;
+  item.updatedAt = nowIso();
+  logActivity("resource", hidden ? "hide" : "unpublish", item.title);
+  commit();
+}
+
+/** Check if a resource is hidden from students (published but hidden flag set). */
+export function isResourceHidden(resourceId: string): boolean {
+  return db.resources.find((r) => r.id === resourceId)?.hidden ?? false;
 }
 
 /**
@@ -939,6 +961,26 @@ export function toggleNoticePinned(id: string): void {
   commit();
 }
 
+/** Auto-expire notices: when "Auto-Expire Notices" is ON, notices whose
+ *  date is in the past are moved to "hidden" so they stop behaving as
+ *  active notices. Nothing is deleted. Idempotent — only commits when
+ *  at least one notice changed. */
+export function expireNotices(): void {
+  if (!settings.notices.autoExpireNotices) return;
+  const now = Date.now();
+  let changed = false;
+  for (const n of db.notices) {
+    if (n.deletedAt) continue;
+    if (Number.isNaN(Date.parse(n.date))) continue;
+    if (new Date(n.date).getTime() < now && n.status === "published") {
+      n.status = "hidden";
+      n.updatedAt = nowIso();
+      changed = true;
+    }
+  }
+  if (changed) commit();
+}
+
 /* ------------------------------------------------------------------ */
 /* Tags                                                                */
 /* ------------------------------------------------------------------ */
@@ -947,7 +989,7 @@ export function toggleNoticePinned(id: string): void {
 export function getAllTags(): { name: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const r of db.resources) {
-    if (r.deletedAt || r.status !== "published") continue;
+    if (r.deletedAt || r.status !== "published" || r.hidden) continue;
     for (const t of r.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
   }
   return [...counts.entries()]
@@ -988,6 +1030,7 @@ export interface CmsStats {
   totalResources: number;
   publishedResources: number;
   draftResources: number;
+  hiddenResources: number;
   trashedResources: number;
   semesters: number;
   subjects: number;
@@ -1000,8 +1043,9 @@ export function getStats(): CmsStats {
   const live = db.resources.filter((r) => !r.deletedAt);
   return {
     totalResources: live.length,
-    publishedResources: live.filter((r) => r.status === "published").length,
+    publishedResources: live.filter((r) => r.status === "published" && !r.hidden).length,
     draftResources: live.filter((r) => r.status === "draft").length,
+    hiddenResources: live.filter((r) => r.hidden).length,
     trashedResources: db.resources.filter((r) => r.deletedAt).length,
     semesters: db.semesters.filter((s) => !s.deletedAt).length,
     subjects: db.subjects.filter((s) => !s.deletedAt).length,
@@ -1046,6 +1090,7 @@ function noticeSort(a: NoticeWithState, b: NoticeWithState): number {
 
 /** Student dashboard notices: published, visible-on-dashboard, alive. */
 export function getDashboardNotices(): NoticeWithState[] {
+  expireNotices();
   return db.notices
     .filter((n) => !n.deletedAt && n.status === "published" && n.showOnDashboard)
     .map(noticeWithState)
@@ -1056,6 +1101,7 @@ export function getDashboardNotices(): NoticeWithState[] {
     any type, regardless of the dashboard-visibility flag). Same sort
     as the dashboard board — pinned first, then priority, then today/upcoming, past. */
 export function getStudentNotices(): NoticeWithState[] {
+  expireNotices();
   return db.notices
     .filter((n) => !n.deletedAt && n.status === "published")
     .map(noticeWithState)
