@@ -11,6 +11,8 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: "sm" | "md";
   /** fill the icon (for selected/pressed state) */
   filled?: boolean;
+  /** Additional class applied to the icon element */
+  iconClassName?: string;
   children?: ReactNode;
 }
 
@@ -34,6 +36,7 @@ export function IconButton({
   size = "md",
   filled = false,
   className,
+  iconClassName,
   children,
   ...rest
 }: IconButtonProps) {
@@ -55,7 +58,7 @@ export function IconButton({
     >
       {children ?? (
         <Icon
-          className={cx(size === "sm" ? "size-4" : "size-5", filled && "fill-current")}
+          className={cx(size === "sm" ? "size-4" : "size-5", filled && "fill-current", iconClassName)}
           aria-hidden="true"
         />
       )}

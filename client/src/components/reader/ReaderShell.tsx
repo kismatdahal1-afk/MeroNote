@@ -152,19 +152,10 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           className="text-foreground/75 hover:bg-surface-hover hover:text-foreground"
         />
       }
-      placeholderLink={
-        <Link
-          to={`${baseRoute}/${resource.id}`}
-          state={detailState}
-          className="text-xs font-semibold text-primary hover:underline"
-        >
-          Resource details
-        </Link>
-      }
-      onBookmark={handleBookmark}
-      bookmarked={bookmarked}
-      onDownload={handleDownload}
-      downloadActive={download?.status === "completed"}
-    />
+       onBookmark={handleBookmark}
+       bookmarked={bookmarked}
+       onDownload={handleDownload}
+       downloadActive={download?.status === "completed"}
+     />
   );
 }

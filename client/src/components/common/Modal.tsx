@@ -42,7 +42,7 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
           <div
             onClick={(e) => e.stopPropagation()}
             className={cx(
-              "card-glow relative my-auto w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl",
+              "card-glow relative my-auto w-full max-w-md max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-surface p-6 shadow-xl",
               className,
             )}
           >

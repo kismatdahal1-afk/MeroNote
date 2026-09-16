@@ -474,7 +474,7 @@ export default function AdminNotices() {
         title={editing ? "Edit Notice" : "Add Notice"}
         className="max-w-lg"
       >
-        <form onSubmit={(e: FormEvent) => { e.preventDefault(); save("published"); }} noValidate className="mt-2 space-y-4 overflow-y-auto">
+        <form onSubmit={(e: FormEvent) => { e.preventDefault(); save("published"); }} noValidate className="mt-2 space-y-4">
             <Input
               id="notice-heading"
               label="Title"
@@ -548,23 +548,23 @@ export default function AdminNotices() {
                 Pin to Dashboard
               </label>
             </div>
-          </div>
-          <div className="flex items-center justify-end gap-3">
-            <Button variant="outline" type="button" onClick={closeForm}>
-              Cancel
-            </Button>
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => save("draft")}
-            >
-              Save as Draft
-            </Button>
-            <Button type="submit">
-              {editing ? "Save changes" : "Save & Publish"}
-            </Button>
-          </div>
-        </form>
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <Button type="submit" className="w-full sm:w-auto whitespace-nowrap">
+                {editing ? "Save changes" : "Save & Publish"}
+              </Button>
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => save("draft")}
+                className="w-full sm:w-auto whitespace-nowrap"
+              >
+                Save as Draft
+              </Button>
+              <Button variant="outline" type="button" onClick={closeForm} className="w-full sm:w-auto whitespace-nowrap">
+                Cancel
+              </Button>
+            </div>
+          </form>
       </Modal>
 
       <ConfirmDialog
