@@ -33,7 +33,9 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
       {/* Mobile compact row — every non-Subject item uses the resource-row pattern. */}
-      <div className="relative z-10 sm:hidden">
+      {/* Taps anywhere open the detail page: content lets pointer events pass
+          through to the stretched link, while real controls opt back in. */}
+      <div className="pointer-events-none relative z-10 sm:hidden">
         <div className="flex items-center gap-2.5">
           <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
             <TypeIcon className="size-4.5" aria-hidden="true" />
@@ -57,14 +59,14 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
             size="sm"
             variant="danger"
             onClick={() => onRemove(bookmark.id)}
-            className="shrink-0"
+            className="pointer-events-auto relative shrink-0"
           />
         </div>
         <Link
           to={`/resources/${resource.id}`}
           state={{ via: "bookmarks" }}
           aria-label={`Open ${resource.title}`}
-          className="mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="pointer-events-auto relative mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           Open
           <ChevronRight className="size-3.5" aria-hidden="true" />
@@ -73,7 +75,7 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
 
       {/* Desktop card body — unchanged, hidden on mobile. */}
       <div className="hidden sm:contents">
-      <div className="relative z-10 flex items-start justify-between gap-3">
+      <div className="pointer-events-none relative z-10 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
             <TypeIcon className="size-5" aria-hidden="true" />
@@ -88,10 +90,11 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
           size="sm"
           variant="danger"
           onClick={() => onRemove(bookmark.id)}
+          className="pointer-events-auto relative"
         />
       </div>
 
-      <div className="mt-3 flex min-w-0 flex-1 flex-col">
+      <div className="pointer-events-none mt-3 flex min-w-0 flex-1 flex-col">
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground group-hover:text-primary">
           {resource.title}
         </h3>
@@ -103,7 +106,7 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
+      <div className="pointer-events-none mt-3 flex flex-wrap gap-1.5">
         {resource.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
@@ -114,7 +117,7 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
         ))}
       </div>
 
-      <div className="relative z-10 mt-4 flex items-center justify-between gap-2 border-t border-border pt-3 text-xs font-medium text-muted-foreground">
+      <div className="pointer-events-none relative z-10 mt-4 flex items-center justify-between gap-2 border-t border-border pt-3 text-xs font-medium text-muted-foreground">
         <span className="inline-flex min-w-0 items-center gap-1.5">
           <BookmarkIcon className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
           <span className="truncate">
@@ -125,7 +128,7 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
           to={`/reader/${resource.id}`}
           state={{ via: "bookmarks" }}
           onClick={() => markOpened(resource.id)}
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
+          className="pointer-events-auto relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
           aria-label={`Open ${resource.title} at page ${bookmark.page}`}
         >
           <Play className="size-3.5 fill-current" aria-hidden="true" />

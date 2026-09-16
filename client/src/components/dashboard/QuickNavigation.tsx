@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
 import { Heart, Bookmark as BookmarkIcon, GraduationCap } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cx } from "../../lib/utils";
 
 interface QuickNavItem {
   to: string;
   label: string;
-  icon: typeof GraduationCap;
+  icon: LucideIcon;
   count?: number;
 }
 

@@ -14,7 +14,7 @@ export function StudySummaryGrid({ stats }: { stats: DashboardStat[] }) {
     <div className="grid auto-rows-fr grid-cols-2 gap-3 lg:grid-cols-4">
       {stats.map(({ label, value, hint, icon: Icon }) => (
         <Card key={label} className="flex h-full flex-col items-center p-3 text-center sm:p-4">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary sm:size-8">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-muted text-primary">
             <Icon className="size-4" aria-hidden="true" />
           </div>
           <p className="mt-2 w-full truncate whitespace-nowrap text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[11px]">

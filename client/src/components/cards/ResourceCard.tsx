@@ -65,7 +65,9 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
         aria-label={`Open ${resource.title}`}
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
-      <div className="relative z-10 flex items-start justify-between gap-3 sm:hidden">
+      {/* Taps anywhere open the detail page: content lets pointer events pass
+          through to the stretched link, while real controls opt back in. */}
+      <div className="pointer-events-none relative z-10 flex items-start justify-between gap-3 sm:hidden">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
             <TypeIcon className="size-4.5" aria-hidden="true" />
@@ -93,6 +95,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
             filled={favorite}
             aria-pressed={favorite}
             onClick={handleFavorite}
+            className="pointer-events-auto relative"
           />
           <IconButton
             icon={Bookmark}
@@ -102,6 +105,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
             filled={bookmarked}
             aria-pressed={bookmarked}
             onClick={handleBookmark}
+            className="pointer-events-auto relative"
           />
         </div>
       </div>
@@ -109,7 +113,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
         to={`/resources/${resource.id}`}
         state={via ? { via } : undefined}
         aria-label={`Open ${resource.title}`}
-        className="relative z-10 mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:hidden"
+        className="pointer-events-auto relative z-10 mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:hidden"
       >
         Open
         <ChevronRight className="size-3.5" aria-hidden="true" />
@@ -117,7 +121,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
 
       {/* Desktop card body — unchanged, hidden on mobile. */}
       <div className="hidden sm:contents">
-      <div className="relative z-10 flex items-start justify-between gap-3">
+      <div className="pointer-events-none relative z-10 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10", typeConfig.badgeClass)}>
             <TypeIcon className="size-5" aria-hidden="true" />
@@ -135,6 +139,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
             filled={favorite}
             aria-pressed={favorite}
             onClick={handleFavorite}
+            className="pointer-events-auto relative"
           />
           <IconButton
             icon={Bookmark}
@@ -144,11 +149,12 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
             filled={bookmarked}
             aria-pressed={bookmarked}
             onClick={handleBookmark}
+            className="pointer-events-auto relative"
           />
         </div>
       </div>
 
-      <div className="mt-2.5 flex min-w-0 flex-1 flex-col sm:mt-3">
+      <div className="pointer-events-none mt-2.5 flex min-w-0 flex-1 flex-col sm:mt-3">
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground group-hover:text-primary">
           {resource.title}
         </h3>
@@ -160,7 +166,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
         )}
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3">
+      <div className="pointer-events-none mt-2 flex flex-wrap gap-1.5 sm:mt-3">
         {resource.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
@@ -173,7 +179,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
 
       {/* Reading progress where available */}
       {progress && (
-        <div className="mt-2.5 sm:mt-3">
+        <div className="pointer-events-none mt-2.5 sm:mt-3">
           <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold">
             <span className="text-muted-foreground">
               Page {progress.lastPage} of {resource.pageCount}
@@ -187,7 +193,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
         </div>
       )}
 
-      <div className="relative z-10 mt-3 flex items-center justify-between border-t border-border pt-3 text-xs font-medium text-muted-foreground sm:mt-4">
+      <div className="pointer-events-none relative z-10 mt-3 flex items-center justify-between border-t border-border pt-3 text-xs font-medium text-muted-foreground sm:mt-4">
         <span>
           {resource.pageCount} pages · {formatFileSize(resource.fileSize)}
         </span>
@@ -195,7 +201,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
           <Link
             to={`/reader/${resource.id}`}
             state={via ? { via } : undefined}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
+            className="pointer-events-auto relative inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
             aria-label={`Open ${resource.title} in reader`}
           >
             <Eye className="size-3.5" aria-hidden="true" />
@@ -212,6 +218,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
               label={`Download ${resource.title}`}
               size="sm"
               onClick={handleDownload}
+              className="pointer-events-auto relative"
             />
           )}
         </div>

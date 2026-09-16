@@ -23,17 +23,18 @@ import { getDashboardNotices } from "../state/cmsStore";
 import { NoticesBoard } from "../components/dashboard/NoticesBoard";
 import { useCmsSync } from "../components/common/CmsSync";
 import { formatTimestamp, getGreeting } from "../lib/utils";
+import type { ReadingProgress, Resource } from "../types";
 
 export default function Dashboard() {
   useCmsSync();
-  const { favorites, bookmarks, downloads, recent, progress } = useLibrary();
+  const { favorites, favoriteSubjects, bookmarks, bookmarkedSubjects, downloads, recent, progress } = useLibrary();
   const { name } = useUser();
   const navigate = useNavigate();
 
   const hero =
     progress
       .map((p) => ({ p, resource: getResourceById(p.resourceId) }))
-      .filter((x) => x.resource)
+      .filter((x): x is { p: ReadingProgress; resource: Resource } => Boolean(x.resource))
       .sort((a, b) => +new Date(b.p.updatedAt) - +new Date(a.p.updatedAt))[0]?.resource ?? null;
 
   const recentResources = recent
@@ -56,7 +57,11 @@ export default function Dashboard() {
     { label: "Saved", value: completedDownloads, hint: "Offline Ready", icon: HardDriveDownload },
   ];
 
-  const quickItems = defaultQuickNav(favorites.length, bookmarks.length);
+  /** Quick-nav badges match the Favorite/Bookmark "All" totals (resources + subjects). */
+  const quickItems = defaultQuickNav(
+    favorites.length + favoriteSubjects.length,
+    bookmarks.length + bookmarkedSubjects.length,
+  );
   const heroUpdatedAt = hero ? progress.find((p) => p.resourceId === hero.id)?.updatedAt : undefined;
 
   return (

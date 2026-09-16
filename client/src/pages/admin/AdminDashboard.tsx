@@ -17,23 +17,17 @@ const QUICK_ACTIONS = [
   { to: "/admin/semesters", label: "Manage Curriculum", icon: GraduationCap },
 ];
 
-/** Recent admin activity (create/publish/delete events + latest uploads). */
-function RecentActivitySection() {
-  const db = useCms();
-  return db.activity.slice(0, 8);
-}
-
 export default function AdminDashboard() {
   const db = useCms();
   const stats = getStats();
-  const recentActivity = RecentActivitySection();
+  const recentActivity = db.activity.slice(0, 7);
   const dashboardNotices = getDashboardNotices();
 
   const recentUploads = db.resources
     .filter((r) => !r.deletedAt)
     .slice()
     .sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt))
-    .slice(0, 5);
+    .slice(0, 7);
 
   const totalLibrarySize = db.resources
     .filter((r) => !r.deletedAt)
