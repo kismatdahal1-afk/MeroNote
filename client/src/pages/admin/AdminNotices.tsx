@@ -549,18 +549,18 @@ export default function AdminNotices() {
               </label>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button type="submit" className="w-full sm:w-auto whitespace-nowrap">
+              <Button type="submit" className="w-full sm:w-auto sm:flex-1 whitespace-nowrap">
                 {editing ? "Save changes" : "Save & Publish"}
               </Button>
               <Button
                 variant="secondary"
                 type="button"
                 onClick={() => save("draft")}
-                className="w-full sm:w-auto whitespace-nowrap"
+                className="w-full sm:w-auto sm:flex-1 whitespace-nowrap"
               >
                 Save as Draft
               </Button>
-              <Button variant="outline" type="button" onClick={closeForm} className="w-full sm:w-auto whitespace-nowrap">
+              <Button variant="outline" type="button" onClick={closeForm} className="w-full sm:w-auto sm:flex-1 whitespace-nowrap">
                 Cancel
               </Button>
             </div>
