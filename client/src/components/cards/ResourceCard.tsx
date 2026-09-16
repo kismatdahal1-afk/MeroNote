@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Heart, Bookmark, Download, Eye, Check } from "lucide-react";
+import { Heart, Bookmark, Download, Eye, Check, ChevronRight } from "lucide-react";
 import type { Resource } from "../../types";
 import { Card } from "../common/PageHeader";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
@@ -53,16 +53,67 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
   };
 
   return (
-    <Card interactive className="group relative flex h-full flex-col p-5">
+    <Card interactive className="group relative flex h-full flex-col p-4 sm:p-5">
       {/* Stretched link — makes the whole card clickable */}
       <Link
         to={`/resources/${resource.id}`}
         aria-label={`Open ${resource.title}`}
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
+      <div className="relative z-10 flex items-start justify-between gap-3 sm:hidden">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
+            <TypeIcon className="size-4.5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-1 text-sm font-bold leading-snug text-foreground">
+              {resource.title}
+            </p>
+            <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
+              {typeConfig.label} · {resource.pageCount} pages · {formatFileSize(resource.fileSize)}
+            </p>
+            {showContext && (subject || semester) && (
+              <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground/80">
+                {[subject?.name, semester?.name].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <IconButton
+            icon={Heart}
+            label={favorite ? "Remove from favorites" : "Add to favorites"}
+            size="sm"
+            variant={favorite ? "favorite" : "default"}
+            filled={favorite}
+            aria-pressed={favorite}
+            onClick={handleFavorite}
+          />
+          <IconButton
+            icon={Bookmark}
+            label={bookmarked ? "Bookmarked" : "Bookmark first page"}
+            size="sm"
+            variant={bookmarked ? "bookmark" : "default"}
+            filled={bookmarked}
+            aria-pressed={bookmarked}
+            onClick={handleBookmark}
+          />
+        </div>
+      </div>
+      <Link
+        to={`/resources/${resource.id}`}
+        aria-label={`Open ${resource.title}`}
+        className="relative z-10 mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:hidden"
+      >
+        Open
+        <ChevronRight className="size-3.5" aria-hidden="true" />
+      </Link>
+
+      {/* Desktop card body — unchanged, hidden on mobile. */}
+      <div className="hidden sm:contents">
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className={cx("flex size-10 shrink-0 items-center justify-center rounded-lg", typeConfig.badgeClass)}>
+          <div className={cx("flex size-9 shrink-0 items-center justify-center rounded-lg sm:size-10", typeConfig.badgeClass)}>
             <TypeIcon className="size-5" aria-hidden="true" />
           </div>
           <span className={cx("inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold", typeConfig.badgeClass)}>
@@ -91,7 +142,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
         </div>
       </div>
 
-      <div className="mt-3 flex min-w-0 flex-1 flex-col">
+      <div className="mt-2.5 flex min-w-0 flex-1 flex-col sm:mt-3">
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground group-hover:text-primary">
           {resource.title}
         </h3>
@@ -103,7 +154,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
         )}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
+      <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3">
         {resource.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
@@ -116,7 +167,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
 
       {/* Reading progress where available */}
       {progress && (
-        <div className="mt-3">
+        <div className="mt-2.5 sm:mt-3">
           <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold">
             <span className="text-muted-foreground">
               Page {progress.lastPage} of {resource.pageCount}
@@ -130,7 +181,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
         </div>
       )}
 
-      <div className="relative z-10 mt-4 flex items-center justify-between border-t border-border pt-3 text-xs font-medium text-muted-foreground">
+      <div className="relative z-10 mt-3 flex items-center justify-between border-t border-border pt-3 text-xs font-medium text-muted-foreground sm:mt-4">
         <span>
           {resource.pageCount} pages · {formatFileSize(resource.fileSize)}
         </span>
@@ -157,6 +208,7 @@ export function ResourceCard({ resource, showContext = true }: ResourceCardProps
             />
           )}
         </div>
+      </div>
       </div>
     </Card>
   );
