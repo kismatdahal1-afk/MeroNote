@@ -529,12 +529,19 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
+  top: auto;
+  margin: 0;
   z-index: 40;
+  display: block;
   width: 100%;
   max-width: 100vw;
   overflow-x: clip;
   overflow-y: visible;
   pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 @media (min-width: 64rem) {
