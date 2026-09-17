@@ -65,7 +65,9 @@ export function AppLayout() {
 
       <div className="lg:pl-64">
         <Header onMenuClick={() => setDrawerOpen(true)} />
-        <main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 lg:px-8 lg:pb-12">
+        {/* pb-28 on mobile clears the fixed bottom nav (74px + safe-area);
+            desktop keeps its own spacing (nav is hidden on lg). */}
+        <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-6 lg:px-8 lg:pb-12">
           <PageTransition>
             <Outlet />
           </PageTransition>

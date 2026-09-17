@@ -513,3 +513,131 @@ body {
     padding-top: 1rem;
   }
 }
+
+/* ============================================================
+   Floating bottom navigation — active bubble + SVG notch
+   (mobile only, shared by Admin and Student portals).
+   Template port: full-width bar pinned to the lowest part of the
+   screen, themed via --nav-background/--nav-icon/--nav-text/
+   --active-background/--active-icon/--active-text tokens.
+   Cream floating circle carrying the active icon in both
+   modes. Only the icon glyphs come from the app's Lucide set
+   (per-portal mapping).
+   ============================================================ */
+.liq-bottom-nav {
+  --nav-background: #657568;
+  --nav-icon: #FFFFFF;
+  --nav-text: #FFFFFF;
+  --active-background: #FFF8EA;
+  --active-icon: #657568;
+  --active-text: #FFFFFF;
+  position: relative;
+  height: calc(74px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+}
+
+.liq-nav-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* Instant bar body behind the SVG notch — pure CSS so the bar is fully
+   visible on first paint even before the notch path is measured/drawn.
+   Starts exactly where the notch dip ends (28px), so it never covers
+   the liquid curve. The SVG path paints the identical color on top. */
+.liq-nav-fallback {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 28px;
+  bottom: 0;
+  background: var(--nav-background);
+}
+
+.liq-nav-bg path {
+  fill: var(--nav-background);
+}
+
+.liq-nav-items {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 14px calc(13px + env(safe-area-inset-bottom, 0px));
+}
+
+.liq-nav-item {
+  appearance: none;
+  background: none;
+  border: none;
+  text-decoration: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 2px;
+  font-family: inherit;
+}
+
+.liq-nav-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  color: var(--nav-icon);
+  transition: opacity 0.25s ease;
+}
+
+.liq-nav-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.liq-nav-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--nav-text);
+  transition: color 0.25s ease;
+  white-space: nowrap;
+}
+
+.liq-nav-item.active .liq-nav-icon { opacity: 0; }
+.liq-nav-item.active .liq-nav-label {
+  color: var(--active-text);
+  font-weight: 700;
+}
+
+.liq-floating-btn {
+  position: absolute;
+  top: -22px;
+  left: 0;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--active-background);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.liq-floating-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  color: var(--active-icon);
+}
+
+.liq-floating-icon svg {
+  width: 100%;
+  height: 100%;
+}
