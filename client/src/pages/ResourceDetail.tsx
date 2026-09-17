@@ -293,7 +293,7 @@ export default function ResourceDetail() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="p-6 lg:col-span-2">
           <h2 className="text-base font-bold text-foreground">Details</h2>
-          <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 sm:gap-x-8">
             <div>
               <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <Layers className="size-3.5" aria-hidden="true" />

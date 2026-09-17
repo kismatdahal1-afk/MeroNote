@@ -342,7 +342,7 @@ export function ResourceDetailSkeleton({ adminStrip = false }: { adminStrip?: bo
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="rounded-xl border border-border bg-surface p-6 lg:col-span-2">
           <SkBox className="h-5 w-24" />
-          <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 sm:gap-x-8">
             <div>
               <SkBox className="h-3 w-20" />
               <SkBox className="mt-2 h-6 w-28 rounded-full" />
