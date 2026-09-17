@@ -126,7 +126,7 @@ export default function Dashboard() {
           <input
             type="search"
             name="q"
-            placeholder="Search notes, past questions, algorithms..."
+            placeholder="Search notes, subjects, past questions…"
             aria-label="Search resources"
             className="h-10 w-full rounded-xl border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
           />

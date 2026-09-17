@@ -76,7 +76,7 @@ export default function Resources() {
       <SearchBar
         initialValue={query}
         className="mb-5 max-w-xl"
-        placeholder="Search notes, past questions, algorithms..."
+        placeholder="Search notes, subjects, past questions…"
         onSubmit={updateQuery}
         onChange={updateQuery}
       />
