@@ -96,7 +96,7 @@ function LiquidBottomNav({
 
   // ---- Template path builder (verbatim geometry) ----
   function buildPath(w: number, h: number, notchX: number): string {
-    const r = 0; // 0 = sharp rectangular corners (was h / 2 for a full pill)
+    const rt = 10; // small curve on upper corners only; bottom stays square to the viewport edge
     const halfNotch = 44;
     const depth = 28;
     const x0 = notchX - halfNotch;
@@ -106,18 +106,16 @@ function LiquidBottomNav({
     const x4 = notchX + halfNotch;
 
     return [
-      `M ${r} 0`,
+      `M ${rt} 0`,
       `L ${x0} 0`,
       `C ${x1} 0 ${x1} ${depth} ${x2} ${depth}`,
       `C ${x3} ${depth} ${x3} 0 ${x4} 0`,
-      `L ${w - r} 0`,
-      `A ${r} ${r} 0 0 1 ${w} ${r}`,
-      `L ${w} ${h - r}`,
-      `A ${r} ${r} 0 0 1 ${w - r} ${h}`,
-      `L ${r} ${h}`,
-      `A ${r} ${r} 0 0 1 0 ${h - r}`,
-      `L 0 ${r}`,
-      `A ${r} ${r} 0 0 1 ${r} 0`,
+      `L ${w - rt} 0`,
+      `A ${rt} ${rt} 0 0 1 ${w} ${rt}`,
+      `L ${w} ${h}`,
+      `L 0 ${h}`,
+      `L 0 ${rt}`,
+      `A ${rt} ${rt} 0 0 1 ${rt} 0`,
       "Z",
     ].join(" ");
   }
@@ -234,7 +232,7 @@ function LiquidBottomNav({
   // page content scrolls behind/above while this stays stationary.
   // overflow-x-clip guarantees no horizontal overflow at any width.
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 overflow-x-clip lg:hidden">
+    <div className="liq-bottom-nav-root fixed inset-x-0 bottom-0 z-40 overflow-x-clip lg:hidden">
       <nav ref={navRef} aria-label={ariaLabel} className="liq-bottom-nav">
         <div aria-hidden="true" className="liq-nav-fallback" />
         <svg ref={svgRef} aria-hidden="true" focusable="false" className="liq-nav-bg">

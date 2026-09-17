@@ -524,15 +524,49 @@ body {
    modes. Only the icon glyphs come from the app's Lucide set
    (per-portal mapping).
    ============================================================ */
+.liq-bottom-nav-root {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: clip;
+  overflow-y: visible;
+  pointer-events: auto;
+}
+
+@media (min-width: 64rem) {
+  .liq-bottom-nav-root {
+    display: none;
+  }
+}
+
+.dark .liq-bottom-nav {
+  --nav-background: var(--color-surface);
+  --nav-icon: #ffffff;
+  --nav-text: #ffffff;
+  --active-background: #ffffff;
+  --active-icon: #000000;
+  --active-text: #ffffff;
+}
+
 .liq-bottom-nav {
-  --nav-background: #657568;
-  --nav-icon: #FFFFFF;
-  --nav-text: #FFFFFF;
-  --active-background: #FFF8EA;
-  --active-icon: #657568;
-  --active-text: #FFFFFF;
+  --nav-background: #fff3db;
+  --nav-icon: #000000;
+  --nav-text: #000000;
+  --active-background: #ffffff;
+  --active-icon: #000000;
+  --active-text: #000000;
   position: relative;
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
+  flex-shrink: 0;
   height: calc(74px + env(safe-area-inset-bottom, 0px));
+  min-height: calc(74px + env(safe-area-inset-bottom, 0px));
+  max-height: calc(74px + env(safe-area-inset-bottom, 0px));
   margin: 0;
 }
 
@@ -560,6 +594,13 @@ body {
 
 .liq-nav-bg path {
   fill: var(--nav-background);
+  stroke: #000000;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.dark .liq-nav-bg path {
+  stroke: #ffffff;
 }
 
 .liq-nav-items {
@@ -568,6 +609,10 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100vw;
+  min-width: 0;
   padding: 0 14px calc(13px + env(safe-area-inset-bottom, 0px));
 }
 
@@ -576,12 +621,15 @@ body {
   background: none;
   border: none;
   text-decoration: none;
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   cursor: pointer;
+  box-sizing: border-box;
   padding: 4px 2px;
   font-family: inherit;
 }
@@ -606,6 +654,9 @@ body {
   color: var(--nav-text);
   transition: color 0.25s ease;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .liq-nav-item.active .liq-nav-icon { opacity: 0; }
@@ -622,12 +673,16 @@ body {
   height: 54px;
   border-radius: 50%;
   background: var(--active-background);
-  border: 1px solid var(--color-border);
+  border: 1.5px solid #000000;
   display: flex;
   align-items: center;
   justify-content: center;
   transform: translateX(-50%);
   pointer-events: none;
+}
+
+.dark .liq-floating-btn {
+  border-color: #ffffff;
 }
 
 .liq-floating-icon {
@@ -640,4 +695,37 @@ body {
 .liq-floating-icon svg {
   width: 100%;
   height: 100%;
+}
+
+/* Mobile bottom nav only — narrow-viewport fit (320px+) without
+   changing the design: slightly tighter gutters/labels so all five
+   buttons stay on one row, no horizontal overflow or clipping. */
+@media (max-width: 23.75rem) {
+  .liq-nav-items {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .liq-nav-item {
+    gap: 3px;
+    padding-left: 1px;
+    padding-right: 1px;
+  }
+  .liq-nav-label {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 20.625rem) {
+  .liq-nav-items {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}
+
+/* Mobile only — keep page content clear of the fixed bottom nav,
+   including the iOS home-indicator safe area. Desktop untouched. */
+@media (max-width: 63.98rem) {
+  .bg-hero-gradient main {
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+  }
 }
