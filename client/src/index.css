@@ -330,7 +330,7 @@ body {
      max-width content column, so no straight top/right boundary can
      appear at the hero section's edges — the glow touches the header's
      bottom edge and the viewport's right edge as one seamless layer.
-   Light mode uses a deep navy-blue tint; dark mode uses the cyan/blue
+   Light mode uses a bright blue tint; dark mode uses the cyan/blue
    accent tint. */
 .student-dashboard {
   position: relative;
@@ -351,15 +351,15 @@ body {
   background-image:
     radial-gradient(
       30rem 32rem ellipse at 100% 0%,
-      rgba(30, 58, 138, 0.22) 0%,
-      rgba(30, 58, 138, 0.1) 42%,
-      rgba(30, 58, 138, 0.03) 60%,
+      rgba(37, 99, 235, 0.26) 0%,
+      rgba(37, 99, 235, 0.12) 42%,
+      rgba(37, 99, 235, 0.04) 60%,
       transparent 78%
     ),
     radial-gradient(
       44rem 50rem ellipse at 96% 0%,
-      rgba(59, 76, 184, 0.13) 0%,
-      rgba(59, 76, 184, 0.04) 45%,
+      rgba(59, 130, 246, 0.16) 0%,
+      rgba(59, 130, 246, 0.055) 45%,
       transparent 72%
     );
   background-repeat: no-repeat;
