@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Sun, Moon, Menu, Wifi, WifiOff } from "lucide-react";
 import { useTheme } from "../../state/ThemeProvider";
 import { useUser } from "../../state/UserProvider";
@@ -8,8 +8,12 @@ import { IconButton } from "../common/IconButton";
 
 export function BrandMark({ subtitle = false }: { subtitle?: boolean }) {
   const { role } = useUser();
-  const isAdmin = role === "ADMIN";
-  const homePath = isAdmin ? "/admin" : "/dashboard";
+  const { pathname } = useLocation();
+  // Preserve the current portal context (same detection as SidebarNav):
+  // inside /admin stay in Admin (Admin Dashboard), everywhere else go to
+  // the Student Dashboard. Never cross-navigate between portals.
+  const inAdmin = role === "ADMIN" && pathname.startsWith("/admin");
+  const homePath = inAdmin ? "/admin" : "/dashboard";
 
   return (
     <Link
@@ -42,9 +46,13 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { resolvedTheme, toggleTheme } = useTheme();
-  const { name } = useUser();
+  const { name, role } = useUser();
+  const { pathname } = useLocation();
   const online = useOnlineStatus();
   const initials = name.split(" ").map((p) => p[0]).slice(0, 2).join("");
+  // Same portal detection as BrandMark/SidebarNav: inside /admin stay in
+  // Admin (Admin Settings), everywhere else go to Student Settings.
+  const settingsPath = role === "ADMIN" && pathname.startsWith("/admin") ? "/admin/settings" : "/settings";
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-surface/80 px-4 backdrop-blur-md lg:px-6">
@@ -81,7 +89,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           onClick={toggleTheme}
         />
         <Link
-          to="/settings"
+          to={settingsPath}
           className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           aria-label={`Account: ${name}`}
         >

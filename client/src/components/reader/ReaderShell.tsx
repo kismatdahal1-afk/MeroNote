@@ -2,7 +2,16 @@ import { useParams, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { getResourceById, getSemesterById, getSubjectById } from "../../data/selectors";
-import { entryPointFromState, entryRootFor, entryShowsSubject, adminEntryPointFromState, adminEntryRootFor } from "../../lib/resourceNavigation";
+import {
+  entryPointFromState,
+  entryRootFor,
+  showsSubjectInResourceTrail,
+  subjectIdFromState,
+  buildResourceNavState,
+  adminEntryPointFromState,
+  adminEntryRootFor,
+  type ResourceNavState,
+} from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 import { BackButton } from "../common/BackButton";
@@ -21,12 +30,21 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   useCmsSync();
   const { resourceId } = useParams<{ resourceId: string }>();
   const { state } = useLocation();
-  const via = (state as { via?: string } | null)?.via;
+  const via = (state as ResourceNavState | null)?.via;
   /** Student navigation context: the breadcrumb mirrors the actual entry
-   *  point (Resources / Favorite / Bookmark / Downloads). Without state
-   *  (direct URL, refresh) it falls back to the Semester trail. */
+   *  point (Resources / Favorites / Bookmarks / Downloads). A Subject crumb
+   *  appears only when the user actually navigated through that subject
+   *  (fromSubject matches) — direct Favorites/Bookmarks → Resource opens
+   *  never invent one. Without state (direct URL, refresh) it falls back
+   *  to the Semester trail. */
   const entry = entryPointFromState(state);
   const entryRoot = !admin ? entryRootFor(entry) : undefined;
+  const fromSubject = subjectIdFromState(state);
+  /** Link back to the detail page preserves the full trail so
+   *  reader → detail keeps the same breadcrumb. */
+  const detailNavState = !admin
+    ? buildResourceNavState(entry, fromSubject)
+    : undefined;
   /** Admin navigation context: Semesters / Resources / Drafts entry point.
    *  Stateless visits (direct URL, refresh) fall back to Resources. */
   const adminEntry = adminEntryPointFromState(state);
@@ -141,7 +159,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
         ) : entryRoot ? (
           <>
             <Link to={entryRoot.to} className="shrink-0 rounded px-1 py-0.5 hover:text-primary">{entryRoot.label}</Link>
-            {entryShowsSubject(entry) && subject && (
+            {showsSubjectInResourceTrail(entry, fromSubject, resource.subjectId) && subject && (
               <span className="inline-flex min-w-0 items-center gap-0.5">
                 <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
                 <span className="whitespace-normal rounded px-1 py-0.5">
@@ -153,7 +171,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
               <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
               <Link
                 to={`${baseRoute}/${resource.id}`}
-                state={{ via: entry }}
+                state={detailNavState}
                 className="whitespace-normal rounded px-1 py-0.5 hover:text-primary"
               >
                 {resource.title}

@@ -13,7 +13,7 @@ import {
   getTopicsBySubject,
   getResourcesBySubject,
 } from "../data/selectors";
-import { entryPointFromState, entryRootFor } from "../lib/resourceNavigation";
+import { entryPointFromState, entryRootFor, entryShowsSubject } from "../lib/resourceNavigation";
 import {
   ALL_RESOURCE_TYPES,
   RESOURCE_TYPE_CONFIG,
@@ -67,12 +67,19 @@ export default function SubjectDetail() {
   const { subjectId } = useParams<{ subjectId: string }>();
   const navigate = useNavigate();
   const { state } = useLocation();
-  /** Favorite/Bookmark entry: the subject was opened from a saved list, so
+  /** Favorites/Bookmarks entry: the subject was opened from a saved list, so
    *  the breadcrumb and resource links keep that entry context. */
   const entry = entryPointFromState(state);
-  const entryRoot =
-    entry === "favorites" || entry === "bookmarks" ? entryRootFor(entry) : undefined;
-  const subjectVia = entryRoot ? entry : undefined;
+  const showsSavedEntry = entryShowsSubject(entry);
+  const entryRoot = showsSavedEntry ? entryRootFor(entry) : undefined;
+  const subjectVia = showsSavedEntry ? entry : undefined;
+  const subject = getSubjectById(subjectId);
+  const semester = subject ? getSemesterById(subject.semesterId) : undefined;
+  /** Only a saved-list subject open carries the origin forward: resources
+   *  opened here must show Favorites/Bookmarks → Subject → Resource, while
+   *  resources opened directly from those lists carry no fromSubject and
+   *  show the direct trail. */
+  const resourceFromSubject = subjectVia && subject ? subject.id : undefined;
   const { toast } = useToast();
   const {
     isFavoriteSubject,
@@ -80,9 +87,6 @@ export default function SubjectDetail() {
     isSubjectBookmarked,
     toggleBookmarkSubject,
   } = useLibrary();
-
-  const subject = getSubjectById(subjectId);
-  const semester = subject ? getSemesterById(subject.semesterId) : undefined;
 
   const topics = useMemo(
     () => (subject ? getTopicsBySubject(subject.id) : []),
@@ -160,7 +164,7 @@ export default function SubjectDetail() {
     <div>
       <div className="mb-1 -ml-1 sm:-ml-1">
         <BackButton
-          label={entryRoot ? `Back to ${entryRoot.label.toLowerCase()}s` : "Back to semester"}
+          label={entryRoot ? `Back to ${entryRoot.label.toLowerCase()}` : "Back to semester"}
           fallbackTo={entryRoot ? entryRoot.to : "/dashboard"}
         />
       </div>
@@ -242,12 +246,12 @@ export default function SubjectDetail() {
                 {/* Mobile: existing compact rows. Desktop: Resources-page card grid. */}
                 <ul className="space-y-2.5 sm:hidden">
                   {resources.map((r) => (
-                    <SubjectResourceRow key={r.id} resource={r} via={subjectVia} />
+                    <SubjectResourceRow key={r.id} resource={r} via={subjectVia} fromSubject={resourceFromSubject} />
                   ))}
                 </ul>
                 <div className="hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
                   {resources.map((r) => (
-                    <ResourceCard key={r.id} resource={r} showContext={false} via={subjectVia} />
+                    <ResourceCard key={r.id} resource={r} showContext={false} via={subjectVia} fromSubject={resourceFromSubject} />
                   ))}
                 </div>
               </SubjectResourceGroup>
@@ -264,12 +268,12 @@ export default function SubjectDetail() {
               {/* Mobile: existing compact rows. Desktop: Resources-page card grid. */}
               <ul className="space-y-2.5 sm:hidden">
                 {resources.map((r) => (
-                  <SubjectResourceRow key={r.id} resource={r} via={subjectVia} />
+                  <SubjectResourceRow key={r.id} resource={r} via={subjectVia} fromSubject={resourceFromSubject} />
                 ))}
               </ul>
               <div className="hidden grid-cols-1 gap-4 sm:grid sm:grid-cols-2 xl:grid-cols-4">
                 {resources.map((r) => (
-                  <ResourceCard key={r.id} resource={r} showContext={false} via={subjectVia} />
+                  <ResourceCard key={r.id} resource={r} showContext={false} via={subjectVia} fromSubject={resourceFromSubject} />
                 ))}
               </div>
             </SubjectResourceGroup>

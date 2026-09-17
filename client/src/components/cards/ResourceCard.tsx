@@ -6,7 +6,7 @@ import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import { ProgressBar } from "../common/ProgressBar";
 import { cx, formatFileSize } from "../../lib/utils";
 import { getSubjectById, getSemesterById } from "../../data/selectors";
-import type { ResourceEntryPoint } from "../../lib/resourceNavigation";
+import { buildResourceNavState, type ResourceEntryPoint } from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 import { IconButton } from "../common/IconButton";
@@ -18,9 +18,14 @@ interface ResourceCardProps {
   /** Navigation entry point for the detail/reader breadcrumb.
    *  Omitted inside Semester flows, which keep the Semester trail. */
   via?: ResourceEntryPoint;
+  /** Subject the user navigated through (set only by Subject pages, so
+   *  detail/reader can show Favorites → Subject → Resource when the
+   *  resource was opened via a subject, and Favorites → Resource when it
+   *  was opened directly). */
+  fromSubject?: string;
 }
 
-export function ResourceCard({ resource, showContext = true, via }: ResourceCardProps) {
+export function ResourceCard({ resource, showContext = true, via, fromSubject }: ResourceCardProps) {
   const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, getProgress } = useLibrary();
   const { toast } = useToast();
 
@@ -61,13 +66,14 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
     startDownload(resource);
     toast("Download started (mock)");
   };
+  const navState = buildResourceNavState(via, fromSubject);
 
   return (
     <Card interactive className="group relative flex h-full flex-col p-4 sm:p-5">
       {/* Stretched link — makes the whole card clickable */}
       <Link
         to={`/resources/${resource.id}`}
-        state={via ? { via } : undefined}
+        state={navState}
         aria-label={`Open ${resource.title}`}
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
@@ -117,7 +123,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
       </div>
       <Link
         to={`/resources/${resource.id}`}
-        state={via ? { via } : undefined}
+        state={navState}
         aria-label={`Open ${resource.title}`}
         className="pointer-events-auto relative z-10 mt-2.5 flex h-9 w-full items-center justify-center gap-1 rounded-lg bg-primary-muted text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:hidden"
       >
@@ -206,7 +212,7 @@ export function ResourceCard({ resource, showContext = true, via }: ResourceCard
         <div className="flex items-center gap-1">
           <Link
             to={`/reader/${resource.id}`}
-            state={via ? { via } : undefined}
+            state={navState}
             className="pointer-events-auto relative inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
             aria-label={`Open ${resource.title} in reader`}
           >

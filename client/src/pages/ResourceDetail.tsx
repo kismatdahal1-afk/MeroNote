@@ -15,7 +15,16 @@ import { ResourceEditorModal } from "../components/admin/ResourceEditorModal";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { getResourceById, getSubjectById, getSemesterById } from "../data/selectors";
 import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
-import { entryPointFromState, entryRootFor, entryShowsSubject, adminEntryPointFromState, adminEntryRootFor } from "../lib/resourceNavigation";
+import {
+  entryPointFromState,
+  entryRootFor,
+  showsSubjectInResourceTrail,
+  subjectIdFromState,
+  buildResourceNavState,
+  adminEntryPointFromState,
+  adminEntryRootFor,
+  type ResourceNavState,
+} from "../lib/resourceNavigation";
 import { cx, formatFileSize, formatDate } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
@@ -43,14 +52,18 @@ export default function ResourceDetail() {
 
   const isAdmin = pathname.startsWith("/admin");
   const readerRoute = isAdmin ? "/admin/reader" : "/reader";
-  /** Navigation context marker forwarded through location state, so the
-   *  breadcrumb and nav highlight reflect where the admin came from. */
-  const via = (state as { via?: string } | null)?.via;
+  /** Raw entry marker + subject trail, forwarded so detail → reader keeps
+   *  the exact same breadcrumb (Favorites → Subject → Resource vs.
+   *  Favorites → Resource). */
+  const via = (state as ResourceNavState | null)?.via;
   /** Student navigation context: the breadcrumb mirrors the actual entry
-   *  point (Resources / Favorite / Bookmark / Downloads). Without state
-   *  (direct URL, refresh) it falls back to the Semester trail. */
+   *  point (Resources / Favorites / Bookmarks / Downloads). Without state
+   *  (direct URL, refresh) it falls back to the Semester trail. A Subject
+   *  crumb is shown only when the user actually navigated through that
+   *  subject (fromSubject matches) — never invented for direct opens. */
   const entry = entryPointFromState(state);
   const entryRoot = !isAdmin ? entryRootFor(entry) : undefined;
+  const fromSubject = subjectIdFromState(state);
   /** Admin navigation context: Semesters / Resources / Drafts entry point.
    *  Stateless visits (direct URL, refresh) fall back to Resources. */
   const adminEntry = adminEntryPointFromState(state);
@@ -89,9 +102,17 @@ export default function ResourceDetail() {
 
   const openReader = () => {
     markOpened(resource.id);
-    // Forward the navigation source (via) so the sidebar keeps
-    // highlighting the section the admin came from.
-    navigate(`${readerRoute}/${resource.id}`, { state: { via } });
+    // Forward the full navigation context so detail → reader keeps the same
+    // breadcrumb and nav highlight (student and admin alike). For students
+    // this preserves Favorites/Bookmarks → Subject → Resource vs. the
+    // direct Favorites/Bookmarks → Resource trail.
+    if (isAdmin) {
+      navigate(`${readerRoute}/${resource.id}`, { state: via ? { via } : undefined });
+    } else {
+      navigate(`${readerRoute}/${resource.id}`, {
+        state: buildResourceNavState(entry, fromSubject),
+      });
+    }
   };
 
   const handleFavorite = () => {
@@ -151,7 +172,7 @@ export default function ResourceDetail() {
                 { label: resource.title },
               ]
             : entryRoot
-              ? entryShowsSubject(entry) && subject
+              ? showsSubjectInResourceTrail(entry, fromSubject, resource.subjectId) && subject
                 ? [
                     { label: entryRoot.label, to: entryRoot.to },
                     { label: subject.name },
