@@ -60,7 +60,7 @@ export default function Dashboard() {
   const heroUpdatedAt = hero ? progress.find((p) => p.resourceId === hero.id)?.updatedAt : undefined;
 
   return (
-    <div>
+    <div className="student-dashboard relative">
       {/* Compact greeting header — the character is absolutely positioned
           so growing it never pushes or squeezes the greeting text. */}
       <header className="relative mb-5 flex items-center justify-between gap-3">

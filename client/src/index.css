@@ -317,6 +317,83 @@ body {
   background-attachment: fixed;
 }
 
+/* Student Dashboard ambient glow — both themes.
+   A single continuous background layer anchored to the exact top-right
+   corner of the viewport (behind the sticky header), spreading diagonally
+   inward/downward with a soft gradual fade. Implemented as a fixed
+   pseudo-element on the student-dashboard root so it:
+   - is scoped to the Student Dashboard route only (class lives solely in
+     pages/Dashboard.tsx; Admin Dashboard never renders it),
+   - never affects layout (position:fixed) or interaction
+     (pointer-events:none),
+   - escapes the page-transition wrapper's overflow-x-clip and the
+     max-width content column, so no straight top/right boundary can
+     appear at the hero section's edges — the glow touches the header's
+     bottom edge and the viewport's right edge as one seamless layer.
+   Light mode uses a deep navy-blue tint; dark mode uses the cyan/blue
+   accent tint. */
+.student-dashboard {
+  position: relative;
+  isolation: isolate;
+}
+
+.student-dashboard::before {
+  content: "";
+  display: block;
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(46rem, 66vw);
+  height: 44rem;
+  max-height: 85vh;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(
+      30rem 32rem ellipse at 100% 0%,
+      rgba(30, 58, 138, 0.22) 0%,
+      rgba(30, 58, 138, 0.1) 42%,
+      rgba(30, 58, 138, 0.03) 60%,
+      transparent 78%
+    ),
+    radial-gradient(
+      44rem 50rem ellipse at 96% 0%,
+      rgba(59, 76, 184, 0.13) 0%,
+      rgba(59, 76, 184, 0.04) 45%,
+      transparent 72%
+    );
+  background-repeat: no-repeat;
+  /* Free left edge: melt the layer itself to transparent toward the left
+     so no boundary can ever appear there — the fade is driven by the mask,
+     not by the layer's box edge. Right side stays at full strength. */
+  -webkit-mask-image: linear-gradient(to left, black 52%, transparent 100%);
+  mask-image: linear-gradient(to left, black 52%, transparent 100%);
+}
+
+.dark .student-dashboard::before {
+  background-image:
+    radial-gradient(
+      30rem 32rem ellipse at 100% 0%,
+      rgba(34, 184, 240, 0.3) 0%,
+      rgba(34, 184, 240, 0.13) 42%,
+      rgba(34, 184, 240, 0.04) 60%,
+      transparent 78%
+    ),
+    radial-gradient(
+      44rem 50rem ellipse at 96% 0%,
+      rgba(56, 130, 246, 0.16) 0%,
+      rgba(56, 130, 246, 0.05) 45%,
+      transparent 72%
+    );
+}
+
+/* Keep dashboard content painted above the ambient layer. Relative
+   positioning without offsets preserves exact layout/spacing. */
+.student-dashboard > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* Dark-mode frosted surfaces — dark slate glass with subtle blur.
    Cards, modals, drawers, toasts and inputs share one material:
    rgba slate tint + soft backdrop blur. Bars painted with opacity
