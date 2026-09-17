@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Home,
@@ -86,14 +86,27 @@ function LiquidBottomNav({
   const btnRef = useRef<HTMLDivElement | null>(null);
   const iconRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const tweenRef = useRef<number | null>(null);
-  const mountedRef = useRef(false);
-  const prevXRef = useRef<number | null>(null);
+  // Live x-position of the bubble/notch (updated every rAF frame). Used as
+  // the slide start so rapid taps continue from the current visual spot —
+  // never a jump back to the previous tab.
+  const currentXRef = useRef<number | null>(null);
+  // Index of the in-flight slide target; guards against stale completions
+  // when tabs are tapped in quick succession.
+  const targetIndexRef = useRef<number | null>(null);
 
   const activeIndex = Math.max(
     0,
     items.findIndex((it) => it.to === activeTo),
   );
-  const ActiveIcon = items[activeIndex].icon;
+  // Persistent visual index: drives BOTH the floating bubble icon and the
+  // slot `.active` styling. It intentionally lags the route by one short
+  // slide — the bubble keeps showing the previous icon while gliding, then
+  // swaps (with zero fade) exactly at arrival while already covering the
+  // new slot. That is what removes the blink: no icon remount mid-flight,
+  // no opacity flash, one continuous movement.
+  const [visibleIndex, setVisibleIndex] = useState(activeIndex);
+  const visibleIndexRef = useRef(visibleIndex);
+  const VisibleIcon = items[Math.min(visibleIndex, items.length - 1)].icon;
 
   // ---- Template path builder (verbatim geometry) ----
   function buildPath(w: number, h: number, notchX: number): string {
@@ -142,30 +155,33 @@ function LiquidBottomNav({
     path.setAttribute("d", buildPath(w, h, x));
   }
 
-  function paintImmediate(): void {
+  function paintAt(index: number): void {
     const btn = btnRef.current;
     if (!btn) return;
-    const x = centerXFor(activeIndex);
+    const x = centerXFor(index);
     btn.style.left = `${x}px`;
     drawPathAt(x);
-    prevXRef.current = x;
+    currentXRef.current = x;
   }
 
-  function easeOutCubic(t: number): number {
-    return 1 - Math.pow(1 - t, 3);
+  function easeInOutCubic(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
-  function tweenNotch(fromX: number, toX: number): void {
+  function tweenNotch(fromX: number, toX: number, onDone: () => void): void {
     if (tweenRef.current !== null) cancelAnimationFrame(tweenRef.current);
     const btn = btnRef.current;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       if (btn) btn.style.left = `${toX}px`;
       drawPathAt(toX);
-      prevXRef.current = toX;
+      currentXRef.current = toX;
       tweenRef.current = null;
+      onDone();
       return;
     }
-    const duration = 380;
+    // Short continuous glide (~250ms): starts directly from the previous
+    // visual position, ends at the new tab — no blink, no jump.
+    const duration = 250;
     const start = performance.now();
 
     // One shared loop drives BOTH the bubble (`left`) and the bar notch
@@ -173,14 +189,16 @@ function LiquidBottomNav({
     // synchronized liquid element — no drift, no wobble.
     function step(now: number): void {
       const t = Math.min((now - start) / duration, 1);
-      const x = fromX + (toX - fromX) * easeOutCubic(t);
+      const x = fromX + (toX - fromX) * easeInOutCubic(t);
       if (btn) btn.style.left = `${x}px`;
       drawPathAt(x);
+      currentXRef.current = x;
       if (t < 1) {
         tweenRef.current = requestAnimationFrame(step);
       } else {
-        prevXRef.current = toX;
+        currentXRef.current = toX;
         tweenRef.current = null;
+        onDone();
       }
     }
     tweenRef.current = requestAnimationFrame(step);
@@ -188,45 +206,64 @@ function LiquidBottomNav({
 
   // Paint synchronously on mount (before first browser paint) so the bar
   // + notch are visible from the very first frame — never hidden on load.
+  // No slide on initial load / refresh / deep link: show the correct tab
+  // immediately.
   useLayoutEffect(() => {
-    paintImmediate();
+    visibleIndexRef.current = activeIndex;
+    setVisibleIndex(activeIndex);
+    targetIndexRef.current = activeIndex;
+    paintAt(activeIndex);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Glide the notch + floating circle when the active tab changes.
   // Both are driven by the same rAF loop (see tweenNotch) so they move
   // together as one element. The bar itself stays fixed — only the
-  // indicator travels horizontally.
+  // indicator travels horizontally. The bubble icon + slot highlight swap
+  // only when the glide lands (already covering the new slot), so there
+  // is never a disappear → reappear flash.
   useEffect(() => {
-    if (!mountedRef.current) {
-      mountedRef.current = true;
+    targetIndexRef.current = activeIndex;
+    if (activeIndex === visibleIndexRef.current) {
+      // Same tab (or already settled): make sure we're parked exactly.
+      if (tweenRef.current === null) paintAt(activeIndex);
       return;
     }
     const toX = centerXFor(activeIndex);
-    const fromX = prevXRef.current ?? toX;
+    const fromX =
+      currentXRef.current ?? centerXFor(visibleIndexRef.current) ?? toX;
     if (fromX === toX) {
-      const btn = btnRef.current;
-      if (btn) btn.style.left = `${toX}px`;
-      drawPathAt(toX);
-      prevXRef.current = toX;
-    } else {
-      tweenNotch(fromX, toX);
+      visibleIndexRef.current = activeIndex;
+      setVisibleIndex(activeIndex);
+      return;
     }
+    tweenNotch(fromX, toX, () => {
+      // Ignore stale completions from a superseded tween.
+      if (targetIndexRef.current !== activeIndex) return;
+      visibleIndexRef.current = activeIndex;
+      setVisibleIndex(activeIndex);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex]);
 
   // Re-layout on width changes (rotation, resize, font load shifts).
+  // Never snap mid-glide: while a tween runs the rAF loop owns the
+  // position; on idle re-park exactly under the settled tab.
   useEffect(() => {
+    const repaintIdle = (): void => {
+      if (tweenRef.current !== null) return;
+      paintAt(visibleIndexRef.current);
+    };
     if (typeof ResizeObserver === "undefined") {
-      const onResize = (): void => paintImmediate();
+      const onResize = (): void => repaintIdle();
       window.addEventListener("resize", onResize);
       return () => window.removeEventListener("resize", onResize);
     }
-    const ro = new ResizeObserver(() => paintImmediate());
+    const ro = new ResizeObserver(() => repaintIdle());
     if (navRef.current) ro.observe(navRef.current);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeIndex]);
+  }, []);
 
   // Cancel any in-flight notch glide if the nav unmounts mid-animation.
   // Zero visual change: guards in drawPathAt already no-op on null refs.
@@ -250,14 +287,18 @@ function LiquidBottomNav({
 
         <div className="liq-nav-items">
           {items.map(({ to, label, icon: Icon, end }, i) => {
-            const active = i === activeIndex;
+            // Route truth (a11y) follows the URL immediately; the visual
+            // highlight follows the gliding bubble and lands with it, so
+            // the slot never flashes while the indicator is mid-flight.
+            const current = i === activeIndex;
+            const visualActive = i === visibleIndex;
             return (
               <NavLink
                 key={to}
                 to={to}
                 end={end}
-                aria-current={active ? "page" : undefined}
-                className={cx("liq-nav-item", active && "active")}
+                aria-current={current ? "page" : undefined}
+                className={cx("liq-nav-item", visualActive && "active")}
               >
                 <span
                   ref={(el) => {
@@ -275,7 +316,7 @@ function LiquidBottomNav({
 
         <div ref={btnRef} aria-hidden="true" className="liq-floating-btn">
           <span className="liq-floating-icon">
-            <ActiveIcon className="size-6" strokeWidth={1.8} aria-hidden="true" />
+            <VisibleIcon className="size-6" strokeWidth={1.8} aria-hidden="true" />
           </span>
         </div>
       </nav>
