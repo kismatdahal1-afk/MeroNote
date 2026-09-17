@@ -64,11 +64,12 @@ function resolveActiveTo(
 /**
  * Floating bottom navigation — template port: full-width bar pinned to
  * the lowest part of the screen with an SVG notch that dips around a
- * white floating circle carrying the active icon. The bar fill and label
- * colors come from the app theme (surface / foreground tokens) so it
- * belongs in both Light and Dark Mode. Only the icon glyphs come from
- * the app's Lucide set (per-portal mapping); layout, notch geometry and
- * timing follow the template 1:1.
+ * white floating circle carrying the active icon. Colors come from the
+ * nav tokens (--nav-background/--nav-icon/--nav-text/--active-*) with
+ * per-mode overrides, so Light and Dark keep their own bar/icon
+ * treatments. Only the icon glyphs come from the app's Lucide set
+ * (per-portal mapping); layout, notch geometry and timing follow the
+ * template 1:1.
  */
 function LiquidBottomNav({
   ariaLabel,
@@ -227,6 +228,14 @@ function LiquidBottomNav({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIndex]);
 
+  // Cancel any in-flight notch glide if the nav unmounts mid-animation.
+  // Zero visual change: guards in drawPathAt already no-op on null refs.
+  useEffect(() => {
+    return () => {
+      if (tweenRef.current !== null) cancelAnimationFrame(tweenRef.current);
+    };
+  }, []);
+
   // Permanently fixed to the viewport bottom: independent of document
   // height and scroll position. No scroll listener, no hide/show logic —
   // page content scrolls behind/above while this stays stationary.
@@ -287,31 +296,15 @@ export function MobileNav() {
 
   const isAdminPortal = role === "ADMIN" && pathname.startsWith("/admin");
 
+  const items = isAdminPortal ? ADMIN_MOBILE_NAV : STUDENT_MOBILE_NAV;
+  const ariaLabel = isAdminPortal ? "Admin mobile navigation" : "Student mobile navigation";
+
   const highlightOverride = isAdminPortal
     ? adminNavHighlight(pathname, state)
     : studentNavHighlight(pathname, state);
 
-  if (isAdminPortal) {
-    const overrideApplies =
-      !!highlightOverride && ADMIN_MOBILE_NAV.some((it) => it.to === highlightOverride);
-    const activeTo = resolveActiveTo(ADMIN_MOBILE_NAV, pathname, highlightOverride, overrideApplies);
-    return (
-      <LiquidBottomNav
-        ariaLabel="Admin mobile navigation"
-        items={ADMIN_MOBILE_NAV}
-        activeTo={activeTo}
-      />
-    );
-  }
-
   const overrideApplies =
-    !!highlightOverride && STUDENT_MOBILE_NAV.some((it) => it.to === highlightOverride);
-  const activeTo = resolveActiveTo(STUDENT_MOBILE_NAV, pathname, highlightOverride, overrideApplies);
-  return (
-    <LiquidBottomNav
-      ariaLabel="Student mobile navigation"
-      items={STUDENT_MOBILE_NAV}
-      activeTo={activeTo}
-    />
-  );
+    !!highlightOverride && items.some((it) => it.to === highlightOverride);
+  const activeTo = resolveActiveTo(items, pathname, highlightOverride, overrideApplies);
+  return <LiquidBottomNav ariaLabel={ariaLabel} items={items} activeTo={activeTo} />;
 }
