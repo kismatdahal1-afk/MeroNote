@@ -601,7 +601,7 @@ body {
 
 .liq-nav-bg path {
   fill: var(--nav-background);
-  stroke: #000000;
+  stroke: #ea580c;
   stroke-width: 1.5;
   stroke-linejoin: round;
 }
@@ -682,7 +682,7 @@ body {
   height: 54px;
   border-radius: 50%;
   background: var(--active-background);
-  border: 1.5px solid #000000;
+  border: 1.5px solid #ea580c;
   display: flex;
   align-items: center;
   justify-content: center;
