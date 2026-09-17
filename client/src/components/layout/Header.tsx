@@ -1,8 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
-import { Sun, Moon, Menu, Wifi, WifiOff } from "lucide-react";
+import { Sun, Moon, Menu } from "lucide-react";
 import { useTheme } from "../../state/ThemeProvider";
 import { useUser } from "../../state/UserProvider";
-import { useOnlineStatus } from "../../state/useOnlineStatus";
 import { HeaderSearch } from "../common/SearchBar";
 import { IconButton } from "../common/IconButton";
 
@@ -48,7 +47,6 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { resolvedTheme, toggleTheme } = useTheme();
   const { name, role } = useUser();
   const { pathname } = useLocation();
-  const online = useOnlineStatus();
   const initials = name.split(" ").map((p) => p[0]).slice(0, 2).join("");
   // Same portal detection as BrandMark/SidebarNav: inside /admin stay in
   // Admin (Admin Settings), everywhere else go to Student Settings.
@@ -67,22 +65,6 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
       <HeaderSearch />
       <div className="ml-auto flex items-center gap-1.5">
-        <span
-          role="status"
-          aria-live="polite"
-          className={
-            online
-              ? "inline-flex items-center gap-1.5 rounded-full bg-success-muted px-2.5 py-1 text-xs font-bold text-success"
-              : "inline-flex items-center gap-1.5 rounded-full bg-warning-muted px-2.5 py-1 text-xs font-bold text-warning"
-          }
-        >
-          {online ? (
-            <Wifi className="size-3.5" aria-hidden="true" />
-          ) : (
-            <WifiOff className="size-3.5" aria-hidden="true" />
-          )}
-          {online ? "Online" : "Offline"}
-        </span>
         <IconButton
           icon={resolvedTheme === "dark" ? Sun : Moon}
           label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
