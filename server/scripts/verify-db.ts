@@ -245,6 +245,9 @@ async function main(): Promise<void> {
   }
   check("custom type without customType rejected", missingCustomType);
 
+  // Await background index builds first: on a fresh database the check
+  // below can otherwise race index creation and flake.
+  await Promise.all([Resource.syncIndexes(), Favorite.syncIndexes(), ReadingProgress.syncIndexes()]);
   const resIndexes = await Resource.collection.indexes();
   const favIndexes = await Favorite.collection.indexes();
   const progIndexes = await ReadingProgress.collection.indexes();

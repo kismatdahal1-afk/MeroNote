@@ -1,6 +1,7 @@
 import { Router } from "express";
 import healthRoute from "./health.route";
 import authRoute from "./auth.route";
+import meRoute from "./me.route";
 import semestersRoute from "./semesters.route";
 import subjectsRoute from "./subjects.route";
 import topicsRoute from "./topics.route";
@@ -12,6 +13,8 @@ const router = Router();
 
 router.use("/", healthRoute);
 router.use("/auth", authRoute);
+// Phase 7 personal study data (authenticated; ownership from session).
+router.use("/me", meRoute);
 // Phase 4 academic content API (public reads; no writes in this phase).
 router.use("/semesters", semestersRoute);
 router.use("/subjects", subjectsRoute);

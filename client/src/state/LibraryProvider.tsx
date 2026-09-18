@@ -26,6 +26,13 @@ import {
   seedProgress,
   seedRecent,
 } from "../data/mock";
+import { useUser } from "./UserProvider";
+import {
+  createBookmark as createServerBookmark,
+  deleteBookmarkById as deleteServerBookmarkById,
+  deleteFavorite as deleteServerFavorite,
+  putFavorite as putServerFavorite,
+} from "../lib/studyApi";
 
 /**
  * Phase 2 mock application state.
@@ -130,6 +137,14 @@ function asBookmarkArray(raw: unknown): Bookmark[] | null {
 }
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
+  // Server sync is best-effort only (see lib/studyApi): local state stays
+  // authoritative until academic-content integration swaps in real ids.
+  // Work is lazy so guests never fire pointless requests.
+  const { status } = useUser();
+  const syncPersonal = (makeWork: () => Promise<unknown>): void => {
+    if (status !== "authed") return;
+    makeWork().catch(() => {});
+  };
   const [favorites, setFavorites] = useState<string[]>(() =>
     readStored(STORAGE_KEYS.favorites, seedFavorites, asStringArray),
   );
@@ -176,12 +191,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   );
 
   const toggleFavorite = useCallback((resourceId: string) => {
+    const adding = !favorites.includes(resourceId);
     setFavorites((prev) =>
       prev.includes(resourceId)
         ? prev.filter((id) => id !== resourceId)
         : [...prev, resourceId],
     );
-  }, []);
+    syncPersonal(() => (adding ? putServerFavorite("resource", resourceId) : deleteServerFavorite("resource", resourceId)));
+  }, [favorites, status]);
 
   const isFavoriteSubject = useCallback(
     (subjectId: string) => favoriteSubjects.includes(subjectId),
@@ -189,12 +206,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   );
 
   const toggleFavoriteSubject = useCallback((subjectId: string) => {
+    const adding = !favoriteSubjects.includes(subjectId);
     setFavoriteSubjects((prev) =>
       prev.includes(subjectId)
         ? prev.filter((id) => id !== subjectId)
         : [...prev, subjectId],
     );
-  }, []);
+    syncPersonal(() => (adding ? putServerFavorite("subject", subjectId) : deleteServerFavorite("subject", subjectId)));
+  }, [favoriteSubjects, status]);
 
   const isSubjectBookmarked = useCallback(
     (subjectId: string) => bookmarkedSubjects.includes(subjectId),
@@ -202,12 +221,16 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   );
 
   const toggleBookmarkSubject = useCallback((subjectId: string) => {
+    const adding = !bookmarkedSubjects.includes(subjectId);
     setBookmarkedSubjects((prev) =>
       prev.includes(subjectId)
         ? prev.filter((id) => id !== subjectId)
         : [...prev, subjectId],
     );
-  }, []);
+    // Removal has no server id to address pre-integration (delete is by :id),
+    // so only creations sync; full two-way sync arrives with real ids.
+    if (adding) syncPersonal(() => createServerBookmark({ targetType: "subject", targetId: subjectId }));
+  }, [bookmarkedSubjects, status]);
 
   const getBookmark = useCallback(
     (resourceId: string) =>
@@ -230,13 +253,16 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           ...prev,
         ];
       });
+      syncPersonal(() => createServerBookmark({ targetType: "resource", targetId: resource.id, page, note }));
     },
-    [],
+    [status],
   );
 
   const removeBookmark = useCallback((bookmarkId: string) => {
     setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
-  }, []);
+    // Mock ids no-op server-side; server-issued ids sync once hydrated.
+    syncPersonal(() => deleteServerBookmarkById(bookmarkId));
+  }, [status]);
 
   const getDownload = useCallback(
     (resourceId: string) =>

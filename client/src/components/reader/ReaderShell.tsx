@@ -1,5 +1,5 @@
 import { useParams, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { getResourceById, getSemesterById, getSubjectById } from "../../data/selectors";
@@ -15,6 +15,8 @@ import {
 } from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
+import { useUser } from "../../state/UserProvider";
+import { getServerProgress, putServerProgress } from "../../lib/studyApi";
 import { fetchResourceFileUrl, FileApiError } from "../../lib/resourceFileApi";
 import { BackButton } from "../common/BackButton";
 import { useCmsSync } from "../common/CmsSync";
@@ -88,6 +90,55 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     };
   }, [openResourceId, retryNonce]);
 
+  // Phase 7 progress sync (best-effort; local state stays authoritative).
+  // Persists page changes debounced (1.5s trailing edge, flushed on unmount)
+  // and seeds local progress from the server once per resource. Both no-op
+  // for mock ids and guests (see lib/studyApi).
+  const { status: authStatus } = useUser();
+  const progressTimer = useRef<number | null>(null);
+  const pendingPage = useRef<number | null>(null);
+  // True once the user navigates locally this session: server seeding must
+  // never overwrite newer local progress that arrived while fetching.
+  const touchedLocally = useRef(false);
+
+  const persistProgress = (page: number) => {
+    if (authStatus !== "authed" || !openResourceId) return;
+    touchedLocally.current = true;
+    pendingPage.current = page;
+    if (progressTimer.current !== null) window.clearTimeout(progressTimer.current);
+    progressTimer.current = window.setTimeout(() => {
+      progressTimer.current = null;
+      const next = pendingPage.current;
+      pendingPage.current = null;
+      if (next !== null && openResourceId) void putServerProgress(openResourceId, next).catch(() => {});
+    }, 1500);
+  };
+
+  useEffect(() => {
+    if (authStatus !== "authed" || !openResourceId) return;
+    const rid = openResourceId;
+    touchedLocally.current = false;
+    let cancelled = false;
+    void getServerProgress(rid).then((server) => {
+      if (cancelled || !server || touchedLocally.current || getProgress(rid)) return;
+      const total = getResourceById(rid)?.pageCount ?? server.lastPage;
+      setReadingProgress(rid, Math.min(server.lastPage, total), total);
+    });
+    return () => {
+      cancelled = true;
+      if (progressTimer.current !== null) {
+        window.clearTimeout(progressTimer.current);
+        progressTimer.current = null;
+      }
+      const next = pendingPage.current;
+      pendingPage.current = null;
+      if (next !== null) void putServerProgress(rid, next).catch(() => {});
+    };
+    // getProgress/setReadingProgress intentionally excluded: re-running on
+    // every local progress write would refetch in a loop post-integration.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openResourceId, authStatus]);
+
   if (!resource) {
     return (
       <div className="reader-bar flex min-h-screen items-center justify-center bg-background p-6">
@@ -128,6 +179,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const handlePageChange = (page: number) => {
     setReadingProgress(resource.id, page, totalPages);
     markOpened(resource.id);
+    persistProgress(page);
   };
 
   const handleBookmark = (page: number) => {
