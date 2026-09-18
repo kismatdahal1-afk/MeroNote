@@ -32,6 +32,8 @@ interface PdfViewerProps {
   urlError?: string | null;
   /** Retry the file-URL request after an error. */
   onRetryFile?: () => void;
+  /** Where the bytes came from ("Saved on device" / "Cached copy" / null). */
+  sourceLabel?: string | null;
 }
 
 export function PdfViewer({
@@ -51,6 +53,7 @@ export function PdfViewer({
   urlLoading = false,
   urlError = null,
   onRetryFile,
+  sourceLabel = null,
 }: PdfViewerProps) {
   const { toast } = useToast();
   // PDF.js page count is authoritative while reading; metadata is the fallback.
@@ -153,6 +156,9 @@ export function PdfViewer({
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
               {subtitle && <p className="truncate text-xs font-medium text-muted-foreground">{subtitle}</p>}
+              {sourceLabel && (
+                <p className="mt-0.5 truncate text-[11px] font-bold text-success">{sourceLabel}</p>
+              )}
             </div>
 
             <div className="hidden items-center gap-1 md:flex">
@@ -227,6 +233,9 @@ export function PdfViewer({
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
               {subtitle && <p className="truncate text-[11px] font-medium text-muted-foreground">{subtitle}</p>}
+              {sourceLabel && (
+                <p className="truncate text-[10px] font-bold text-success">{sourceLabel}</p>
+              )}
             </div>
           </div>
 

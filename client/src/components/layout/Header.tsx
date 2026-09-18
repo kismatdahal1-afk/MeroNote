@@ -4,6 +4,7 @@ import { useTheme } from "../../state/ThemeProvider";
 import { useUser } from "../../state/UserProvider";
 import { HeaderSearch } from "../common/SearchBar";
 import { IconButton } from "../common/IconButton";
+import { OfflineBadge } from "../common/OfflineBadge";
 
 export function BrandMark({ subtitle = false }: { subtitle?: boolean }) {
   const { role } = useUser();
@@ -65,6 +66,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
       <HeaderSearch />
       <div className="ml-auto flex items-center gap-1.5">
+        <OfflineBadge />
         <IconButton
           icon={resolvedTheme === "dark" ? Sun : Moon}
           label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}

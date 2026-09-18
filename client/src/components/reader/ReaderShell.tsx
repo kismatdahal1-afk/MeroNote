@@ -19,6 +19,8 @@ import { useUser } from "../../state/UserProvider";
 import { getServerProgress, putServerProgress } from "../../lib/studyApi";
 import { fetchResourceFileUrl, FileApiError } from "../../lib/resourceFileApi";
 import { resolveLocalFileUrl, revokeLocalFileUrl } from "../../lib/downloadManager";
+import { getTempPdf, putTempPdf } from "../../lib/tempPdfCache";
+import { decideReadingSource, readingSourceLabel, type ReadingSource } from "../../lib/cachePolicy";
 import { BackButton } from "../common/BackButton";
 import { useCmsSync } from "../common/CmsSync";
 import { PdfViewer } from "./PdfViewer";
@@ -66,6 +68,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const [urlLoading, setUrlLoading] = useState(true);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [source, setSource] = useState<ReadingSource | null>(null);
   const openResourceId = resource?.id;
 
   // Phase 8 local-first loading: an explicitly downloaded blob opens
@@ -75,41 +78,113 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
 
   useEffect(() => {
     if (!openResourceId) return;
+    const rid = openResourceId;
     let cancelled = false;
     setFileUrl(null);
     setUrlError(null);
     setUrlLoading(true);
-    const openRemote = () => {
-      fetchResourceFileUrl(openResourceId).then(
+    setSource(null);
+
+    const showObjectUrl = (url: string, src: ReadingSource) => {
+      if (cancelled) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      localObjectUrl.current = url;
+      setFileUrl(url);
+      setSource(src);
+      setUrlLoading(false);
+    };
+
+    const fail = (message: string) => {
+      if (!cancelled) {
+        setUrlError(message);
+        setUrlLoading(false);
+      }
+    };
+
+    // Streaming path for large files (no temp buffering — see Step 7/8).
+    const openRemoteStream = () => {
+      fetchResourceFileUrl(rid).then(
         ({ url }) => {
           if (cancelled) return;
           setFileUrl(url);
+          setSource(null);
           setUrlLoading(false);
         },
         (err: unknown) => {
           if (cancelled) return;
-          setUrlError(err instanceof FileApiError ? err.message : "Couldn't open this file.");
-          setUrlLoading(false);
+          fail(err instanceof FileApiError ? err.message : "Couldn't open this file.");
         },
       );
     };
-    resolveLocalFileUrl(openResourceId)
-      .then((url) => {
+
+    (async () => {
+      // 1. Permanent download always wins (Phase 8 IndexedDB).
+      try {
+        const local = await resolveLocalFileUrl(rid);
         if (cancelled) {
-          if (url) revokeLocalFileUrl(url);
+          if (local) revokeLocalFileUrl(local);
           return;
         }
-        if (url) {
-          localObjectUrl.current = url;
-          setFileUrl(url);
-          setUrlLoading(false);
+        if (local) {
+          showObjectUrl(local, "download");
           return;
         }
-        openRemote();
-      })
-      .catch(() => {
-        if (!cancelled) openRemote();
-      });
+      } catch {
+        // Storage failure falls through to temp cache, then network.
+      }
+
+      // 2. Valid temporary cache.
+      try {
+        const temp = await getTempPdf(rid);
+        if (cancelled) return;
+        if (temp) {
+          showObjectUrl(URL.createObjectURL(temp), "cache");
+          return;
+        }
+      } catch {
+        // Temp-cache failure falls through to network (never breaks online).
+      }
+
+      // 3/4. Network: fetch-and-cache when small enough, stream when large.
+      const fileSize = getResourceById(rid)?.fileSize ?? 0;
+      const decision = decideReadingSource({ hasPermanentDownload: false, hasTempCache: false, fileSize });
+      if (decision === "network-fetch") {
+        try {
+          const { url } = await fetchResourceFileUrl(rid);
+          const res = await fetch(url, { credentials: "omit" });
+          if (!res.ok) throw new Error(`PDF fetch failed with status ${res.status}.`);
+          const buffer = await res.arrayBuffer();
+          const head = new TextDecoder().decode(new Uint8Array(buffer).slice(0, 5));
+          if (head !== "%PDF-") {
+            if (!cancelled) fail("This file couldn't be opened as a PDF.");
+            return;
+          }
+          const blob = new Blob([buffer], { type: "application/pdf" });
+          // Best-effort temp write — render proceeds even if it fails.
+          await putTempPdf(rid, blob).catch(() => {});
+          if (!cancelled) showObjectUrl(URL.createObjectURL(blob), "network-fetch");
+          return;
+        } catch (err) {
+          // Fall back to streaming (e.g. transient failure); offline lands
+          // in the friendly error path there.
+          if (cancelled) return;
+          if (err instanceof FileApiError && !navigator.onLine) {
+            fail(err.message);
+            return;
+          }
+          openRemoteStream();
+          return;
+        }
+      }
+      if (decision === "network-stream") {
+        openRemoteStream();
+        return;
+      }
+      fail("You're offline and there's no saved copy of this file.");
+    })();
+
     return () => {
       cancelled = true;
       if (localObjectUrl.current) {
@@ -240,6 +315,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       fileUrl={fileUrl}
       urlLoading={urlLoading}
       urlError={urlError}
+      sourceLabel={source ? readingSourceLabel(source) : null}
       onRetryFile={() => setRetryNonce((n) => n + 1)}      breadcrumbs={
         admin ? (
           <>
