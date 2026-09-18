@@ -53,6 +53,9 @@ export function sha256Hex(body: Uint8Array): string {
 }
 
 function toStorageError(err: unknown, key?: string): Error {
+  // Preserve typed errors (config state, missing objects) for callers that
+  // map them to status codes — never wrap them into generic messages.
+  if (err instanceof StorageNotConfiguredError || err instanceof StorageMissingError) return err;
   const name = (err as { name?: string })?.name ?? "";
   const message = err instanceof Error ? err.message : String(err);
   if (name === "NotFound" || name === "NoSuchKey" || name === "NoSuchBucket") {

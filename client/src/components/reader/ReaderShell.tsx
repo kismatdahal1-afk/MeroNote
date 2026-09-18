@@ -1,4 +1,5 @@
 import { useParams, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { getResourceById, getSemesterById, getSubjectById } from "../../data/selectors";
@@ -14,6 +15,7 @@ import {
 } from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
+import { fetchResourceFileUrl, FileApiError } from "../../lib/resourceFileApi";
 import { BackButton } from "../common/BackButton";
 import { useCmsSync } from "../common/CmsSync";
 import { PdfViewer } from "./PdfViewer";
@@ -54,6 +56,37 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const { getProgress, setReadingProgress, addBookmark, getBookmark, getDownload, startDownload, markOpened } = useLibrary();
   const baseRoute = admin ? "/admin/resources" : "/resources";
   const detailState = admin && via ? { via } : undefined;
+
+  // Phase 6 secure file access: short-lived presigned URL per resource.
+  // The binary is streamed by PDF.js — never stored in app state.
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [urlLoading, setUrlLoading] = useState(true);
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const openResourceId = resource?.id;
+
+  useEffect(() => {
+    if (!openResourceId) return;
+    let cancelled = false;
+    setFileUrl(null);
+    setUrlError(null);
+    setUrlLoading(true);
+    fetchResourceFileUrl(openResourceId).then(
+      ({ url }) => {
+        if (cancelled) return;
+        setFileUrl(url);
+        setUrlLoading(false);
+      },
+      (err: unknown) => {
+        if (cancelled) return;
+        setUrlError(err instanceof FileApiError ? err.message : "Couldn't open this file.");
+        setUrlLoading(false);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [openResourceId, retryNonce]);
 
   if (!resource) {
     return (
@@ -117,11 +150,16 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
 
   return (
     <PdfViewer
+      // Fresh viewer state (page, zoom, PDF.js doc) per document.
+      key={resource.id}
       resource={resource}
       subtitle={subject ? `${subject.name} · ${resource.pageCount} pages` : `${resource.pageCount} pages`}
       initialPage={progress?.lastPage}
       onPageChange={handlePageChange}
-      breadcrumbs={
+      fileUrl={fileUrl}
+      urlLoading={urlLoading}
+      urlError={urlError}
+      onRetryFile={() => setRetryNonce((n) => n + 1)}      breadcrumbs={
         admin ? (
           <>
             <Link to="/admin" className="rounded px-1 py-0.5 hover:text-primary">Admin</Link>

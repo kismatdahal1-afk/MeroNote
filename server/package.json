@@ -12,6 +12,7 @@
     "seed:dev": "tsx scripts/seed-dev.ts",
     "verify:parity": "tsx scripts/verify-parity.ts",
     "verify:content": "tsx scripts/verify-content.ts",
+    "verify:resource-file": "tsx scripts/verify-resource-file.ts",
     "verify:db": "tsx scripts/verify-db.ts",
     "verify:auth": "tsx scripts/verify-auth.ts",
     "verify:b2": "tsx scripts/verify-b2.ts",

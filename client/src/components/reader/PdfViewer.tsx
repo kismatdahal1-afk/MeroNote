@@ -1,11 +1,12 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
-  Bookmark, ChevronLeft, ChevronRight, Download,
+  Bookmark, ChevronLeft, ChevronRight, Download, FileWarning, Loader2,
   Maximize2, Minus, Plus, RectangleHorizontal, RectangleVertical, Search,
 } from "lucide-react";
 import { IconButton } from "../common/IconButton";
 import { useToast } from "../../state/ToastProvider";
 import { clamp, cx } from "../../lib/utils";
+import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
 
 const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
 const A4_RATIO = 297 / 210;
@@ -23,6 +24,14 @@ interface PdfViewerProps {
   variant?: "page" | "embedded";
   breadcrumbs?: ReactNode;
   className?: string;
+  /** Secure short-lived PDF URL (Phase 6). Absent = URL still resolving. */
+  fileUrl?: string | null;
+  /** True while the file URL is being requested from the API. */
+  urlLoading?: boolean;
+  /** Friendly file-access error (unavailable, no file, offline…). */
+  urlError?: string | null;
+  /** Retry the file-URL request after an error. */
+  onRetryFile?: () => void;
 }
 
 export function PdfViewer({
@@ -38,9 +47,16 @@ export function PdfViewer({
   variant = "page",
   breadcrumbs,
   className,
+  fileUrl = null,
+  urlLoading = false,
+  urlError = null,
+  onRetryFile,
 }: PdfViewerProps) {
   const { toast } = useToast();
-  const totalPages = Math.max(1, resource.pageCount);
+  // PDF.js page count is authoritative while reading; metadata is the fallback.
+  const [docPages, setDocPages] = useState<number | null>(null);
+  const [docError, setDocError] = useState<string | null>(null);
+  const totalPages = Math.max(1, docPages ?? resource.pageCount);
 
   const [page, setPage] = useState(() => clamp(initialPage, 1, totalPages));
   const [zoom, setZoom] = useState(100);
@@ -48,6 +64,20 @@ export function PdfViewer({
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<'portrait' | 'landscape'>('portrait');
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Keep the page in range once the real document reports its length.
+  useEffect(() => {
+    if (docPages !== null) setPage((p) => clamp(p, 1, docPages));
+  }, [docPages]);
+
+  const handlePdfState = (s: PdfLoadState) => {
+    if (s.status === "ready") {
+      setDocPages(s.totalPages);
+      setDocError(null);
+    } else if (s.status === "error") {
+      setDocError(s.message);
+    }
+  };
 
   const goToPage = (next: number) => {
     const p = clamp(next, 1, totalPages);
@@ -295,13 +325,43 @@ export function PdfViewer({
         <div className="flex justify-center bg-background px-4 py-6 lg:py-10">
           <div
             aria-label="PDF document area"
-            style={{
-              width: `${pageWidth}%`,
-              maxWidth: pageMaxWidth,
-              aspectRatio: pageAspectRatio,
-            }}
+            style={
+              fileUrl && !urlError && !docError
+                ? { width: `${pageWidth}%`, maxWidth: pageMaxWidth }
+                : {
+                    width: `${pageWidth}%`,
+                    maxWidth: pageMaxWidth,
+                    aspectRatio: pageAspectRatio,
+                  }
+            }
             className="card-glow rounded-xl border border-border bg-surface shadow-card transition-[width,aspect-ratio]"
-          />
+          >
+            {urlError || docError ? (
+              <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
+                <FileWarning className="size-8 text-muted-foreground" aria-hidden="true" />
+                <p className="text-sm font-bold text-foreground">Couldn't open this PDF</p>
+                <p className="max-w-sm text-xs font-medium text-muted-foreground">{urlError ?? docError}</p>
+                {onRetryFile && (
+                  <button
+                    type="button"
+                    onClick={onRetryFile}
+                    className="mt-1 rounded-lg bg-primary-muted px-3.5 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    Try again
+                  </button>
+                )}
+              </div>
+            ) : urlLoading || !fileUrl ? (
+              <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8" role="status" aria-label="Loading PDF">
+                <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
+                <p className="text-xs font-semibold text-muted-foreground">
+                  {urlLoading ? "Requesting secure access…" : "Loading PDF…"}
+                </p>
+              </div>
+            ) : (
+              <PdfCanvas url={fileUrl} page={page} scale={zoom / 100} onStateChange={handlePdfState} />
+            )}
+          </div>
         </div>
       </main>
     </div>
