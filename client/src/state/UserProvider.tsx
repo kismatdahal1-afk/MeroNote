@@ -1,31 +1,34 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
-import { mockUser } from "../data/mock";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { fetchMe, loginRequest, logoutRequest, registerRequest, type AuthUser } from "../lib/authApi";
 
 /**
- * Editable display-name state for the mock account.
- * The name is user-editable (Settings → Edit Profile) and persisted to
- * localStorage; email/role stay fixed until real auth arrives (Phase 4).
+ * Session-backed account state (Phase 3).
+ * Identity (email/role) always comes from the server session — never from
+ * local storage. The display name keeps its local Settings override on top
+ * of the server name (server-side rename is a later phase).
  */
 
 const STORAGE_KEY = "meronote-user-name";
 
+type AuthStatus = "loading" | "authed" | "guest";
+
 interface UserContextValue {
-  /** Current display name (editable). */
+  /** Authenticated user from GET /api/auth/me (null when guest). */
+  user: AuthUser | null;
+  /** Session resolution state. */
+  status: AuthStatus;
+  /** Display name (server name + local Settings override). */
   name: string;
-  /** Fixed mock email. */
+  /** Server email ("" when guest). */
   email: string;
-  /** Fixed mock role. */
+  /** Server role — drives portal access ("USER" when guest). */
   role: "USER" | "ADMIN";
-  /** Update the display name; persisted to localStorage. */
+  /** Local display-name override (Settings → Edit Profile). */
   setName: (name: string) => void;
+  login: (email: string, password: string, remember: boolean) => Promise<AuthUser>;
+  register: (email: string, password: string, confirmPassword: string) => Promise<AuthUser>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const UserContext = createContext<UserContextValue | null>(null);
@@ -40,25 +43,84 @@ function readStoredName(): string | null {
   }
 }
 
+function writeStoredName(name: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (name) window.localStorage.setItem(STORAGE_KEY, name);
+    else window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage unavailable — keep UI-only state.
+  }
+}
+
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [name, setNameState] = useState<string>(() => readStoredName() ?? mockUser.name);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [status, setStatus] = useState<AuthStatus>("loading");
+  const [nameOverride, setNameOverride] = useState<string | null>(() => readStoredName());
+
+  const refresh = useCallback(async () => {
+    try {
+      const me = await fetchMe();
+      setUser(me);
+      setStatus("authed");
+    } catch {
+      setUser(null);
+      setStatus("guest");
+    }
+  }, []);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, name);
-    } catch {
-      // Storage unavailable — keep UI-only state.
-    }
-  }, [name]);
+    void refresh();
+  }, [refresh]);
 
   const setName = useCallback((next: string) => {
     const trimmed = next.trim();
-    if (trimmed) setNameState(trimmed);
+    if (!trimmed) return;
+    setNameOverride(trimmed);
+    writeStoredName(trimmed);
   }, []);
 
-  const value = useMemo(
-    () => ({ name, email: mockUser.email, role: mockUser.role, setName }),
-    [name, setName],
+  const login = useCallback(async (email: string, password: string, remember: boolean) => {
+    const authed = await loginRequest(email, password, remember);
+    writeStoredName(null);
+    setNameOverride(null);
+    setUser(authed);
+    setStatus("authed");
+    return authed;
+  }, []);
+
+  const register = useCallback(async (email: string, password: string, confirmPassword: string) => {
+    const authed = await registerRequest(email, password, confirmPassword);
+    writeStoredName(null);
+    setNameOverride(null);
+    setUser(authed);
+    setStatus("authed");
+    return authed;
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } finally {
+      setUser(null);
+      setStatus("guest");
+    }
+  }, []);
+
+  const value = useMemo<UserContextValue>(
+    () => ({
+      user,
+      status,
+      name: nameOverride ?? user?.name ?? "Student",
+      email: user?.email ?? "",
+      role: user?.role ?? "USER",
+      setName,
+      login,
+      register,
+      logout,
+      refresh,
+    }),
+    [user, status, nameOverride, setName, login, register, logout, refresh],
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

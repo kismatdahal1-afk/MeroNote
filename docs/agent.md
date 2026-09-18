@@ -1,1098 +1,1381 @@
-﻿# MERO NOTE — AI AGENT MASTER RULES & PHASE PLAN
+﻿# MERO NOTE — BACKEND DEVELOPMENT AGENT RULES
 
-## 0. Purpose
+Version: 2.0
+Status: Active
+Scope: Backend-first development
+Frontend status: COMPLETE FOR NOW
 
-Mero Note is a personal-first CSIT study library for desktop and Android. It must support large study resources such as books, short notes, extra notes, questions, past papers, practical/lab materials, and revision notes.
+---
 
-The application must be:
+# 1. PROJECT PURPOSE
 
-- Clean, premium, modern, student-friendly, and content-first.
-- Responsive on laptop and Android.
-- Data-driven, not hardcoded.
-- Designed for incremental development.
-- Safe for large PDF libraries.
-- Usable online and offline with a clear distinction between temporary cache and permanent downloads.
+Mero Note is a personal-first CSIT study library for desktop and Android/mobile use.
 
-## 1. NON-NEGOTIABLE AGENT RULES
+The application manages:
 
-### 1.1 Development Workflow
+- Semesters
+- Subjects
+- Topics
+- Study Resources
+- Books
+- Notices
+- PDF files
+- User accounts
+- Favorites
+- Bookmarks
+- Reading progress
+- Downloads
+- Recent views
+- Semester preferences
+- Admin content management
 
-ALWAYS work in small, controlled tasks.
+The frontend UI is already substantially complete.
 
-Workflow:
+The current priority is to build the real backend and replace the current mock/local data architecture with a production-ready backend architecture.
 
-1. Read this file before starting a task.
-2. Inspect the existing project before changing anything.
-3. Identify the current phase and task.
-4. Make the smallest required change.
-5. Do NOT rebuild unrelated parts.
-6. Run relevant checks/tests.
-7. Fix errors caused by the change.
-8. Report exactly what changed.
-9. Do not move to the next phase unless explicitly instructed.
+---
 
-NEVER:
+# 2. CURRENT TECHNOLOGY DECISIONS
 
-- Build the entire application in one operation.
-- Rewrite working code without a reason.
-- Replace the chosen stack without approval.
-- Add unnecessary dependencies.
-- Delete existing features to simplify implementation.
-- Invent APIs, database fields, storage providers, or credentials.
-- Assume a feature is complete without testing it.
-
-### 1.2 Existing Code Protection
-
-Before modifying a file:
-
-- Read the file.
-- Understand its purpose.
-- Preserve existing working behavior.
-- Reuse existing components/utilities where appropriate.
-
-If a change may affect multiple existing features:
-
-- Explain the impact first.
-- Make the smallest safe change.
-- Do not modify unrelated files.
-
-### 1.3 UI Protection
-
-The Stitch-approved design is the visual source of truth.
-
-Follow:
-
-- Existing spacing system.
-- Existing typography.
-- Existing colors/tokens.
-- Existing components.
-- Existing responsive behavior.
-- Existing animations.
-
-Do not:
-
-- Redesign pages unnecessarily.
-- Introduce random colors.
-- Add excessive gradients/glows.
-- Turn the product into a cyberpunk interface.
-- Create inconsistent cards/buttons/forms.
-- Replace a working layout just because another design seems better.
-
-Style target: **Premium + minimal + modern + calm + slightly futuristic.**
-
-### 1.4 Responsive Rule
-
-Every UI feature must work on:
-
-- Laptop/desktop.
-- Android mobile.
-
-Desktop:
-
-- Sidebar navigation.
-- Spacious content layout.
-
-Mobile:
-
-- Bottom navigation and/or drawer.
-- Touch-friendly controls.
-- Compact cards.
-- Readable typography.
-- No horizontal overflow.
-
-Never consider a UI task complete if mobile behavior is obviously broken.
-
-### 1.5 Data Rule
-
-Never hardcode real CSIT content into components.
-
-Use:
-
-- API data.
-- Database data.
-- Temporary mock data only during UI development.
-
-The architecture must allow: **Semester → Subject → Resource → File.**
-
-Resource types must remain extensible:
-
-- Book
-- Short Note
-- Extra Note
-- Questions
-- Past Paper
-- Important Questions
-- Practical/Lab
-- Revision Note
-- Other
-
-### 1.6 PDF Rule
-
-Large PDFs must NOT be stored directly inside normal MongoDB documents.
-
-- MongoDB Atlas stores metadata.
-- PDF binaries use separate file/object storage.
-
-MongoDB resource metadata should contain information such as:
-
-- title
-- description
-- semester
-- subject
-- resource type
-- file reference
-- file size
-- page count
-- tags
-- upload date
-- updated date
-
-Use PDF.js for reading.
-
-### 1.7 Online / Cache / Download Rule
-
-There are THREE different concepts:
-
-1. **Online Reading** — The PDF is read from cloud/file storage through the application.
-2. **Temporary Cache** — Recently accessed data/pages/assets may be cached locally for faster access.
-
-   Temporary cache:
-   - Is not guaranteed permanent.
-   - Can be cleared.
-   - Must never be treated as a permanent download.
-
-3. **Permanent Download** — When the user explicitly presses Download:
-   - Save the PDF locally.
-   - Mark it as Downloaded.
-   - Make it available offline.
-   - Show it in Downloads.
-
-**Clear Cache MUST NOT delete explicit downloads.**
-
-### 1.8 Offline Rule
-
-Offline support must use suitable browser/PWA storage mechanisms such as:
-
-- Service Worker
-- Cache API
-- IndexedDB
-- Local file/download handling where appropriate
-
-Cache only what is practical.
-
-Do not claim that normal browser cache is permanent offline storage.
-
-Offline UI must clearly distinguish:
-
-- Available online
-- Cached
-- Downloaded
-- Offline available
-
-### 1.9 Database Rule
-
-Recommended collections:
-
-- users
-- semesters
-- subjects
-- resources
-- readingProgress
-- bookmarks
-- favorites
-
-Keep relationships clean and scalable.
-
-- Do not create unnecessary duplicate data.
-- Use validation for important fields.
-- Use indexes for frequently searched/filtered fields when needed.
-
-### 1.10 Security Rule
-
-Authentication/authorization must be enforced server-side.
-
-Roles:
-
-- USER
-- ADMIN
-
-USER can:
-
-- Read
-- Search
-- Download
-- Favorite
-- Bookmark
-- Track reading progress
-- Manage personal study data
-
-ADMIN can additionally:
-
-- Upload resources
-- Edit resources
-- Delete resources
-- Manage semesters
-- Manage subjects
-- Manage resource metadata
-
-- Never trust frontend-only role checks.
-- Never expose secrets in frontend code.
-
-Never commit:
-
-- API keys
-- Database credentials
-- JWT secrets
-- Storage credentials
-- .env files containing secrets
-
-Use environment variables.
-
-### 1.11 Error Handling Rule
-
-Every network/storage operation should have:
-
-- Loading state.
-- Success state.
-- Error state.
-- Empty state where relevant.
-
-Errors must be understandable to normal users.
-
-- Do not silently swallow errors.
-- Do not expose sensitive backend details to users.
-
-### 1.12 Testing Rule
-
-After meaningful changes, run appropriate checks.
-
-Frontend where applicable:
-
-- lint
-- typecheck
-- build
-- tests
-
-Backend where applicable:
-
-- TypeScript/build
-- API tests
-- validation tests
-- auth tests
-
-For PDF/download/offline features, manually test the actual user flow.
-
-Never report a feature as verified if it was not actually checked.
-
-### 1.13 Dependency Rule
-
-Before adding a package:
-
-- Check whether the project already has an equivalent utility.
-- Prefer established, lightweight dependencies.
-- Avoid unnecessary packages.
-- Do not introduce a new framework for a small feature.
-- Do not change React/Vite/TypeScript/Express/MongoDB architecture without explicit approval.
-
-### 1.14 Git Rule
-
-Do not automatically push to GitHub unless explicitly instructed.
-
-Preferred workflow:
-
-1. Implement.
-2. Test.
-3. Explain.
-4. Let the user review.
-5. User decides when to commit/push.
-
-Suggested branch names:
-
-- feature/foundation
-- feature/dashboard
-- feature/pdf-reader
-- feature/auth
-- feature/admin
-- feature/offline
-- feature/downloads
-
-### 1.15 Documentation Rule
-
-When architecture or behavior changes significantly:
-
-- Update the relevant documentation.
-- Keep documentation concise.
-- Do not create duplicate documentation.
-
-Important docs:
-
-- project-rules.md
-- project-roadmap.md
-- system-architecture.md
-- ui-specification.md
-- database-schema.md
-- api-specification.md
-- offline-storage-plan.md
-
-## 2. TECH STACK — LOCKED DEFAULT
-
-Frontend:
+## Frontend
 
 - React
 - Vite
 - TypeScript
 - Tailwind CSS
+- Existing responsive desktop/mobile UI
 
-Backend:
+Frontend is considered COMPLETE FOR NOW.
+
+Do NOT redesign or rebuild the frontend during backend phases.
+
+Only modify frontend code when a later API integration task genuinely requires it.
+
+---
+
+## Backend
 
 - Node.js
 - Express
 - TypeScript
 
-Database:
+Current backend is minimal and currently contains only:
 
-- MongoDB Atlas
+- Express application
+- Server entry
+- Environment configuration
+- Health controller
+- Health route
+- Error middleware
 
-PDF:
+---
 
-- PDF.js
+## Database
 
-PWA/offline:
+MongoDB Atlas is the official application database.
+
+MongoDB stores:
+
+- User metadata
+- Academic metadata
+- Resource metadata
+- CMS metadata
+- Personal study metadata
+- Relationships
+- Progress/state metadata
+- Other structured application data
+
+MongoDB MUST NOT be used to store large PDF binaries.
+
+---
+
+## Object Storage
+
+Backblaze B2 is the official object storage provider.
+
+Backblaze B2 stores:
+
+- PDF binaries
+- Other approved resource files if supported later
+
+MongoDB stores metadata/reference information for those files.
+
+Actual file bytes belong in Backblaze B2.
+
+---
+
+# 3. SOURCE OF TRUTH
+
+Before making backend decisions, inspect the existing codebase.
+
+The following are important sources:
+
+- `client/src/types/index.ts`
+- `client/src/data/mock.ts`
+- `client/src/state/`
+- `client/src/lib/`
+- `client/src/pages/`
+- `client/src/components/`
+- `client/src/router.tsx`
+- `server/src/`
+- `docs/agent.md` only as historical reference if replaced
+
+The existing frontend audit established that most domain metadata currently exists in the frontend rather than the backend.
+
+Do NOT assume that a field exists simply because it was mentioned in an old roadmap.
+
+Distinguish:
+
+1. Already implemented
+2. Expected by current frontend
+3. Planned but not implemented
+4. Newly required for backend functionality
+
+Never silently invent application requirements.
+
+---
+
+# 4. CURRENT IMPLEMENTATION STATUS
+
+## Frontend
+
+Currently implemented:
+
+- Main UI
+- Desktop UI
+- Mobile UI
+- Student navigation
+- Admin navigation
+- Semester UI
+- Subject UI
+- Resource UI
+- Reader UI
+- Favorites UI
+- Bookmarks UI
+- Downloads UI
+- Notices UI
+- Settings UI
+- Admin CMS UI
+- Local/mock state
+- LocalStorage persistence for selected features
+
+The frontend currently uses mock/local data.
+
+---
+
+## Backend
+
+Currently implemented:
+
+- Express
+- TypeScript
+- `/api/health`
+
+Currently NOT implemented:
+
+- MongoDB connection
+- Models
+- Schemas
+- Validation layer
+- Authentication
+- Authorization
+- User API
+- Semester API
+- Subject API
+- Topic API
+- Resource API
+- Book API
+- Notice API
+- Activity API
+- Favorites API
+- Bookmark API
+- Reading-progress API
+- Download API
+- Recent-view API
+- Backblaze B2 integration
+- Real PDF upload
+- Real PDF retrieval
+- Real PDF reader integration
+- Search API
+- Production deployment
+
+---
+
+# 5. IMPORTANT CURRENT DATA MODEL
+
+The frontend audit identified these major entities:
+
+## Core academic entities
+
+- Semester
+- Subject
+- Topic
+- Resource
+- Book
+- Notice
+- ActivityEntry
+
+## User/personal entities
+
+- User
+- Favorite
+- FavoriteSubject
+- Bookmark
+- BookmarkedSubject
+- ReadingProgress
+- Download
+- RecentView
+- SemesterUserStatus / semester preferences
+
+## Global configuration
+
+- ProgramInfo
+- Admin application settings
+
+Preserve currently implemented domain concepts unless a schema-design phase explicitly approves a change.
+
+---
+
+# 6. CORE RELATIONSHIPS
+
+The current conceptual hierarchy is:
+
+Semester
+↓
+Subject
+↓
+Topic
+↓
+Resource
+
+Resource may optionally reference:
+
+- Book
+
+User-owned data relates to:
+
+User
+├── Favorites
+├── Bookmarks
+├── Reading Progress
+├── Downloads
+├── Recent Views
+└── Semester Preferences
+
+Do not introduce unrelated relationships without a documented reason.
+
+---
+
+# 7. FRONTEND PROTECTION RULE
+
+The existing frontend is NOT the current development target.
+
+During backend development:
+
+DO NOT:
+
+- redesign UI
+- change layouts
+- change colors
+- change typography
+- change navigation
+- change responsive behavior
+- replace components unnecessarily
+- modify desktop navigation
+- modify mobile navigation
+- rewrite existing visual components
+- remove existing mock functionality unless explicitly required
+- refactor frontend merely for code style
+
+Frontend changes are allowed ONLY when:
+
+1. The current phase explicitly requires frontend/API integration, OR
+2. A backend contract cannot be consumed without a small frontend change, AND
+3. The change is minimal and directly related to the phase.
+
+---
+
+# 8. GENERAL DEVELOPMENT RULES
+
+These rules apply to EVERY phase.
+
+## Rule 1 — Inspect first
+
+Before modifying anything:
+
+- inspect the existing implementation
+- identify affected files
+- understand existing types and relationships
+- check existing conventions
+- check dependencies
+
+Never modify blindly.
+
+---
+
+## Rule 2 — Small controlled changes
+
+Implement only the current phase.
+
+Do not jump ahead.
+
+Do not implement future phases "while you are here."
+
+---
+
+## Rule 3 — No invented APIs
+
+Do not invent:
+
+- undocumented endpoints
+- fields
+- credentials
+- environment variables
+- external services
+- database relationships
+
+If a requirement is unclear, stop and report it.
+
+---
+
+## Rule 4 — Preserve existing behavior
+
+Do not break existing functionality unnecessarily.
+
+If a change may affect existing functionality:
+
+- identify it
+- explain it
+- test it
+
+---
+
+## Rule 5 — Secrets
+
+NEVER hardcode:
+
+- MongoDB credentials
+- Backblaze credentials
+- JWT secrets
+- API keys
+- passwords
+- tokens
+
+Use environment variables.
+
+NEVER commit `.env`.
+
+---
+
+## Rule 6 — Validation
+
+Backend input must be validated.
+
+Never trust:
+
+- request body
+- query parameters
+- URL parameters
+- uploaded files
+- user roles
+- client-side permissions
+
+---
+
+## Rule 7 — Authorization
+
+Frontend role checks are NOT security.
+
+All protected operations must be checked server-side.
+
+USER and ADMIN permissions must be enforced by backend middleware/services.
+
+---
+
+## Rule 8 — Error handling
+
+Use consistent backend error handling.
+
+Do not expose:
+
+- secrets
+- database credentials
+- internal sensitive information
+- production stack traces
+
+Development-only diagnostics may be allowed where appropriate.
+
+---
+
+## Rule 9 — Database safety
+
+Do not:
+
+- delete collections accidentally
+- drop the database
+- overwrite production data
+- run destructive migrations without explicit approval
+
+Use safe migrations/seeding where required.
+
+---
+
+## Rule 10 — File safety
+
+PDF uploads must be validated.
+
+Do not trust only the file extension.
+
+Do not store large PDFs inside MongoDB documents.
+
+---
+
+## Rule 11 — Dependencies
+
+Do not install packages unnecessarily.
+
+Before adding a dependency:
+
+- verify it is required
+- check whether existing dependencies can solve the problem
+- add only what is necessary
+
+---
+
+## Rule 12 — No unrelated refactoring
+
+Do not clean up unrelated code during a phase.
+
+Avoid broad rewrites.
+
+---
+
+# 9. PHASE ROADMAP
+
+The backend development must follow this order unless the project owner explicitly changes it.
+
+---
+
+# PHASE 0 — BACKEND ARCHITECTURE & SCHEMA DESIGN
+
+## Goal
+
+Create the approved backend architecture before implementing database models.
+
+## Tasks
+
+Design:
+
+- MongoDB collections
+- Field definitions
+- Data types
+- Required/optional fields
+- Relationships
+- References
+- User ownership
+- Validation rules
+- Indexes
+- Soft-delete strategy
+- Status strategy
+- Favorite/bookmark strategy
+- Resource/Book relationship
+- Backblaze B2 metadata strategy
+- Authentication data requirements
+
+Clearly separate:
+
+MongoDB
+vs
+Backblaze B2
+vs
+Client/device storage.
+
+## Important decisions to resolve
+
+### User identity
+
+Current personal records do not contain `userId`.
+
+Backend must establish proper user ownership.
+
+### Semester status
+
+Current frontend contains multiple status concepts:
+
+- enrollment
+- SemesterUserStatus
+- CMS PublishStatus
+
+Do not blindly merge them.
+
+Define their exact meanings.
+
+### Favorites/bookmarks
+
+Current frontend contains:
+
+- resource favorites
+- subject favorites
+- resource bookmarks
+- subject bookmarks
+
+Define a clean backend representation.
+
+### Resource file metadata
+
+Current frontend lacks storage fields.
+
+Define required backend file metadata such as:
+
+- storage key
+- object reference
+- MIME type
+- checksum/ETag where appropriate
+- file size
+- page count
+
+Do not implement these fields until the architecture is approved.
+
+## Phase completion
+
+Phase 0 is complete when:
+
+- collection design exists
+- fields are documented
+- relationships are documented
+- indexes are documented
+- validation rules are documented
+- B2 strategy is documented
+- unresolved decisions are resolved
+- architecture is reviewed/approved
+
+DO NOT create final MongoDB models before Phase 0 approval.
+
+---
+
+# PHASE 1 — BACKEND FOUNDATION
+
+## Goal
+
+Create a clean production-ready backend structure.
+
+## Tasks
+
+Establish appropriate structure for:
+
+- config
+- models
+- schemas/validation
+- controllers
+- services
+- routes
+- middleware
+- utilities
+- database connection
+
+Implement:
+
+- MongoDB Atlas connection
+- environment configuration
+- centralized error handling
+- API response conventions
+- basic request handling
+- health check preservation
+
+## Do NOT
+
+- build all APIs
+- build authentication
+- build B2 upload
+- modify frontend unnecessarily
+
+## Completion
+
+Backend starts successfully and connects safely to MongoDB.
+
+---
+
+# PHASE 2 — MONGODB DATA LAYER
+
+## Goal
+
+Implement the approved database architecture.
+
+## Tasks
+
+Create approved models/collections for:
+
+- Users
+- Semesters
+- Subjects
+- Topics
+- Resources
+- Books
+- Notices
+- Activity Logs
+- Favorites
+- Bookmarks
+- Reading Progress
+- Downloads
+- Recent Views
+- User Semester Preferences
+
+Only create collections approved during Phase 0.
+
+Implement:
+
+- schema validation
+- indexes
+- references
+- timestamps
+- soft deletion where required
+
+## Completion
+
+Database models are working and validated.
+
+No application-wide API implementation is required yet unless needed for testing.
+
+---
+
+# PHASE 3 — AUTHENTICATION & AUTHORIZATION
+
+## Goal
+
+Replace mock authentication with real backend authentication.
+
+## Tasks
+
+Implement:
+
+- registration strategy if required
+- login
+- password hashing
+- authentication
+- token/session mechanism
+- protected routes
+- current-user endpoint
+- logout/session invalidation where applicable
+- USER role
+- ADMIN role
+- authorization middleware
+
+## Security
+
+Never trust:
+
+- frontend role
+- frontend user ID
+- client-provided ownership
+
+The backend must determine authenticated identity.
+
+## Completion
+
+A user can authenticate and protected endpoints correctly enforce permissions.
+
+---
+
+# PHASE 4 — ACADEMIC CONTENT API
+
+## Goal
+
+Create real APIs for the academic hierarchy.
+
+Implement APIs for:
+
+- Semesters
+- Subjects
+- Topics
+- Resources
+- Books
+- Notices
+- Activity data where approved
+
+Support:
+
+- list
+- detail
+- relationships
+- filtering
+- sorting
+- admin CRUD where applicable
+
+Maintain the existing academic hierarchy.
+
+## Completion
+
+The backend can provide the real academic library data required by the existing UI.
+
+---
+
+# PHASE 5 — BACKBLAZE B2 STORAGE
+
+## Goal
+
+Implement real PDF storage.
+
+Flow:
+
+Admin
+↓
+Backend upload
+↓
+Backblaze B2
+↓
+File metadata
+↓
+MongoDB
+
+MongoDB stores metadata/reference.
+
+Backblaze stores actual PDF bytes.
+
+## Tasks
+
+Implement:
+
+- B2 configuration
+- upload service
+- file validation
+- PDF validation
+- object naming/key strategy
+- metadata persistence
+- failure handling
+- cleanup handling where required
+
+## Security
+
+B2 credentials remain server-side.
+
+Never expose secret credentials to frontend code.
+
+## Completion
+
+An approved admin workflow can upload a valid PDF and store its metadata/reference correctly.
+
+---
+
+# PHASE 6 — REAL PDF READER
+
+## Goal
+
+Replace the current placeholder reader with real PDF rendering.
+
+Flow:
+
+Resource
+↓
+Secure file access
+↓
+Backblaze B2
+↓
+PDF.js
+↓
+Reader
+
+Implement:
+
+- PDF retrieval/access
+- PDF.js rendering
+- page navigation
+- zoom
+- fullscreen
+- initial page
+- loading state
+- error state
+- page count
+- reader state
+
+Keep the existing reader UI unless integration genuinely requires small changes.
+
+## Completion
+
+A real uploaded PDF can be opened and read through the existing reader experience.
+
+---
+
+# PHASE 7 — PERSONAL STUDY DATA
+
+## Goal
+
+Move personal study state from local/mock-only storage to backend persistence.
+
+Implement:
+
+- Favorites
+- Subject Favorites
+- Bookmarks
+- Subject Bookmarks
+- Reading Progress
+- Recent Views
+- Semester Preferences
+
+Every personal record must be correctly scoped to the authenticated user.
+
+## Completion
+
+Different authenticated users have isolated personal data.
+
+---
+
+# PHASE 8 — REAL DOWNLOAD SYSTEM
+
+## Goal
+
+Replace simulated downloads with real downloads.
+
+Implement:
+
+- download initiation
+- download state
+- progress where technically appropriate
+- completed state
+- failed state
+- remove download
+- download metadata
+- user ownership
+
+Clearly distinguish:
+
+Server/resource availability
+from
+device-local downloaded files.
+
+## Completion
+
+A user can download an approved PDF and the application correctly tracks its download state.
+
+---
+
+# PHASE 9 — CACHE & OFFLINE SYSTEM
+
+## Goal
+
+Support useful offline behavior.
+
+Use appropriate browser/PWA technologies such as:
 
 - Service Worker
 - Cache API
 - IndexedDB
 
-Authentication:
+Maintain the distinction:
 
-- JWT
-- Secure/HTTP-only cookies where appropriate
+Temporary cache
+≠
+Permanent user download
 
-File storage:
+Implement offline behavior only where clearly defined.
 
-- Separate object/file storage for large PDFs
+## Completion
 
-Deployment target:
+Approved cached/downloaded resources behave correctly when connectivity is unavailable.
 
-- Frontend: suitable static hosting
-- Backend: suitable Node.js hosting
-- Database: MongoDB Atlas
-- PDF files: object/file storage
+---
 
-Android:
+# PHASE 10 — SEARCH & DISCOVERY
 
-- PWA installed through Chrome/Add to Home Screen.
-- No Play Store/App Store requirement for V1.
-- Same React codebase should serve desktop and Android.
+## Goal
 
-## 3. ARCHITECTURE
+Create backend-powered search.
 
-```
-Mero Note
-├── client/
-│   ├── React + Vite + TypeScript
-│   ├── UI
-│   ├── PDF Reader
-│   ├── PWA
-│   └── local cache/download handling
-│
-├── server/
-│   ├── Express + TypeScript
-│   ├── API routes
-│   ├── authentication
-│   ├── authorization
-│   ├── business logic
-│   └── file/storage integration
-│
-├── docs/
-│   ├── project-rules.md
-│   ├── project-roadmap.md
-│   ├── system-architecture.md
-│   ├── ui-specification.md
-│   ├── database-schema.md
-│   ├── api-specification.md
-│   └── offline-storage-plan.md
-│
-└── README.md
-```
+Search relevant metadata such as:
 
-Core flow:
+- Resource title
+- Subject
+- Semester
+- Resource type
+- Tags
 
-```
-User
-→ React/PWA
-→ Express API
-→ MongoDB Atlas for metadata
-→ Object/File Storage for PDFs
-```
+Implement where required:
 
-PDF reading:
+- filtering
+- sorting
+- pagination
+- indexes
+- search optimization
 
-```
-Cloud PDF → PDF.js → Reader
-```
+Do not change the visual search UI unless API integration requires it.
 
-Explicit offline download:
+## Completion
 
-```
-Cloud PDF → local storage/download → Downloaded
-```
+Search returns correct backend results with appropriate filtering/sorting.
 
-Temporary cache:
+---
 
-```
-Cloud data → browser/PWA cache → temporary cached content
-```
+# PHASE 11 — ADMIN CMS BACKEND
 
-## 4. DEVELOPMENT PHASE PLAN
+## Goal
 
-### PHASE 1 — FOUNDATION
+Move the frontend local CMS functionality to the real backend.
 
-Goal: Create a clean full-stack project foundation.
+Admin management must cover approved entities:
 
-Tasks:
+- Semesters
+- Subjects
+- Topics
+- Resources
+- Books
+- Notices
+- Activity Logs
 
-- Initialize Git repository.
-- Create client.
-- Create server.
-- Configure React/Vite/TypeScript.
-- Configure Tailwind.
-- Configure Express/TypeScript.
-- Add environment configuration.
-- Add basic API structure.
-- Add /api/health.
-- Configure basic error handling.
-- Configure CORS appropriately.
-- Create initial documentation.
-- Verify frontend and backend run independently.
+Support approved operations:
 
-Exit criteria:
+- create
+- edit
+- publish
+- hide
+- soft delete
+- restore where applicable
+- PDF upload
+- metadata management
 
-- Frontend starts.
-- Backend starts.
-- Health endpoint works.
-- No TypeScript/build errors.
-- Repository structure is clean.
+All admin operations require server-side authorization.
 
-### PHASE 2 — UI FOUNDATION + STITCH IMPLEMENTATION
+## Completion
 
-Goal: Implement the approved UI with mock data.
+Admin can manage real database content instead of only localStorage/mock data.
 
-Screens:
+---
 
-- Welcome/Landing
-- Login
-- Dashboard
-- Semester Library
-- Subject List
-- Subject Detail
-- Resource List
-- Resource Detail
-- PDF Reader shell
-- Search
-- Favorites
-- Bookmarks
-- Downloads
-- Recent
-- Settings
-- Admin Dashboard
-- Admin Upload
-- Admin Resource Management
+# PHASE 12 — FRONTEND ↔ BACKEND INTEGRATION
 
-Implement:
+## Goal
 
-- Layout.
-- Sidebar.
-- Mobile navigation.
-- Header.
-- Cards.
-- Buttons.
-- Forms.
-- Search UI.
-- Empty states.
-- Loading states.
-- Error states.
-- Responsive behavior.
-- Light/dark mode if included in design.
+Connect the completed frontend to the real backend.
 
-Use mock data only.
+Replace appropriate mock/local sources with API data.
 
-Exit criteria:
+Integrate:
 
-- Main UI flows are clickable.
-- Desktop works.
-- Android/mobile layout works.
-- No real backend dependency is required yet.
-
-### PHASE 3 — DATABASE + DATA MODEL
-
-Goal: Connect the application to MongoDB Atlas.
-
-Collections:
-
-- users
+- authentication
+- user profile
 - semesters
 - subjects
+- topics
 - resources
-- readingProgress
-- bookmarks
+- books
+- notices
 - favorites
+- bookmarks
+- reading progress
+- recent views
+- downloads
+- PDF reader
+- admin CMS
 
-Implement:
+## Frontend rule
 
-- Schemas/models.
-- Validation.
-- Indexes where useful.
-- Database connection.
-- CRUD/service layer.
-- Seed/sample data if useful.
+This is the main phase where frontend changes are expected.
 
-Relationships:
+However:
 
-- Semester → Subjects
-- Subject → Resources
-- User → personal study data
+- preserve existing UI
+- preserve layout
+- preserve navigation
+- preserve responsive behavior
+- do not redesign components unnecessarily
 
-Exit criteria:
+Only replace the data source and add required loading/error states.
 
-- API can read/write core metadata.
-- Validation works.
-- No real PDF binary storage in normal documents.
+## Completion
 
-### PHASE 4 — AUTHENTICATION + ADMIN
+The application can operate using real backend data.
 
-Goal: Create secure user/admin access.
+---
 
-Implement:
+# PHASE 13 — PWA / ANDROID OPTIMIZATION
 
-- Registration/login as required.
-- Session/auth handling.
-- JWT.
-- Secure cookies where appropriate.
-- Role checks.
-- Protected routes.
-- USER/ADMIN authorization.
-- Admin dashboard.
-- Admin resource management UI.
+## Goal
 
-USER:
+Finalize mobile/PWA behavior.
 
-- Read/search.
-- Download.
-- Favorite.
-- Bookmark.
-- Progress.
+Implement/refine:
 
-ADMIN:
+- installability
+- service worker
+- offline behavior
+- IndexedDB
+- local file handling
+- Android behavior
+- mobile performance
+- app-like experience
 
-- Upload.
-- Edit.
-- Delete.
-- Manage semesters.
-- Manage subjects.
-- Manage resources.
+Do not redesign the existing mobile UI unless required.
 
-Exit criteria:
+## Completion
 
-- Unauthorized users cannot access admin operations.
-- Authorization is enforced by backend.
-- Secrets are not exposed.
+The application behaves reliably as a PWA/mobile application.
 
-### PHASE 5 — REAL PDF STORAGE + UPLOAD
+---
 
-Goal: Make resource files real.
+# PHASE 14 — TESTING & SECURITY HARDENING
 
-Flow:
+## Goal
 
-```
-Admin selects PDF
-→ Backend validates upload
-→ PDF goes to object/file storage
-→ MongoDB stores metadata + file reference
-→ Resource becomes available in library
-```
-
-Implement:
-
-- Upload.
-- File validation.
-- File size handling.
-- MIME validation.
-- Metadata creation.
-- Storage integration.
-- Secure access.
-- Delete/replace handling.
-- Upload progress where useful.
-
-Do not store large PDFs directly in normal MongoDB documents.
-
-Exit criteria:
-
-- Admin can upload a real PDF.
-- User can retrieve it.
-- Metadata is correct.
-- Delete/replace does not leave uncontrolled orphan files.
-
-### PHASE 6 — PDF READER
-
-Goal: Build the real study reader.
-
-Use PDF.js.
-
-Features:
-
-- Open PDF.
-- Page navigation.
-- Page number.
-- Zoom.
-- Search inside PDF where supported.
-- Fullscreen.
-- Responsive reader.
-- Bookmark current page.
-- Download.
-- Last-read page.
-- Continue Reading.
-
-Prioritize usability over visual complexity.
-
-Exit criteria:
-
-- Large PDFs open reliably.
-- Reader works on desktop.
-- Reader works on Android.
-- Navigation does not break existing app layout.
-
-### PHASE 7 — READING PROGRESS
-
-Goal: Remember where the user stopped.
-
-Store:
-
-- user ID
-- resource ID
-- last page
-- progress
-- updated timestamp
-
-Features:
-
-- Continue Reading.
-- Resume at last page.
-- Recent resources.
-- Progress indicator.
-
-Do not save progress excessively on every tiny event if it creates unnecessary network traffic. Use a sensible debounce/throttle strategy.
-
-### PHASE 8 — DOWNLOAD SYSTEM
-
-Goal: Create explicit permanent downloads.
-
-Flow:
-
-```
-User presses Download
-→ file is fetched
-→ local copy is stored
-→ resource marked Downloaded
-→ user can open offline
-```
-
-Implement:
-
-- Download button.
-- Progress.
-- Cancel/retry if practical.
-- Download state.
-- Download list.
-- Open downloaded PDF.
-- Delete local download.
-- Storage size tracking.
-
-Downloaded files must remain separate from temporary cache.
-
-### PHASE 9 — CACHE + OFFLINE SYSTEM
-
-Goal: Provide useful offline behavior without treating all cache as permanent storage.
-
-Implement:
-
-- Service Worker.
-- Cache API.
-- IndexedDB.
-- App shell caching.
-- Metadata caching.
-- Recent-content caching where practical.
-- Offline detection.
-- Offline indicator.
-- Downloaded-resource access.
-- Cache clearing.
-
-Settings should distinguish:
-
-- Downloaded Files
-- Temporary Cache
-- Total Storage
-
-Example:
-
-```
-Downloaded Files: 650 MB
-Temporary Cache: 82 MB
-Total: 732 MB
-```
-
-Clear Cache must not delete downloads.
-
-Exit criteria:
-
-- App can load its shell offline.
-- Explicitly downloaded PDFs can be opened offline.
-- Temporary cache can be cleared independently.
-- UI accurately reports availability.
-
-### PHASE 10 — PWA + ANDROID
-
-Goal: Make Mero Note installable on Android without an app store.
-
-Implement:
-
-- Web App Manifest.
-- Service Worker.
-- App icons.
-- Installable PWA.
-- Responsive mobile UI.
-- Mobile PDF reader.
-- Android storage/download testing.
-
-Development testing:
-
-- Laptop and Android on same Wi-Fi.
-- Expose development server to LAN.
-- Open laptop LAN address from Android.
-
-Production:
-
-- Deploy over HTTPS.
-- Open in Android Chrome.
-- Add to Home Screen/install PWA.
-
-Do not introduce React Native unless the project requirements later demand it.
-
-### PHASE 11 — MOBILE OPTIMIZATION
-
-Test every major feature on Android.
-
-Check:
-
-- Navigation.
-- Touch targets.
-- Scrolling.
-- Search.
-- PDF reader.
-- Zoom.
-- Download.
-- Offline mode.
-- Storage manager.
-- Dark/light mode.
-- Long titles.
-- Large PDFs.
-- Slow network.
-- Small screens.
-
-Fix mobile-specific problems without breaking desktop.
-
-### PHASE 12 — REAL CSIT CONTENT STRUCTURE
-
-Create the real hierarchy:
-
-```
-Semester 1
-→ Subjects
-→ Resources
-
-Semester 2
-→ Subjects
-→ Resources
-
-Continue through Semester 8.
-```
-
-Resource categories:
-
-- Books
-- Short Notes
-- Extra Notes
-- Questions
-- Past Papers
-- Important Questions
-- Practical/Lab
-- Revision Notes
-- Other
-
-Do not hardcode the number of semesters/subjects into UI logic.
-
-Admin should be able to create/manage content dynamically.
-
-### PHASE 13 — PERSONAL STUDY FEATURES
-
-Implement:
-
-- Favorites.
-- Bookmarks.
-- Recent resources.
-- Reading progress.
-- Continue Reading.
-- Personal notes if included in requirements.
-- Resource tags.
-- Download management.
-
-Personal data must belong to the authenticated user.
-
-### PHASE 14 — SEARCH
-
-Start with metadata search:
-
-- Title.
-- Subject.
-- Semester.
-- Resource type.
-- Tags.
-
-Add filters:
-
-- Semester.
-- Subject.
-- Type.
-- Downloaded.
-- Favorites.
-
-Later, if practical: PDF full-text search/indexing.
-
-Do not implement expensive full-text processing before basic search works.
-
-### PHASE 15 — STORAGE MANAGER
-
-Create a clear storage UI.
-
-Show:
-
-- Downloaded Files.
-- Temporary Cache.
-- Total Used.
-- Available storage when the platform permits it.
-
-Actions:
-
-- Clear Cache.
-- Manage Downloads.
-- Delete selected download.
-- Open downloaded resource.
-
-Never allow Clear Cache to delete permanent downloads.
-
-### PHASE 16 — TESTING + HARDENING
+Test the entire system before deployment.
 
 Test:
 
-Frontend:
+- authentication
+- authorization
+- database operations
+- CRUD
+- validation
+- PDF uploads
+- B2 integration
+- PDF retrieval
+- reader
+- favorites
+- bookmarks
+- progress
+- downloads
+- offline behavior
+- search
+- admin permissions
+- mobile behavior
+- error handling
 
-- lint
-- typecheck
-- build
-- component tests where useful
+Security checks:
 
-Backend:
+- unauthorized access
+- ownership bypass
+- invalid input
+- malicious upload attempts
+- secret exposure
+- CORS
+- authentication weaknesses
+- authorization weaknesses
+- database safety
 
-- health.
-- auth.
-- authorization.
-- CRUD.
-- upload.
-- download.
-- validation.
-- errors.
+## Completion
 
-User flows:
+Critical application workflows pass testing and identified security issues are addressed.
 
-- Login.
-- Browse semester.
-- Browse subject.
-- Open resource.
-- Read PDF.
-- Save progress.
-- Bookmark.
-- Favorite.
-- Download.
-- Open offline.
-- Clear cache.
-- Delete download.
+---
 
-Device testing:
+# PHASE 15 — PRODUCTION DEPLOYMENT
 
-- Laptop.
-- Android.
+## Goal
 
-Network testing:
-
-- Good connection.
-- Slow connection.
-- Offline.
-
-Large PDF testing:
-
-- Small PDF.
-- Medium PDF.
-- Very large PDF.
-
-### PHASE 17 — DEPLOYMENT
+Deploy Mero Note safely.
 
 Production architecture:
 
-```
-Android/Desktop
-→ Frontend hosting
-→ Backend API
-→ MongoDB Atlas
-→ PDF object/file storage
-```
+Frontend
+↓
+Production Hosting
 
-Before deployment:
+Backend
+↓
+Production Server
 
-- Configure production environment variables.
-- Configure CORS.
-- Configure HTTPS.
-- Secure cookies/auth.
-- Configure storage access.
-- Run production build.
-- Test upload/read/download/offline.
-- Check logs.
-- Remove development-only behavior.
+MongoDB Atlas
+↓
+Production Database
 
-Do not deploy secrets.
+Backblaze B2
+↓
+Production File Storage
 
-## 5. UI REQUIREMENTS
+Implement:
 
-Main desktop navigation:
+- production environment variables
+- HTTPS
+- CORS configuration
+- deployment configuration
+- production database configuration
+- B2 production configuration
+- monitoring/logging
+- backup strategy
+- final production tests
 
-- Dashboard
-- Semesters
-- Subjects
-- Favorites
-- Bookmarks
-- Downloads
-- Recent
-- Settings
-- User/profile area
+## Completion
 
-Mobile:
+Mero Note is running in production with secure configuration and working core functionality.
 
-- Bottom navigation for key sections.
-- Drawer for secondary sections.
+---
 
-Dashboard should prioritize:
+# 10. DATABASE RULES
 
-- Continue Reading.
-- Recent resources.
-- Semester shortcuts.
-- Favorites/downloads.
-- Useful study overview.
+MongoDB should primarily contain structured metadata.
 
-Resource cards should show useful metadata without clutter.
+Examples:
 
-PDF reader should prioritize:
+- user records
+- academic entities
+- resource metadata
+- relationships
+- personal state
+- timestamps
+- statuses
+- file references
 
-- Reading area.
-- Page controls.
-- Search.
-- Zoom.
-- Bookmark.
-- Download.
+Do NOT store large PDF binaries directly in normal MongoDB documents.
 
-## 6. PERFORMANCE RULES
+PDF bytes belong in Backblaze B2.
 
-Because the library may contain very large PDFs:
+---
 
-- Do not load the entire library into memory unnecessarily.
-- Paginate large resource lists.
-- Lazy-load UI sections when useful.
-- Avoid unnecessary re-renders.
-- Avoid downloading PDFs until needed.
-- Stream/fetch large files appropriately.
-- Do not preload every PDF.
-- Cache selectively.
-- Keep API payloads small.
-- Use thumbnails/previews only when useful.
-- Never load 300–1000+ page PDFs completely into a normal list page.
+# 11. BACKBLAZE B2 RULES
 
-## 7. AGENT TASK FORMAT
+Backblaze B2 is the official file/object storage.
 
-When the user gives a task, internally determine:
+All B2 credentials must remain server-side.
 
-```
-PHASE:
-TASK:
-FILES TO CHANGE:
-DEPENDENCIES:
-RISK:
-TESTS:
-```
+The backend is responsible for:
 
-Before coding:
+- upload
+- validation
+- object naming
+- metadata persistence
+- secure retrieval strategy
+- deletion/cleanup where applicable
 
-- Inspect relevant files.
-- Confirm current implementation.
-- Avoid assumptions.
+Never expose B2 secret credentials in:
 
-After coding:
+- React
+- Vite environment variables
+- browser source
+- committed files
 
-- Run appropriate checks.
-- Summarize files changed.
-- Summarize behavior added.
-- Report tests/checks.
-- Report any known limitation.
+---
 
-If the request conflicts with this master file:
+# 12. API RULES
 
-- Point out the conflict briefly.
-- Follow the user's explicit newer instruction only when it clearly overrides the rule.
-- Otherwise preserve the architecture and rules.
+APIs must:
 
-## 8. STOP CONDITIONS
+- use consistent routes
+- validate inputs
+- authenticate protected requests
+- authorize protected operations
+- return predictable responses
+- return appropriate HTTP status codes
+- avoid leaking internal errors
 
-STOP and ask for clarification when:
+Avoid unnecessary API duplication.
 
-- A required design decision is genuinely missing and cannot safely be inferred.
-- A task would require changing the locked architecture.
-- A destructive operation could delete user/project data.
-- Credentials or secrets are required.
-- A requested feature conflicts with existing functionality and there is no safe interpretation.
+Use services for reusable business logic.
 
-Do NOT stop for minor implementation choices that can safely follow existing project conventions.
+Controllers should remain focused on request/response handling.
 
-## 9. DEFINITION OF DONE
+---
 
-A task is DONE only when:
+# 13. USER DATA SECURITY
 
-- Requested functionality exists.
-- Existing functionality still works.
-- Code follows the project architecture.
-- UI follows the established design system.
-- Desktop behavior is acceptable.
-- Mobile behavior is acceptable where relevant.
-- Errors/loading/empty states are handled where relevant.
-- Appropriate tests/checks pass.
-- No unnecessary files/dependencies were added.
-- Documentation is updated if the change affects architecture or behavior.
+Any personal data must be associated with the authenticated user.
 
-## 10. CURRENT PRIORITY
+Never trust a client-supplied `userId` when authentication already provides identity.
 
-- Always use the user's explicitly stated current phase/task as the immediate priority.
-- Do not automatically continue through the roadmap.
-- When a phase is completed: verify it, report completion, and wait for the next instruction.
+Ownership must be derived from the authenticated request.
 
-- The roadmap is the source of project direction.
-- This file is the source of agent behavior and engineering rules.
-- The existing codebase is the source of current implementation truth.
-- The approved Stitch UI is the source of visual truth.
+Example:
 
-**END OF MERO NOTE AGENT RULES**
+Authenticated User
+↓
+req.user
+↓
+Service
+↓
+user-owned database record
+
+Do NOT allow:
+
+POST /favorites
+{
+"userId": "some-other-user"
+}
+
+to override authenticated ownership.
+
+---
+
+# 14. SOFT DELETE
+
+Where the approved schema uses soft deletion:
+
+- preserve the record
+- mark deletion state
+- exclude deleted records from normal queries
+- allow restore only where explicitly supported
+- permanently delete only through an approved operation
+
+Do not introduce permanent destructive deletion casually.
+
+---
+
+# 15. STATUS RULE
+
+Do not confuse:
+
+- publication status
+- user enrollment/status
+- file/download status
+- resource visibility
+
+Each status must have one clear purpose.
+
+Avoid duplicate status fields that represent the same concept.
+
+---
+
+# 16. MIGRATION RULE
+
+The current frontend mock data is reference/seed data.
+
+Do not automatically migrate every localStorage value into MongoDB.
+
+Before migration:
+
+1. identify the data
+2. map it to approved backend structures
+3. validate it
+4. decide whether it should become seed data or user data
+5. migrate only approved data
+
+Never treat mock data as production user data.
+
+---
+
+# 17. TESTING RULE
+
+Every meaningful backend phase must include appropriate tests.
+
+At minimum, verify:
+
+- happy path
+- invalid input
+- unauthorized request
+- forbidden request
+- missing resource
+- database failure where practical
+- expected response structure
+
+Do not claim a phase is complete without verifying its completion criteria.
+
+---
+
+# 18. PHASE BOUNDARY RULE
+
+OpenCode MUST NOT continue automatically into the next phase.
+
+When a phase is complete:
+
+1. stop
+2. summarize changes
+3. list files changed
+4. list tests performed
+5. report failures/warnings
+6. report anything intentionally not implemented
+7. wait for explicit approval for the next phase
+
+Never assume approval.
+
+---
+
+# 19. CHANGE REPORT FORMAT
+
+At the end of every phase, report:
+
+## Completed
+
+- item
+- item
+- item
+
+## Files Created
+
+- path
+- path
+
+## Files Modified
+
+- path
+- path
+
+## Tests
+
+- test
+- result
+
+## Not Implemented
+
+- item
+- reason
+
+## Risks / Warnings
+
+- item
+
+## Next Phase
+
+State only the next planned phase.
+
+Do not start it automatically.
+
+---
+
+# 20. FINAL DEVELOPMENT PRINCIPLE
+
+Mero Note must be developed incrementally.
+
+The correct sequence is:
+
+Inspect
+→ Design
+→ Approve
+→ Implement
+→ Test
+→ Audit
+→ Approve
+→ Next Phase
+
+Never:
+
+Guess
+→ Rewrite
+→ Add unrelated features
+→ Continue automatically
+
+The existing frontend is the current visual foundation.
+
+The backend must be built around the verified existing domain model while improving the architecture where the approved backend design requires it.
+
+Prioritize:
+
+- correctness
+- security
+- maintainability
+- data integrity
+- controlled changes
+- clear separation of responsibilities
+- reliable PDF storage
+- reliable user data
+- API consistency
+
+Do not optimize for speed at the cost of architectural correctness.
+
+---
+
+# CURRENT PROJECT STATE
+
+Frontend:
+COMPLETE FOR NOW
+
+Backend:
+FOUNDATION ONLY
+
+Database:
+MongoDB Atlas SELECTED
+
+Object Storage:
+Backblaze B2 SELECTED
+
+Current Phase:
+PHASE 0 — BACKEND ARCHITECTURE & SCHEMA DESIGN
+
+Next Action:
+Create the backend schema/architecture proposal.
+
+DO NOT IMPLEMENT DATABASE MODELS UNTIL PHASE 0 DESIGN IS APPROVED.

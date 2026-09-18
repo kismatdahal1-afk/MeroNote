@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
+import { RequireAdmin, RequireAuth } from "./components/auth/RequireAuth";
 import { ScrollToTop } from "./components/layout/ScrollToTop";
 import { SkeletonCards } from "./components/common/Skeleton";
 import {
@@ -30,6 +31,7 @@ import {
 
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Semesters = lazy(() => import("./pages/Semesters"));
 const SemesterSubjects = lazy(() => import("./pages/Semesters").then((m) => ({ default: m.SemesterSubjects })));
@@ -73,9 +75,14 @@ export const router = createBrowserRouter([
     children: [
       { path: "/", element: withSuspense(<Welcome />) },
       { path: "/login", element: withSuspense(<Login />) },
+      { path: "/register", element: withSuspense(<Register />) },
       {
         path: "/",
-        element: <AppLayout />,
+        element: (
+          <RequireAuth>
+            <AppLayout />
+          </RequireAuth>
+        ),
         children: [
           { index: true, element: <Navigate to="/dashboard" replace /> },
           { path: "dashboard", element: withSuspense(<Dashboard />, <DashboardSkeleton />) },
@@ -91,16 +98,16 @@ export const router = createBrowserRouter([
           { path: "notices", element: withSuspense(<Notices />, <NoticesSkeleton />) },
           { path: "settings", element: withSuspense(<Settings />, <SettingsSkeleton />) },
           { path: "help", element: withSuspense(<HelpSupport />) },
-          // Admin CMS
-          { path: "admin", element: withSuspense(<AdminDashboard />, <AdminDashboardSkeleton />) },
-          { path: "admin/notices", element: withSuspense(<AdminNotices />, <AdminNoticesSkeleton />) },
-          { path: "admin/semesters", element: withSuspense(<AdminSemesters />, <AdminSemestersSkeleton />) },
-          { path: "admin/resources", element: withSuspense(<AdminResources />, <AdminResourcesSkeleton />) },
-          { path: "admin/resources/:resourceId", element: withSuspense(<ResourceDetail />, <AdminResourceDetailSkeleton />) },
-          { path: "admin/reader/:resourceId", element: withSuspense(<AdminReader />, <ReaderSkeleton />) },
-          { path: "admin/drafts", element: withSuspense(<AdminDrafts />, <AdminDraftsSkeleton />) },
-          { path: "admin/trash", element: withSuspense(<AdminTrash />, <AdminTrashSkeleton />) },
-          { path: "admin/settings", element: withSuspense(<AdminSettings />, <AdminSettingsSkeleton />) },
+          // Admin CMS (ADMIN role only — server enforces via requireAdmin)
+          { path: "admin", element: withSuspense(<RequireAdmin><AdminDashboard /></RequireAdmin>, <AdminDashboardSkeleton />) },
+          { path: "admin/notices", element: withSuspense(<RequireAdmin><AdminNotices /></RequireAdmin>, <AdminNoticesSkeleton />) },
+          { path: "admin/semesters", element: withSuspense(<RequireAdmin><AdminSemesters /></RequireAdmin>, <AdminSemestersSkeleton />) },
+          { path: "admin/resources", element: withSuspense(<RequireAdmin><AdminResources /></RequireAdmin>, <AdminResourcesSkeleton />) },
+          { path: "admin/resources/:resourceId", element: withSuspense(<RequireAdmin><ResourceDetail /></RequireAdmin>, <AdminResourceDetailSkeleton />) },
+          { path: "admin/reader/:resourceId", element: withSuspense(<RequireAdmin><AdminReader /></RequireAdmin>, <ReaderSkeleton />) },
+          { path: "admin/drafts", element: withSuspense(<RequireAdmin><AdminDrafts /></RequireAdmin>, <AdminDraftsSkeleton />) },
+          { path: "admin/trash", element: withSuspense(<RequireAdmin><AdminTrash /></RequireAdmin>, <AdminTrashSkeleton />) },
+          { path: "admin/settings", element: withSuspense(<RequireAdmin><AdminSettings /></RequireAdmin>, <AdminSettingsSkeleton />) },
           { path: "*", element: withSuspense(<NotFound />) },
         ],
       },

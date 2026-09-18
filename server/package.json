@@ -8,17 +8,34 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:dev": "tsx scripts/seed-dev.ts",
+    "verify:parity": "tsx scripts/verify-parity.ts",
+    "verify:content": "tsx scripts/verify-content.ts",
+    "verify:db": "tsx scripts/verify-db.ts",
+    "verify:auth": "tsx scripts/verify-auth.ts",
+    "verify:b2": "tsx scripts/verify-b2.ts",
+    "promote-admin": "tsx scripts/promote-admin.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1135.0",
+    "@aws-sdk/s3-request-presigner": "^3.1135.0",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.10.1"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.10.2",
+    "mongodb-memory-server": "^11.2.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

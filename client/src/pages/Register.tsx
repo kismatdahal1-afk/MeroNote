@@ -1,45 +1,47 @@
-﻿import { useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, type FormEvent } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "../state/ToastProvider";
 import { useUser } from "../state/UserProvider";
 import { AuthError } from "../lib/authApi";
 
-function homeForRole(role: "USER" | "ADMIN"): string {
-  return role === "ADMIN" ? "/admin" : "/dashboard";
-}
-
-export default function Login() {
+export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { status, user, login } = useUser();
+  const { status, user, register } = useUser();
 
   if (status === "authed" && user) {
-    return <Navigate to={homeForRole(user.role)} replace />;
+    return <Navigate to={user.role === "ADMIN" ? "/admin" : "/dashboard"} replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password) {
-      setError("Please enter both email and password.");
+    if (!email.trim() || !password || !confirmPassword) {
+      setError("Please fill in email, password, and confirmation.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
     setError("");
     setBusy(true);
     try {
-      const authed = await login(email.trim(), password, remember);
-      toast(`Welcome back, ${authed.name}`);
-      const next = searchParams.get("next");
-      navigate(next && next.startsWith("/") ? next : homeForRole(authed.role));
+      const authed = await register(email.trim(), password, confirmPassword);
+      toast(`Welcome to Mero Note, ${authed.name}`);
+      navigate("/dashboard");
     } catch (err) {
-      setError(err instanceof AuthError ? err.message : "Login failed. Please try again.");
+      setError(err instanceof AuthError ? err.message : "Registration failed. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -57,10 +59,10 @@ export default function Login() {
             className="size-12 shrink-0 rounded-2xl object-cover shadow-md"
           />
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            Welcome back
+            Create your account
           </h1>
           <p className="mt-1.5 text-sm font-medium text-muted-foreground">
-            Log in to your Mero Note library
+            Join your Mero Note study library
           </p>
         </div>
 
@@ -70,11 +72,11 @@ export default function Login() {
           className="card-glow space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-card"
         >
           <div className="space-y-1.5">
-            <label htmlFor="login-email" className="block text-sm font-semibold text-foreground">
+            <label htmlFor="register-email" className="block text-sm font-semibold text-foreground">
               Email
             </label>
             <input
-              id="login-email"
+              id="register-email"
               type="email"
               autoComplete="email"
               value={email}
@@ -85,17 +87,17 @@ export default function Login() {
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="login-password" className="block text-sm font-semibold text-foreground">
+            <label htmlFor="register-password" className="block text-sm font-semibold text-foreground">
               Password
             </label>
             <div className="relative">
               <input
-                id="login-password"
+                id="register-password"
                 type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="At least 8 characters"
                 className="h-10 w-full rounded-lg border border-border-strong bg-surface-muted px-3.5 pr-11 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
               />
               <button
@@ -110,23 +112,19 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-                className="size-4 rounded border-border-strong text-primary focus:ring-primary/25"
-              />
-              Remember me
+          <div className="space-y-1.5">
+            <label htmlFor="register-confirm" className="block text-sm font-semibold text-foreground">
+              Confirm password
             </label>
-            <button
-              type="button"
-              onClick={() => toast("Password reset is coming soon", "info")}
-              className="text-sm font-semibold text-primary hover:underline"
-            >
-              Forgot password?
-            </button>
+            <input
+              id="register-confirm"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Repeat your password"
+              className="h-10 w-full rounded-lg border border-border-strong bg-surface-muted px-3.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+            />
           </div>
 
           {error && (
@@ -141,13 +139,13 @@ export default function Login() {
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60"
           >
             {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-            {busy ? "Logging in..." : "Log in"}
+            {busy ? "Creating account..." : "Sign up"}
           </button>
 
           <p className="text-center text-sm font-medium text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link to="/register" className="font-semibold text-primary hover:underline">
-              Sign up
+            Already have an account?{" "}
+            <Link to="/login" className="font-semibold text-primary hover:underline">
+              Log in
             </Link>
           </p>
         </form>
