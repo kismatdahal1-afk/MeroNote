@@ -38,6 +38,8 @@ const bookSchema = new Schema<IBook>(
 
 bookSchema.index({ subjectId: 1, status: 1 });
 bookSchema.index({ semesterId: 1, status: 1 });
+// Phase 10 unified search (single text index per collection).
+bookSchema.index({ title: "text", author: "text", description: "text" });
 bookSchema.index({ deletedAt: 1 }, { partialFilterExpression: { deletedAt: { $exists: true } } });
 
 export const Book = model<IBook>("Book", bookSchema, "books");

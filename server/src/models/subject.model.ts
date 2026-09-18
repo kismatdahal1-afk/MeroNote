@@ -51,6 +51,8 @@ const subjectSchema = new Schema<ISubject>(
 
 // Semester library listing (most common query).
 subjectSchema.index({ semesterId: 1, status: 1 });
+// Phase 10 unified search (single text index per collection).
+subjectSchema.index({ name: "text", code: "text", description: "text", hotTopics: "text" });
 subjectSchema.index({ deletedAt: 1 }, { partialFilterExpression: { deletedAt: { $exists: true } } });
 
 export const Subject = model<ISubject>("Subject", subjectSchema, "subjects");

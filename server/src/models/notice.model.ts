@@ -45,6 +45,8 @@ noticeSchema.pre("save", function (this: HydratedDocument<INotice>) {
 });
 
 noticeSchema.index({ status: 1, showOnDashboard: 1, pinned: 1, date: 1 });
+// Phase 10 unified search (single text index per collection).
+noticeSchema.index({ heading: "text", subtext: "text" });
 noticeSchema.index({ deletedAt: 1 }, { partialFilterExpression: { deletedAt: { $exists: true } } });
 
 export const Notice = model<INotice>("Notice", noticeSchema, "notices");

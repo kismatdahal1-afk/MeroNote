@@ -93,8 +93,8 @@ export function useSearchQuery(): [query: string, updateQuery: (q: string) => vo
 
 /**
  * Compact search field used in the header. Portal-aware: inside /admin routes
- * it searches admin content (/admin/resources?q=), everywhere else it searches
- * student content (/resources?q=). Results never cross portal boundaries.
+ * it searches admin content (/admin/resources?q=), everywhere else it opens
+ * the global search page (/search?q=). Results never cross portal boundaries.
  */
 export function HeaderSearch() {
   const [value, setValue] = useState("");
@@ -109,7 +109,7 @@ export function HeaderSearch() {
       onSubmit={(e) => {
         e.preventDefault();
         const q = encodeURIComponent(value);
-        navigate(isAdmin ? `/admin/resources?q=${q}` : `/resources?q=${q}`);
+        navigate(isAdmin ? `/admin/resources?q=${q}` : `/search?q=${q}`);
       }}
     >
       <Search className="pointer-events-none absolute left-4 top-1/2 size-4.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />

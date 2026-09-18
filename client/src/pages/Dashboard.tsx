@@ -110,7 +110,7 @@ export default function Dashboard() {
         <NoticesBoard notices={notices} plainLabels />
       </div>
 
-      {/* Compact search — redirects to Resources page on Enter */}
+      {/* Compact search — redirects to the Search page on Enter */}
       <form
         role="search"
         className="mb-6 flex gap-2.5"
@@ -118,7 +118,7 @@ export default function Dashboard() {
           e.preventDefault();
           const q = new FormData(e.currentTarget).get("q");
           const query = typeof q === "string" ? q.trim() : "";
-          navigate(query ? `/resources?q=${encodeURIComponent(query)}` : "/resources");
+          navigate(query ? `/search?q=${encodeURIComponent(query)}` : "/resources");
         }}
       >
         <div className="relative flex-1">

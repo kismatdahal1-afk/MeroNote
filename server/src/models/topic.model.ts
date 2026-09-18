@@ -28,6 +28,8 @@ const topicSchema = new Schema<ITopic>(
 
 // Ordered syllabus fetch.
 topicSchema.index({ subjectId: 1, order: 1 });
+// Phase 10 unified search (single text index per collection).
+topicSchema.index({ title: "text", description: "text" });
 topicSchema.index({ deletedAt: 1 }, { partialFilterExpression: { deletedAt: { $exists: true } } });
 
 export const Topic = model<ITopic>("Topic", topicSchema, "topics");

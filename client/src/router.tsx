@@ -36,6 +36,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Semesters = lazy(() => import("./pages/Semesters"));
 const SemesterSubjects = lazy(() => import("./pages/Semesters").then((m) => ({ default: m.SemesterSubjects })));
 const Resources = lazy(() => import("./pages/Resources"));
+const Search = lazy(() => import("./pages/Search"));
 const SubjectDetail = lazy(() => import("./pages/SubjectDetail"));
 const ResourceDetail = lazy(() => import("./pages/ResourceDetail"));
 const Reader = lazy(() => import("./pages/Reader"));
@@ -90,6 +91,7 @@ export const router = createBrowserRouter([
           { path: "semesters/:semesterId", element: withSuspense(<SemesterSubjects />, <SemesterSubjectsSkeleton />) },
           { path: "subjects/:subjectId", element: withSuspense(<SubjectDetail />, <SubjectDetailSkeleton />) },
           { path: "resources", element: withSuspense(<Resources />, <ResourcesSkeleton />) },
+          { path: "search", element: withSuspense(<Search />, <ResourcesSkeleton />) },
           { path: "resources/:resourceId", element: withSuspense(<ResourceDetail />, <ResourceDetailSkeleton />) },
           { path: "reader/:resourceId", element: withSuspense(<Reader />, <ReaderSkeleton />) },
           { path: "favorites", element: withSuspense(<Favorites />, <FavoritesSkeleton />) },
