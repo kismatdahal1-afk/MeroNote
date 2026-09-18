@@ -5,8 +5,7 @@ dotenv.config();
 /**
  * Read-parity verification: `npm run verify:parity`
  *
- * 1. Connects to MongoDB (MONGODB_URI when set, otherwise an ephemeral
- *    in-memory server — nothing is written to any real database by default).
+ * 1. Connects to an ephemeral test database (ALLOW_REAL_DB=1 for a real URI).
  * 2. Runs the dev seed (same transform as `npm run seed:dev`).
  * 3. Reads representative documents from every collection and asserts
  *    counts, references, preserved fields, retired-field absence,
@@ -16,8 +15,8 @@ dotenv.config();
  * No frontend files are touched. No binaries are stored.
  */
 
-import { MongoMemoryServer } from "mongodb-memory-server";
 import { connectDb, disconnectDb } from "../src/db/connection";
+import { useTestDatabase } from "./testDb";
 import { seedDev } from "../src/seed/seedDev";
 import {
   Bookmark,
@@ -57,13 +56,8 @@ function check(name: string, pass: boolean, detail = ""): void {
 }
 
 async function main(): Promise<void> {
-  let memory: MongoMemoryServer | null = null;
-  let uri = env.mongodbUri;
-  if (!uri) {
-    memory = await MongoMemoryServer.create();
-    uri = memory.getUri("meronote-verify");
-    console.log("verify: no MONGODB_URI set — using ephemeral in-memory MongoDB");
-  }
+  // Ephemeral by default (never touches real Atlas — see scripts/testDb.ts).
+  const { uri, cleanup } = await useTestDatabase("verify");
   await connectDb(uri);
 
   const counts = await seedDev({
@@ -237,7 +231,7 @@ async function main(): Promise<void> {
   );
 
   await disconnectDb();
-  if (memory) await memory.stop();
+  await cleanup();
 
   const failed = results.filter((r) => !r.pass);
   const summary = failed.length === 0 ? "ALL PASS" : failed.length + " FAILURES";

@@ -91,7 +91,7 @@ export function TopicResourceList({ resources }: TopicResourceListProps) {
                   size="sm"
                   onClick={() => {
                     startDownload(r);
-                    toast("Download started (mock)");
+                    toast("Download started");
                   }}
                 />
               )}

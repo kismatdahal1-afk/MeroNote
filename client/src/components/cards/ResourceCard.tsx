@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Heart, Bookmark, Download, Eye, Check, ChevronRight } from "lucide-react";
+import { Heart, Bookmark, Download, Eye, Check, ChevronRight, Loader2, RotateCcw, X } from "lucide-react";
 import type { Resource } from "../../types";
 import { Card } from "../common/PageHeader";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
@@ -26,7 +26,7 @@ interface ResourceCardProps {
 }
 
 export function ResourceCard({ resource, showContext = true, via, fromSubject }: ResourceCardProps) {
-  const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, getProgress } = useLibrary();
+  const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, cancelDownload, getProgress } = useLibrary();
   const { toast } = useToast();
 
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
@@ -64,7 +64,7 @@ export function ResourceCard({ resource, showContext = true, via, fromSubject }:
       return;
     }
     startDownload(resource);
-    toast("Download started (mock)");
+    toast(download ? "Retrying download" : "Download started");
   };
   const navState = buildResourceNavState(via, fromSubject);
 
@@ -224,10 +224,22 @@ export function ResourceCard({ resource, showContext = true, via, fromSubject }:
               <Check className="size-3.5" aria-hidden="true" />
               Saved
             </span>
+          ) : download?.status === "downloading" ? (
+            <span className="inline-flex h-8 items-center gap-1 rounded-lg bg-primary-muted px-2 text-xs font-bold text-primary">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+              {download.progress}%
+              <IconButton
+                icon={X}
+                label="Cancel download"
+                size="sm"
+                onClick={() => cancelDownload(resource.id)}
+                className="pointer-events-auto relative"
+              />
+            </span>
           ) : (
             <IconButton
-              icon={Download}
-              label={`Download ${resource.title}`}
+              icon={download?.status === "failed" || download?.status === "cancelled" ? RotateCcw : Download}
+              label={download ? `Retry download of ${resource.title}` : `Download ${resource.title}`}
               size="sm"
               onClick={handleDownload}
               className="pointer-events-auto relative"

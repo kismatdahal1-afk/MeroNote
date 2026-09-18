@@ -18,6 +18,7 @@ import { useToast } from "../../state/ToastProvider";
 import { useUser } from "../../state/UserProvider";
 import { getServerProgress, putServerProgress } from "../../lib/studyApi";
 import { fetchResourceFileUrl, FileApiError } from "../../lib/resourceFileApi";
+import { resolveLocalFileUrl, revokeLocalFileUrl } from "../../lib/downloadManager";
 import { BackButton } from "../common/BackButton";
 import { useCmsSync } from "../common/CmsSync";
 import { PdfViewer } from "./PdfViewer";
@@ -67,26 +68,54 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const [retryNonce, setRetryNonce] = useState(0);
   const openResourceId = resource?.id;
 
+  // Phase 8 local-first loading: an explicitly downloaded blob opens
+  // directly (object URL revoked on change/unmount); otherwise the existing
+  // remote presigned-URL flow runs. Corrupt local records are dropped.
+  const localObjectUrl = useRef<string | null>(null);
+
   useEffect(() => {
     if (!openResourceId) return;
     let cancelled = false;
     setFileUrl(null);
     setUrlError(null);
     setUrlLoading(true);
-    fetchResourceFileUrl(openResourceId).then(
-      ({ url }) => {
-        if (cancelled) return;
-        setFileUrl(url);
-        setUrlLoading(false);
-      },
-      (err: unknown) => {
-        if (cancelled) return;
-        setUrlError(err instanceof FileApiError ? err.message : "Couldn't open this file.");
-        setUrlLoading(false);
-      },
-    );
+    const openRemote = () => {
+      fetchResourceFileUrl(openResourceId).then(
+        ({ url }) => {
+          if (cancelled) return;
+          setFileUrl(url);
+          setUrlLoading(false);
+        },
+        (err: unknown) => {
+          if (cancelled) return;
+          setUrlError(err instanceof FileApiError ? err.message : "Couldn't open this file.");
+          setUrlLoading(false);
+        },
+      );
+    };
+    resolveLocalFileUrl(openResourceId)
+      .then((url) => {
+        if (cancelled) {
+          if (url) revokeLocalFileUrl(url);
+          return;
+        }
+        if (url) {
+          localObjectUrl.current = url;
+          setFileUrl(url);
+          setUrlLoading(false);
+          return;
+        }
+        openRemote();
+      })
+      .catch(() => {
+        if (!cancelled) openRemote();
+      });
     return () => {
       cancelled = true;
+      if (localObjectUrl.current) {
+        URL.revokeObjectURL(localObjectUrl.current);
+        localObjectUrl.current = null;
+      }
     };
   }, [openResourceId, retryNonce]);
 
@@ -192,12 +221,12 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   };
 
   const handleDownload = () => {
-    if (download) {
-      toast("Already downloaded or downloading", "info");
+    if (download?.status === "completed" || download?.status === "downloading") {
+      toast("Download already in progress or completed", "info");
       return;
     }
     startDownload(resource);
-    toast("Download started (mock)");
+    toast(download ? "Retrying download" : "Download started");
   };
 
   return (

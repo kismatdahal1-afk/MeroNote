@@ -21,11 +21,15 @@ import {
 } from "../data/selectors";
 import {
   seedBookmarks,
-  seedDownloads,
   seedFavorites,
   seedProgress,
   seedRecent,
 } from "../data/mock";
+import { deleteFile, listStoredIds } from "../lib/downloadStore";
+import {
+  cancelDownloadRequest,
+  startDownloadRequest,
+} from "../lib/downloadManager";
 import { useUser } from "./UserProvider";
 import {
   createBookmark as createServerBookmark,
@@ -63,6 +67,7 @@ interface LibraryContextValue {
   downloads: DownloadItem[];
   getDownload: (resourceId: string) => DownloadItem | undefined;
   startDownload: (resource: Resource) => void;
+  cancelDownload: (resourceId: string) => void;
   removeDownload: (downloadId: string) => void;
   totalDownloadSize: number;
 
@@ -87,6 +92,8 @@ const STORAGE_KEYS = {
   favoriteSubjects: "meronote.library.favoriteSubjects.v1",
   bookmarks: "meronote.library.bookmarks.v1",
   bookmarkedSubjects: "meronote.library.bookmarkedSubjects.v1",
+  /** Completed download rows only — blobs live in IndexedDB, states do not. */
+  downloads: "meronote.library.downloads.v1",
 } as const;
 
 function readStored<T>(key: string, fallback: T, validate: (raw: unknown) => T | null): T {
@@ -112,6 +119,26 @@ function writeStored(key: string, value: unknown): void {
 function asStringArray(raw: unknown): string[] | null {
   if (!Array.isArray(raw)) return null;
   return raw.filter((v): v is string => typeof v === "string");
+}
+
+function asDownloadRowArray(raw: unknown): DownloadItem[] | null {
+  if (!Array.isArray(raw)) return null;
+  const list: DownloadItem[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null) continue;
+    const rec = item as Record<string, unknown>;
+    if (typeof rec.id !== "string" || typeof rec.resourceId !== "string") continue;
+    if (rec.status !== "completed") continue;
+    list.push({
+      id: rec.id,
+      resourceId: rec.resourceId,
+      status: "completed",
+      progress: 100,
+      sizeBytes: typeof rec.sizeBytes === "number" && rec.sizeBytes > 0 ? rec.sizeBytes : 0,
+      downloadedAt: typeof rec.downloadedAt === "string" ? rec.downloadedAt : new Date().toISOString(),
+    });
+  }
+  return list;
 }
 
 function asBookmarkArray(raw: unknown): Bookmark[] | null {
@@ -157,7 +184,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [bookmarkedSubjects, setBookmarkedSubjects] = useState<string[]>(() =>
     readStored(STORAGE_KEYS.bookmarkedSubjects, [], asStringArray),
   );
-  const [downloads, setDownloads] = useState<DownloadItem[]>(seedDownloads);
+  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [recent, setRecent] = useState<RecentEntry[]>(seedRecent);
   const [progress, setProgress] = useState<ReadingProgress[]>(seedProgress);
   const nextId = useRef(100);
@@ -175,6 +202,30 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     writeStored(STORAGE_KEYS.bookmarkedSubjects, bookmarkedSubjects);
   }, [bookmarkedSubjects]);
+
+  /* Downloads: restore completed rows whose blobs still exist, drop orphans. */
+  useEffect(() => {
+    let cancelled = false;
+    const stored = readStored(STORAGE_KEYS.downloads, [], asDownloadRowArray);
+    listStoredIds()
+      .then((ids) => {
+        if (!cancelled) setDownloads(stored.filter((row) => ids.includes(row.resourceId)));
+      })
+      .catch(() => {
+        if (!cancelled) setDownloads([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* Persist completed rows only — blobs live in IndexedDB, states do not. */
+  useEffect(() => {
+    writeStored(
+      STORAGE_KEYS.downloads,
+      downloads.filter((d) => d.status === "completed"),
+    );
+  }, [downloads]);
 
   /* Keep generated bookmark ids unique across reloads (stored ids stay reserved). */
   useEffect(() => {
@@ -270,39 +321,72 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [downloads],
   );
 
-  /** Simulated download with progress updates; no real storage is written. */
+  /** Real download: secure URL → streamed fetch → IndexedDB. Duplicate-safe. */
   const startDownload = useCallback((resource: Resource) => {
-    const downloadId = `dl-${++nextId.current}`;
+    const existing = downloads.find((d) => d.resourceId === resource.id);
+    if (existing && (existing.status === "completed" || existing.status === "downloading")) return;
+    const rowId = `dl-${resource.id}`;
     setDownloads((prev) => [
       {
-        id: downloadId,
+        id: rowId,
         resourceId: resource.id,
         status: "downloading",
         progress: 0,
         sizeBytes: resource.fileSize,
         downloadedAt: new Date().toISOString(),
       },
-      ...prev,
+      ...prev.filter((d) => d.resourceId !== resource.id),
     ]);
-
-    const timer = window.setInterval(() => {
-      setDownloads((prev) =>
-        prev.map((d) => {
-          if (d.id !== downloadId || d.status !== "downloading") return d;
-          const next = d.progress + 12 + Math.random() * 16;
-          if (next >= 100) {
-            window.clearInterval(timer);
-            return { ...d, status: "completed" as const, progress: 100 };
+    void startDownloadRequest(
+      { resourceId: resource.id, fileName: resource.fileName ?? `${resource.title}.pdf` },
+      {
+        onProgress: (percent) => {
+          // Indeterminate (null): keep the spinner, never fake numbers.
+          if (percent === null) return;
+          setDownloads((prev) =>
+            prev.map((d) => (d.id === rowId && d.status === "downloading" ? { ...d, progress: percent } : d)),
+          );
+        },
+        onDone: (result, sizeBytes, errorMessage) => {
+          if (result === "completed") {
+            setDownloads((prev) =>
+              prev.map((d) =>
+                d.id === rowId
+                  ? { ...d, status: "completed", progress: 100, sizeBytes, downloadedAt: new Date().toISOString() }
+                  : d,
+              ),
+            );
+          } else if (result === "failed") {
+            setDownloads((prev) =>
+              prev.map((d) =>
+                d.id === rowId ? { ...d, status: "failed", error: errorMessage ?? undefined } : d,
+              ),
+            );
+          } else {
+            setDownloads((prev) =>
+              prev.map((d) => (d.id === rowId ? { ...d, status: "cancelled", progress: 0 } : d)),
+            );
           }
-          return { ...d, progress: Math.round(next) };
-        }),
-      );
-    }, 260);
+        },
+      },
+    );
+  }, [downloads]);
+
+  const cancelDownload = useCallback((resourceId: string) => {
+    // State flips to cancelled via the manager's onDone; no-op when idle.
+    cancelDownloadRequest(resourceId);
   }, []);
 
   const removeDownload = useCallback((downloadId: string) => {
+    const row = downloads.find((d) => d.id === downloadId);
+    if (row) {
+      // Local only: aborts any active fetch and deletes the IndexedDB blob.
+      // Never touches B2 or MongoDB.
+      cancelDownloadRequest(row.resourceId);
+      void deleteFile(row.resourceId).catch(() => {});
+    }
     setDownloads((prev) => prev.filter((d) => d.id !== downloadId));
-  }, []);
+  }, [downloads]);
 
   const totalDownloadSize = useMemo(
     () =>
@@ -368,6 +452,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       downloads,
       getDownload,
       startDownload,
+      cancelDownload,
       removeDownload,
       totalDownloadSize,
       recent,
@@ -393,6 +478,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       downloads,
       getDownload,
       startDownload,
+      cancelDownload,
       removeDownload,
       totalDownloadSize,
       recent,

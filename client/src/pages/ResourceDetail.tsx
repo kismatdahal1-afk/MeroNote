@@ -130,12 +130,12 @@ export default function ResourceDetail() {
   };
 
   const handleDownload = () => {
-    if (download) {
-      toast("Already downloaded or downloading", "info");
+    if (download?.status === "completed" || download?.status === "downloading") {
+      toast("Download already in progress or completed", "info");
       return;
     }
     startDownload(resource);
-    toast("Download started (mock)");
+    toast(download ? "Retrying download" : "Download started");
   };
 
   const handleDelete = () => {

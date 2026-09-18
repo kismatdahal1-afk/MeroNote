@@ -12,8 +12,8 @@ if (!process.env.JWT_SECRET) {
 /**
  * Phase 7 personal-study verification: `npm run verify:personal-study`
  *
- * Boots the REAL app against an ephemeral database (MONGODB_URI when set,
- * otherwise in-memory), creates temporary users + academic fixtures, and
+ * Boots the REAL app against an ephemeral database (ALLOW_REAL_DB=1 for an
+ * intentional real-DB run), creates temporary users + academic fixtures, and
  * asserts the authenticated personal-data contract over HTTP:
  * 401 matrix / favorites idempotent CRUD + visibility / bookmarks CRUD +
  * PATCH + duplicates / progress upsert + validation / cross-user isolation
@@ -36,10 +36,10 @@ function check(name: string, pass: boolean, detail = ""): void {
 }
 
 async function main(): Promise<void> {
-  const [{ MongoMemoryServer }] = await Promise.all([import("mongodb-memory-server")]);
   const [{ createApp }] = await Promise.all([import("../src/app")]);
   const [{ env }] = await Promise.all([import("../src/config/env")]);
   const [{ connectDb, disconnectDb }] = await Promise.all([import("../src/db/connection")]);
+  const [{ useTestDatabase }] = await Promise.all([import("./testDb")]);
   const [{ Favorite, Bookmark, ReadingProgress, Resource, Semester, Subject, User }] = await Promise.all([
     import("../src/models/index"),
   ]);
@@ -48,13 +48,7 @@ async function main(): Promise<void> {
     throw new Error("verify:personal-study refuses to run with NODE_ENV=production.");
   }
 
-  let memory: MongoMemoryServer | null = null;
-  let uri = env.mongodbUri;
-  if (!uri) {
-    memory = await MongoMemoryServer.create();
-    uri = memory.getUri("meronote-personal");
-    console.log("verify: no MONGODB_URI set — using ephemeral in-memory MongoDB");
-  }
+  const { uri, cleanup } = await useTestDatabase("personal");
   await connectDb(uri);
 
   const app = createApp();
@@ -269,7 +263,7 @@ async function main(): Promise<void> {
     server.close((err) => (err ? reject(err) : resolve()));
   });
   await disconnectDb();
-  if (memory) await memory.stop();
+  await cleanup();
 
   console.log(`\nverify:personal-study ${failures === 0 ? "ALL PASS" : failures + " FAILURES"} (${passes + failures} checks)`);
   if (failures > 0) process.exitCode = 1;

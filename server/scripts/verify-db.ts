@@ -15,17 +15,17 @@ dotenv.config();
  * - basic data-layer CRUD
  * - graceful shutdown (HTTP close + disconnectDb)
  *
- * Uses MONGODB_URI when set, otherwise an ephemeral in-memory server.
+ * Always uses an ephemeral in-memory server (ALLOW_REAL_DB=1 for a real URI).
  * Refuses NODE_ENV=production. Exit 0 = all checks pass.
  */
 
 import type { Server } from "http";
 import type { AddressInfo } from "net";
-import { MongoMemoryServer } from "mongodb-memory-server";
 import mongoose from "mongoose";
 import { createApp } from "../src/app";
 import { env } from "../src/config/env";
 import { connectDb, disconnectDb, isDbConnected } from "../src/db/connection";
+import { useTestDatabase } from "./testDb";
 import {
   liveFilter,
   liveResourceFilter,
@@ -84,14 +84,8 @@ async function main(): Promise<void> {
     "Failed to connect to MongoDB",
   );
 
-  // 2. Real connection (env URI or ephemeral memory server).
-  let memory: MongoMemoryServer | null = null;
-  let uri = env.mongodbUri;
-  if (!uri) {
-    memory = await MongoMemoryServer.create();
-    uri = memory.getUri("meronote-phase2");
-    console.log("verify: no MONGODB_URI set — using ephemeral in-memory MongoDB");
-  }
+  // 2. Real connection (ephemeral by default — never touches real Atlas).
+  const { uri, cleanup } = await useTestDatabase("phase2");
   await connectDb(uri);
   check("connectDb connects (readyState 1)", isDbConnected());
   await connectDb(uri);
@@ -288,7 +282,7 @@ async function main(): Promise<void> {
   await disconnectDb();
   check("disconnectDb leaves readyState 0", mongoose.connection.readyState === 0 && !isDbConnected());
 
-  if (memory) await memory.stop();
+  await cleanup();
 
   // Keep unused model imports honest (all 10 collections touched above).
   void Notice;

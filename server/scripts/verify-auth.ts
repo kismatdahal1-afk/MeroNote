@@ -12,7 +12,7 @@ if (!process.env.JWT_SECRET) {
  * Phase 3 auth verification: `npm run verify-auth`
  *
  * Boots the REAL app + real auth stack against a live database
- * (MONGODB_URI when set, otherwise an ephemeral in-memory server)
+ * (ephemeral in-memory server by default; ALLOW_REAL_DB=1 for a real URI)
  * and asserts the full contract over HTTP:
  * register → duplicate rejection → hash-only storage → login ok/ko →
  * me → logout → protected-route matrix (401/403/200) → health.
@@ -46,23 +46,17 @@ function redactCookieHeader(value: string | null): string {
 }
 
 async function main(): Promise<void> {
-  const [{ MongoMemoryServer }] = await Promise.all([import("mongodb-memory-server")]);
   const [{ createApp }] = await Promise.all([import("../src/app")]);
   const [{ env }] = await Promise.all([import("../src/config/env")]);
   const [{ connectDb, disconnectDb }] = await Promise.all([import("../src/db/connection")]);
+  const [{ useTestDatabase }] = await Promise.all([import("./testDb")]);
   const [{ User }] = await Promise.all([import("../src/models/index")]);
 
   if (env.nodeEnv === "production") {
     throw new Error("verify-auth refuses to run with NODE_ENV=production.");
   }
 
-  let memory: MongoMemoryServer | null = null;
-  let uri = env.mongodbUri;
-  if (!uri) {
-    memory = await MongoMemoryServer.create();
-    uri = memory.getUri("meronote-auth");
-    console.log("verify: no MONGODB_URI set — using ephemeral in-memory MongoDB");
-  }
+  const { uri, cleanup } = await useTestDatabase("auth");
   await connectDb(uri);
 
   const app = createApp();
@@ -158,7 +152,7 @@ async function main(): Promise<void> {
     server.close((err) => (err ? reject(err) : resolve()));
   });
   await disconnectDb();
-  if (memory) await memory.stop();
+  await cleanup();
 
   console.log(`\nverify:auth ${failures === 0 ? "ALL PASS" : failures + " FAILURES"} (${passes + failures} checks)`);
   if (failures > 0) process.exitCode = 1;

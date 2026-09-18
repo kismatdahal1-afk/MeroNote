@@ -5,10 +5,10 @@ dotenv.config();
 /**
  * Phase 6 file-access verification: `npm run verify:resource-file`
  *
- * Boots the REAL app against an ephemeral database (MONGODB_URI when set,
- * otherwise in-memory), seeds the mock transform, and asserts the secure
+ * Boots the REAL app against an ephemeral database (ALLOW_REAL_DB=1 for an
+ * intentional real-DB run), seeds the mock transform, and asserts the secure
  * PDF access contract over HTTP:
- * 400 invalid id / 404 missing+hiddent+draft / 410 fileless /
+ * 400 invalid id / 404 missing+hidden+draft / 410 fileless /
  * 503 without B2 credentials (credential-free body) / route isolation.
  * Live presigned-URL issuance is honestly skipped without B2 credentials.
  *
@@ -18,10 +18,10 @@ dotenv.config();
 
 import type { Server } from "http";
 import type { AddressInfo } from "net";
-import { MongoMemoryServer } from "mongodb-memory-server";
 import { createApp } from "../src/app";
 import { env } from "../src/config/env";
 import { connectDb, disconnectDb } from "../src/db/connection";
+import { useTestDatabase } from "./testDb";
 import { Resource } from "../src/models/index";
 import { seedDev } from "../src/seed/seedDev";
 import { loadDevSeedInput } from "./devSeedInput";
@@ -36,7 +36,8 @@ function check(name: string, pass: boolean, detail = ""): void {
 }
 
 function leaksSecrets(body: string): boolean {
-  return /B2_|APPLICATION_KEY|secret|bucket.*kzipbll|mongodb(\+srv)?:\/\//i.test(body);
+  // Generic patterns only — never embed a real hostname or credential here.
+  return /B2_|APPLICATION_KEY|secret|mongodb(\+srv)?:\/\/|\.mongodb\.net|backblaze/i.test(body);
 }
 
 async function main(): Promise<void> {
@@ -44,13 +45,7 @@ async function main(): Promise<void> {
     throw new Error("verify:resource-file refuses to run with NODE_ENV=production.");
   }
 
-  let memory: MongoMemoryServer | null = null;
-  let uri = env.mongodbUri;
-  if (!uri) {
-    memory = await MongoMemoryServer.create();
-    uri = memory.getUri("meronote-file");
-    console.log("verify: no MONGODB_URI set — using ephemeral in-memory MongoDB");
-  }
+  const { uri, cleanup } = await useTestDatabase("file");
   await connectDb(uri);
   await seedDev(loadDevSeedInput());
 
@@ -135,7 +130,7 @@ async function main(): Promise<void> {
     server.close((err) => (err ? reject(err) : resolve()));
   });
   await disconnectDb();
-  if (memory) await memory.stop();
+  await cleanup();
 
   console.log(`\nverify:resource-file ${failures === 0 ? "ALL PASS" : failures + " FAILURES"} (${passes + failures} checks)`);
   if (failures > 0) process.exitCode = 1;

@@ -5,8 +5,8 @@ dotenv.config();
 /**
  * Phase 4 content API verification: `npm run verify:content`
  *
- * Boots the REAL app against a live database (MONGODB_URI when set,
- * otherwise an ephemeral in-memory server), seeds the mock transform, and
+ * Boots the REAL app against an ephemeral test database (ALLOW_REAL_DB=1
+ * for an intentional real-DB run), seeds the mock transform, and
  * asserts the read-only academic contract over HTTP:
  * semesters / subjects / topics / resources (+filters, pagination) /
  * books (+one-way link) / notices, envelope shape, 400/404 behavior,
@@ -17,10 +17,10 @@ dotenv.config();
 
 import type { Server } from "http";
 import type { AddressInfo } from "net";
-import { MongoMemoryServer } from "mongodb-memory-server";
 import { createApp } from "../src/app";
 import { env } from "../src/config/env";
 import { connectDb, disconnectDb } from "../src/db/connection";
+import { useTestDatabase } from "./testDb";
 import { Book, Notice, Resource, Semester, Subject, Topic } from "../src/models/index";
 import { seedDev } from "../src/seed/seedDev";
 import { loadDevSeedInput } from "./devSeedInput";
@@ -39,13 +39,7 @@ async function main(): Promise<void> {
     throw new Error("verify:content refuses to run with NODE_ENV=production.");
   }
 
-  let memory: MongoMemoryServer | null = null;
-  let uri = env.mongodbUri;
-  if (!uri) {
-    memory = await MongoMemoryServer.create();
-    uri = memory.getUri("meronote-content");
-    console.log("verify: no MONGODB_URI set — using ephemeral in-memory MongoDB");
-  }
+  const { uri, cleanup } = await useTestDatabase("content");
   await connectDb(uri);
   await seedDev(loadDevSeedInput());
 
@@ -282,7 +276,7 @@ async function main(): Promise<void> {
     server.close((err) => (err ? reject(err) : resolve()));
   });
   await disconnectDb();
-  if (memory) await memory.stop();
+  await cleanup();
 
   console.log(`\nverify:content ${failures === 0 ? "ALL PASS" : failures + " FAILURES"} (${passes + failures} checks)`);
   if (failures > 0) process.exitCode = 1;

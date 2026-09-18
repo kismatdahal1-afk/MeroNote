@@ -200,7 +200,7 @@ export default function Downloads() {
         onConfirm={() => {
           if (pendingDelete) {
             removeDownload(pendingDelete);
-            toast("Download deleted (mock)");
+            toast("Download deleted");
           }
           setPendingDelete(null);
         }}

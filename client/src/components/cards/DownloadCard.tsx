@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Trash2, Eye, CheckCircle2, Loader2, Heart, Bookmark, ChevronRight } from "lucide-react";
+import { Trash2, Eye, CheckCircle2, Loader2, Heart, Bookmark, ChevronRight, RotateCcw, X } from "lucide-react";
 import type { DownloadItem, Resource } from "../../types";
 import { Card } from "../common/PageHeader";
 import { ProgressBar } from "../common/ProgressBar";
@@ -18,7 +18,7 @@ interface DownloadCardProps {
 
 /** Card form of a downloaded resource — mirrors ResourceCard/BookmarkCard layout. */
 export function DownloadCard({ download, resource, onRemove }: DownloadCardProps) {
-  const { markOpened, isFavorite, toggleFavorite, getBookmark, addBookmark } = useLibrary();
+  const { markOpened, isFavorite, toggleFavorite, getBookmark, addBookmark, cancelDownload, startDownload } = useLibrary();
   const { toast } = useToast();
 
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
@@ -34,6 +34,10 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
   const completed = download.status === "completed";
   const favorite = isFavorite(resource.id);
   const bookmarked = Boolean(getBookmark(resource.id));
+
+  const handleRetry = () => {
+    startDownload(resource);
+  };
 
   const handleFavorite = () => {
     toggleFavorite(resource.id);
@@ -114,10 +118,38 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
           <div className="mt-2.5 flex items-center gap-2.5">
             <ProgressBar value={download.progress / 100} label={`Download progress ${download.progress}%`} className="max-w-48" />
             <span className="text-xs font-bold text-primary">{download.progress}%</span>
+            <IconButton
+              icon={X}
+              label="Cancel download"
+              size="sm"
+              onClick={() => cancelDownload(resource.id)}
+              className="pointer-events-auto relative"
+            />
           </div>
         )}
         {download.status === "failed" && (
-          <p className="mt-2.5 text-xs font-semibold text-error">Download failed</p>
+          <div className="mt-2.5 flex items-center gap-2">
+            <p className="text-xs font-semibold text-error">{download.error ?? "Download failed"}</p>
+            <IconButton
+              icon={RotateCcw}
+              label="Retry download"
+              size="sm"
+              onClick={handleRetry}
+              className="pointer-events-auto relative"
+            />
+          </div>
+        )}
+        {download.status === "cancelled" && (
+          <div className="mt-2.5 flex items-center gap-2">
+            <p className="text-xs font-semibold text-muted-foreground">Download cancelled</p>
+            <IconButton
+              icon={RotateCcw}
+              label="Retry download"
+              size="sm"
+              onClick={handleRetry}
+              className="pointer-events-auto relative"
+            />
+          </div>
         )}
         <Link
           to={`/resources/${resource.id}`}
@@ -178,6 +210,27 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
         <div className="pointer-events-none mt-3 flex items-center gap-2.5">
           <ProgressBar value={download.progress / 100} label={`Download progress ${download.progress}%`} className="max-w-48" />
           <span className="text-xs font-bold text-primary">{download.progress}%</span>
+          <IconButton
+            icon={X}
+            label="Cancel download"
+            size="sm"
+            onClick={() => cancelDownload(resource.id)}
+            className="pointer-events-auto relative"
+          />
+        </div>
+      )}
+      {(download.status === "failed" || download.status === "cancelled") && (
+        <div className="pointer-events-none mt-3 flex items-center gap-2">
+          <p className="text-xs font-semibold text-muted-foreground">
+            {download.status === "failed" ? (download.error ?? "Download failed") : "Download cancelled"}
+          </p>
+          <IconButton
+            icon={RotateCcw}
+            label="Retry download"
+            size="sm"
+            onClick={handleRetry}
+            className="pointer-events-auto relative"
+          />
         </div>
       )}
 
@@ -192,8 +245,10 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
             {completed
               ? `${formatFileSize(download.sizeBytes)} · ${formatRelativeTime(download.downloadedAt)}`
               : download.status === "failed"
-                ? "Failed"
-                : "Downloading…"}
+                ? (download.error ?? "Failed")
+                : download.status === "cancelled"
+                  ? "Cancelled"
+                  : "Downloading…"}
           </span>
         </span>
         {completed && (

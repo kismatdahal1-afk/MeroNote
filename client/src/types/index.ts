@@ -220,11 +220,13 @@ export interface Bookmark {
 export interface DownloadItem {
   id: string;
   resourceId: string;
-  status: "queued" | "downloading" | "completed" | "failed";
+  status: "queued" | "downloading" | "completed" | "failed" | "cancelled";
   /** 0..100 */
   progress: number;
   sizeBytes: number;
   downloadedAt: string;
+  /** User-facing failure reason (failed only). */
+  error?: string;
 }
 
 export interface RecentEntry {

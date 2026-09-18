@@ -1,6 +1,5 @@
 ﻿import type {
   Bookmark,
-  DownloadItem,
   MockUser,
   ProgramInfo,
   RecentEntry,
@@ -302,12 +301,6 @@ export const seedBookmarks: Bookmark[] = [
   { id: "bm-3", resourceId: "res-csa-notes", page: 51, note: "Booth algorithm", createdAt: iso(3) },
   { id: "bm-4", resourceId: "res-cnet-notes", page: 30, note: "TCP vs UDP table", createdAt: iso(9) },
   { id: "bm-5", resourceId: "res-math1-book", page: 155, note: "L'Hopital solved set", createdAt: iso(14) },
-];
-
-export const seedDownloads: DownloadItem[] = [
-  { id: "dl-1", resourceId: "res-csa-book", status: "completed", progress: 100, sizeBytes: resources[0].fileSize, downloadedAt: iso(4) },
-  { id: "dl-2", resourceId: "res-cprog-book", status: "completed", progress: 100, sizeBytes: 33 * 1024 * 1024, downloadedAt: iso(7) },
-  { id: "dl-3", resourceId: "res-dbms-book", status: "completed", progress: 100, sizeBytes: 55 * 1024 * 1024, downloadedAt: iso(12) },
 ];
 
 export const seedRecent: RecentEntry[] = [
