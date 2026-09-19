@@ -316,7 +316,7 @@ export function fetchSubject(id: string, signal?: AbortSignal): Promise<SubjectD
 }
 
 export function fetchTopics(subjectId: string, signal?: AbortSignal): Promise<ListResult<Topic>> {
-  return request<RawDoc[]>(`/api/topics${queryString({ subjectId, limit: 200 })}`, { signal }).then(({ data, pagination }) => {
+  return request<RawDoc[]>(`/api/topics${queryString({ subjectId, limit: 100 })}`, { signal }).then(({ data, pagination }) => {
     const rows = (Array.isArray(data) ? data : []).map((doc) => mapTopic(withId(doc)));
     return { rows, total: pagination?.total ?? rows.length };
   });

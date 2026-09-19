@@ -170,7 +170,7 @@ export default function AdminDrafts() {
     adminList<Semester>("semesters", { limit: 100 }, signal),
   );
   const subjectsAllQuery = useApiQuery("admin-drafts-subjects-all", (signal) =>
-    adminList<Subject>("subjects", { limit: 200 }, signal),
+    adminList<Subject>("subjects", { limit: 100 }, signal),
   );
   const resQuery = useApiQuery("admin-drafts-resources", (signal) =>
     adminList<Resource>("resources", { status: "draft", limit: 100 }, signal),

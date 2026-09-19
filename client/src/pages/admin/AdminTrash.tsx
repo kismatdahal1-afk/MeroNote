@@ -147,7 +147,7 @@ export default function AdminTrash() {
     adminList<Semester>("semesters", { includeDeleted: true, limit: 100 }, signal),
   );
   const subjAllQuery = useApiQuery("admin-trash-subjects-all", (signal) =>
-    adminList<Subject>("subjects", { includeDeleted: true, limit: 200 }, signal),
+    adminList<Subject>("subjects", { includeDeleted: true, limit: 100 }, signal),
   );
   const retryAll = () => {
     semQuery.retry(); subjQuery.retry(); topicQuery.retry();

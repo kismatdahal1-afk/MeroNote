@@ -58,10 +58,10 @@ export default function AdminSemesters() {
     adminList<Semester>("semesters", { limit: 100 }, signal),
   );
   const subjectsQuery = useApiQuery("admin-semesters-subjects", (signal) =>
-    adminList<Subject>("subjects", { limit: 200 }, signal),
+    adminList<Subject>("subjects", { limit: 100 }, signal),
   );
   const resourcesQuery = useApiQuery("admin-semesters-resources", (signal) =>
-    adminList<Resource>("resources", { limit: 200 }, signal),
+    adminList<Resource>("resources", { limit: 100 }, signal),
   );
   const retryAll = () => { semestersQuery.retry(); subjectsQuery.retry(); resourcesQuery.retry(); };
 
