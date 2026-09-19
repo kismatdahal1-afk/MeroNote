@@ -28,13 +28,27 @@ export class StorageNotConfiguredError extends Error {
 }
 
 export function b2Endpoint(): string {
-  if (env.b2Endpoint.trim()) return env.b2Endpoint.trim();
-  return `https://s3.${env.b2Region}.backblaze.com`;
+  const raw = env.b2Endpoint.trim();
+  const base = raw || `https://s3.${env.b2Region}.backblaze.com`;
+  // Backblaze shows the endpoint host without a scheme; the SDK needs one.
+  return /^https?:\/\//i.test(base) ? base : `https://${base}`;
 }
 
-/** Throws a credential-free error when B2 is not configured. */
+/** Template markers (`<...>` from server/.env.example) are never real credentials. */
+export function isB2Placeholder(value: string): boolean {
+  const t = value.trim();
+  return t.startsWith("<") && t.endsWith(">");
+}
+
+/**
+ * Throws a credential-free error when B2 is not configured.
+ * Missing, blank, and placeholder values all fail closed as unconfigured:
+ * treating them as live config would point the SDK at a bogus endpoint
+ * instead of the documented 503 offline behavior.
+ */
 export function requireB2Config(): B2Config {
-  if (!env.b2KeyId || !env.b2ApplicationKey || !env.b2BucketName) {
+  const trio = [env.b2KeyId, env.b2ApplicationKey, env.b2BucketName];
+  if (trio.some((v) => !v.trim() || isB2Placeholder(v))) {
     throw new StorageNotConfiguredError();
   }
   return { region: env.b2Region, endpoint: b2Endpoint(), bucket: env.b2BucketName };

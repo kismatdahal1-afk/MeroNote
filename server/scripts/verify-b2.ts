@@ -21,6 +21,7 @@ dotenv.config();
  */
 
 import { env } from "../src/config/env";
+import { b2CredsPresent, b2CredsUsable, b2PlaceholdersPresent } from "./b2TestEnv";
 import { b2Bucket, b2Endpoint, requireB2Config } from "../src/storage/b2.client";
 import {
   ALLOWED_PDF_MIME,
@@ -66,11 +67,21 @@ async function main(): Promise<void> {
 
   // ---- Tier 1: offline ----
   const rawEndpoint = (process.env.B2_ENDPOINT ?? "").trim();
-  const expectedEndpoint = rawEndpoint || `https://s3.${env.b2Region}.backblaze.com`;
+  // A schemeless host (as Backblaze displays it) normalizes to https://.
+  const expectedEndpoint = /^https?:\/\//i.test(rawEndpoint)
+    ? rawEndpoint
+    : `https://${rawEndpoint || `s3.${env.b2Region}.backblaze.com`}`;
   check("endpoint derivation", b2Endpoint() === expectedEndpoint, b2Endpoint());
 
-  const credsPresent = Boolean(env.b2KeyId && env.b2ApplicationKey && env.b2BucketName);
-  if (credsPresent) {
+  // Template placeholders (e.g. `<YOUR_B2_KEY_ID>`) count as unconfigured
+  // so a placeholder .env stays on the offline tier instead of hitting live B2.
+  if (b2PlaceholdersPresent()) {
+    check("placeholder credentials treated as unconfigured", true, "template .env detected");
+  }
+  const credsPresent = b2CredsPresent();
+  const placeholdersPresent = b2PlaceholdersPresent();
+  const credsUsable = b2CredsUsable();
+  if (credsUsable) {
     let ok = true;
     try {
       requireB2Config();
@@ -79,7 +90,8 @@ async function main(): Promise<void> {
     }
     check("config accepts complete credentials", ok);
   } else {
-    expectThrow("config rejects missing credentials", () => requireB2Config(), Error);
+    // Missing AND placeholder credentials both fail closed as unconfigured.
+    expectThrow("config rejects missing/placeholder credentials", () => requireB2Config(), Error);
   }
 
   check("resource key shape", buildResourceKey("res-123", "My Notes.pdf") === "resources/res-123/my-notes.pdf");
@@ -105,7 +117,9 @@ async function main(): Promise<void> {
     () => validatePdfUpload({ fileName: "notes.pdf", mime: ALLOWED_PDF_MIME, body: Buffer.from("hello world, not a pdf") }),
     FileRejectedError,
   );
-  check("max size default 100MB", maxPdfBytes() === 100 * 1024 * 1024, `${maxPdfBytes()}`);
+  // Honors an explicitly configured MAX_PDF_BYTES; otherwise the 100 MB default.
+  const expectedMax = Number(process.env.MAX_PDF_BYTES) || 100 * 1024 * 1024;
+  check("max size matches configuration", maxPdfBytes() === expectedMax, `${maxPdfBytes()}`);
   const oversize = Buffer.alloc(maxPdfBytes() + 1);
   oversize.set(Buffer.from("%PDF-"));
   expectThrow("oversize file rejected", () => validatePdfUpload({ fileName: "big.pdf", mime: ALLOWED_PDF_MIME, body: oversize }), FileRejectedError);
@@ -115,18 +129,22 @@ async function main(): Promise<void> {
     sha256Hex(Buffer.from("abc")) === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
   );
 
-  if (!credsPresent) {
-    let blocked = false;
-    try {
-      await uploadPdf({ resourceId: "phase5-verify", fileName: "t.pdf", mime: ALLOWED_PDF_MIME, body: MINIMAL_PDF });
-    } catch (err) {
-      blocked = err instanceof Error && err.message.includes("not configured");
+  if (!credsUsable) {
+    if (!credsPresent) {
+      let blocked = false;
+      try {
+        await uploadPdf({ resourceId: "phase5-verify", fileName: "t.pdf", mime: ALLOWED_PDF_MIME, body: MINIMAL_PDF });
+      } catch (err) {
+        blocked = err instanceof Error && err.message.includes("not configured");
+      }
+      check("upload without creds fails before any storage (case A)", blocked);
+    } else {
+      check("upload skipped for placeholder credentials (no live attempt)", true);
     }
-    check("upload without creds fails before any storage (case A)", blocked);
   }
 
   // ---- Tier 2: live (gated) ----
-  if (!credsPresent) {
+  if (!credsUsable) {
     console.log("LIVE SKIPPED — B2_KEY_ID / B2_APPLICATION_KEY / B2_BUCKET_NAME not all set.");
   } else {
     const probe = await checkBucketAccess();

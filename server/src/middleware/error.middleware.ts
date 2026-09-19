@@ -1,12 +1,12 @@
 import { NextFunction, Request, Response } from "express";
 
 export function notFoundHandler(
-  req: Request,
+  _req: Request,
   res: Response,
   next: NextFunction
 ): void {
   res.status(404);
-  next(new Error(`Not found: ${req.method} ${req.originalUrl}`));
+  next(new Error("Not found."));
 }
 
 export function errorHandler(
@@ -16,7 +16,12 @@ export function errorHandler(
   _next: NextFunction
 ): void {
   const status = res.statusCode !== 200 ? res.statusCode : 500;
-  const message = err.message || "Internal server error";
+  // Unexpected 5xx failures never leak internals outside development —
+  // controllers already map every known failure to a safe DTO.
+  const message =
+    status >= 500 && process.env.NODE_ENV !== "development"
+      ? "Internal server error."
+      : err.message || "Internal server error";
 
   res.status(status).json({
     status: "error",

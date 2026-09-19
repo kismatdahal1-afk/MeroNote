@@ -1,12 +1,17 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import helmet from "helmet";
 import apiRouter from "./routes";
 import { env } from "./config/env";
 import { notFoundHandler, errorHandler } from "./middleware/error.middleware";
 
 export function createApp(): express.Express {
   const app = express();
+
+  // Fingerprint + baseline hardening for a JSON API (no CSP: no HTML served).
+  app.disable("x-powered-by");
+  app.use(helmet({ contentSecurityPolicy: false }));
 
   // Cookie sessions require credentialed CORS with a fixed origin (never "*").
   app.use(cors({ origin: env.clientUrl, credentials: true }));

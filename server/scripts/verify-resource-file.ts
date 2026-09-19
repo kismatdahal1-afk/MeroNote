@@ -22,6 +22,8 @@ import { createApp } from "../src/app";
 import { env } from "../src/config/env";
 import { connectDb, disconnectDb } from "../src/db/connection";
 import { useTestDatabase } from "./testDb";
+import { b2CredsUsable } from "./b2TestEnv";
+import { deleteObject, uploadPdf } from "../src/storage/b2.service";
 import { Resource } from "../src/models/index";
 import { seedDev } from "../src/seed/seedDev";
 import { loadDevSeedInput } from "./devSeedInput";
@@ -101,10 +103,12 @@ async function main(): Promise<void> {
   check("hidden resource → 404", hidden.status === 404);
   check("draft resource → 404", draftRes.status === 404);
 
-  // 5. Valid resource without B2 creds → 503, credential-free, envelope-shaped.
-  const credsPresent = Boolean(env.b2KeyId && env.b2ApplicationKey && env.b2BucketName);
-  const live = await get(`/api/resources/${seededId}/file`);
-  if (!credsPresent) {
+  // 5. Valid resource without usable B2 creds → 503, credential-free,
+  // envelope-shaped. Template placeholders count as unconfigured (offline tier).
+  // The offline fetch runs only on the offline tier — live mode provisions
+  // its own temp object below instead of hitting the seed key.
+  if (!b2CredsUsable()) {
+    const live = await get(`/api/resources/${seededId}/file`);
     check(
       "no B2 creds → 503 + error envelope",
       live.status === 503 && live.json?.status === "error" && typeof live.json?.message === "string",
@@ -113,9 +117,42 @@ async function main(): Promise<void> {
     check("503 body leaks no secrets", !leaksSecrets(live.text));
     console.log("LIVE SKIPPED — B2 credentials not configured; presigned-URL issuance untested against real B2.");
   } else {
-    const okShape = live.status === 200 && typeof live.json?.data?.url === "string" && live.json?.data?.expiresIn === 900;
-    check("valid resource → presigned URL envelope", okShape);
-    check("URL body leaks no secrets", !leaksSecrets(live.text.replace(live.json?.data?.url ?? "", "<url>")));
+    // Live: self-provision a temp object + temp resource, prove the 200
+    // envelope, then remove both (nothing permanent left behind).
+    const tinyPdf = Buffer.from("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n");
+    let liveKey = "";
+    let liveResId = "";
+    try {
+      const meta = await uploadPdf({
+        resourceId: "phase6-verify",
+        fileName: "live-probe.pdf",
+        mime: "application/pdf",
+        body: tinyPdf,
+      });
+      liveKey = meta.key;
+      const probe = await Resource.create({
+        semesterId: seeded?.semesterId,
+        subjectId: seeded?.subjectId,
+        title: "Live File Verify",
+        type: "short_note",
+        fileName: "live-probe.pdf",
+        fileSize: meta.sizeBytes,
+        pageCount: 1,
+        status: "published",
+        file: { key: meta.key, bucket: meta.bucket, mime: meta.mime },
+      });
+      liveResId = String(probe._id);
+      const liveHit = await get(`/api/resources/${liveResId}/file`);
+      const okShape =
+        liveHit.status === 200 &&
+        typeof liveHit.json?.data?.url === "string" &&
+        liveHit.json?.data?.expiresIn === 900;
+      check("valid resource → presigned URL envelope", okShape, `status=${liveHit.status}`);
+      check("URL body leaks no secrets", !leaksSecrets(liveHit.text.replace(liveHit.json?.data?.url ?? "", "<url>")));
+    } finally {
+      if (liveResId) await Resource.findByIdAndDelete(liveResId).exec().catch(() => {});
+      if (liveKey) await deleteObject(liveKey).catch(() => {});
+    }
   }
 
   // 6. Route isolation: detail endpoint unaffected.

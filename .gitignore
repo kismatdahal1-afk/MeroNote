@@ -9,6 +9,8 @@ build/
 .env
 .env.local
 .env.*.local
+# Local B2 placeholder file (owner request: never push, even though it holds no secrets)
+server/.env.example
 
 # Logs
 logs/

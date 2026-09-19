@@ -22,6 +22,7 @@ import { createApp } from "../src/app";
 import { env } from "../src/config/env";
 import { connectDb, disconnectDb } from "../src/db/connection";
 import { useTestDatabase } from "./testDb";
+import { b2CredsUsable } from "./b2TestEnv";
 import { User } from "../src/models/index";
 
 let passes = 0;
@@ -310,9 +311,9 @@ async function main(): Promise<void> {
     "upload auth + 404 + no-file + wrong-type",
     upAnon.status === 401 && upUser.status === 403 && upMissing.status === 404 && upNoFile.status === 400 && upBadType.status === 400,
   );
-  const credsPresent = Boolean(env.b2KeyId && env.b2ApplicationKey && env.b2BucketName);
+  // Template placeholders count as unconfigured (offline tier) — see b2TestEnv.
   const upLive = await call("POST", `/api/admin/resources/${resId}/file`, admin, undefined, pdfForm());
-  if (!credsPresent) {
+  if (!b2CredsUsable()) {
     check("upload without B2 creds → 503 (nothing fabricated)", upLive.status === 503);
   } else {
     check(
@@ -352,7 +353,7 @@ async function main(): Promise<void> {
   await disconnectDb();
   await cleanup();
 
-  if (!credsPresent) {
+  if (!b2CredsUsable()) {
     console.log("LIVE SKIPPED — B2 credentials not configured; upload/replace/delete ran offline tiers only.");
   }
   console.log(`\nverify:admin-cms ${failures === 0 ? "ALL PASS" : failures + " FAILURES"} (${passes + failures} checks)`);
