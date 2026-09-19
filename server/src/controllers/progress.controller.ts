@@ -60,6 +60,10 @@ export async function putProgress(req: Request, res: Response): Promise<void> {
     res.status(404).json({ status: "error", message: "Resource not found." });
     return;
   }
+  if (resource.pageCount === undefined) {
+    res.status(400).json({ status: "error", message: "Resource has no readable file yet." });
+    return;
+  }
   if (lastPage > resource.pageCount) {
     res.status(400).json({ status: "error", message: `Field 'lastPage' must not exceed ${resource.pageCount}.` });
     return;

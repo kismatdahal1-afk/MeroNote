@@ -16,9 +16,13 @@ export interface IResource extends Document {
   description: string;
   type: (typeof RESOURCE_TYPES)[number];
   customType?: string;
-  fileName: string;
-  fileSize: number;
-  pageCount: number;
+  // Phase 11: file metadata is optional at rest so resources can be created
+  // metadata-first and honestly fileless after file deletion. All validation
+  // still applies whenever values are present. Fileless resources stay
+  // unpublished until a file is attached (enforced API-side).
+  fileName?: string;
+  fileSize?: number;
+  pageCount?: number;
   tags: string[];
   bookId?: Types.ObjectId;
   featured: boolean;
@@ -27,7 +31,7 @@ export interface IResource extends Document {
   paperDurationMinutes?: number;
   status: (typeof PUBLISH_STATUSES)[number];
   hidden: boolean;
-  file: IResourceFile;
+  file?: IResourceFile;
   uploadedBy?: Types.ObjectId;
   uploadedAt: Date;
   updatedAt: Date;
@@ -68,7 +72,7 @@ const resourceSchema = new Schema<IResource>(
     customType: { type: String, required: false, trim: true, minlength: 1, maxlength: 60 },
     fileName: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       minlength: 1,
       maxlength: 255,
@@ -77,8 +81,8 @@ const resourceSchema = new Schema<IResource>(
         message: "fileName must end with .pdf (Phase 1 supports PDFs only).",
       },
     },
-    fileSize: { type: Number, required: true, min: 1 },
-    pageCount: { type: Number, required: true, min: 1 },
+    fileSize: { type: Number, required: false, min: 1 },
+    pageCount: { type: Number, required: false, min: 1 },
     tags: {
       type: [String],
       default: [],
@@ -100,7 +104,7 @@ const resourceSchema = new Schema<IResource>(
     paperDurationMinutes: { type: Number, required: false, min: 1 },
     status: { type: String, required: true, enum: PUBLISH_STATUSES, default: "draft" },
     hidden: { type: Boolean, required: false, default: false },
-    file: { type: resourceFileSchema, required: true },
+    file: { type: resourceFileSchema, required: false },
     uploadedBy: { type: Schema.Types.ObjectId, ref: "User", required: false },
     deletedAt: { type: Date, required: false, default: undefined },
   },

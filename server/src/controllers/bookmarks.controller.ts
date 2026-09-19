@@ -66,7 +66,11 @@ export async function createBookmark(req: Request, res: Response): Promise<void>
       pageValue = 1;
     }
     const resource = await Resource.findById(targetId).select("pageCount").lean().exec();
-    if (resource && pageValue > resource.pageCount) {
+    if (!resource || resource.pageCount === undefined) {
+      res.status(400).json({ status: "error", message: "Resource has no readable file yet." });
+      return;
+    }
+    if (pageValue > resource.pageCount) {
       res.status(400).json({ status: "error", message: `Field 'page' must not exceed ${resource.pageCount}.` });
       return;
     }
@@ -127,7 +131,11 @@ export async function updateBookmark(req: Request, res: Response): Promise<void>
       return;
     }
     const resource = await Resource.findById(bookmark.targetId).select("pageCount").lean().exec();
-    if (resource && page > resource.pageCount) {
+    if (!resource || resource.pageCount === undefined) {
+      res.status(400).json({ status: "error", message: "Resource has no readable file yet." });
+      return;
+    }
+    if (page > resource.pageCount) {
       res.status(400).json({ status: "error", message: `Field 'page' must not exceed ${resource.pageCount}.` });
       return;
     }

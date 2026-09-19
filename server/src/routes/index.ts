@@ -2,6 +2,7 @@ import { Router } from "express";
 import healthRoute from "./health.route";
 import authRoute from "./auth.route";
 import meRoute from "./me.route";
+import adminRoute from "./admin/index";
 import searchRoute from "./search.route";
 import semestersRoute from "./semesters.route";
 import subjectsRoute from "./subjects.route";
@@ -16,6 +17,8 @@ router.use("/", healthRoute);
 router.use("/auth", authRoute);
 // Phase 7 personal study data (authenticated; ownership from session).
 router.use("/me", meRoute);
+// Phase 11 Admin CMS (requireAuth + requireAdmin enforced inside).
+router.use("/admin", adminRoute);
 // Phase 10 unified search (public read-only; no writes in this phase).
 router.use("/search", searchRoute);
 // Phase 4 academic content API (public reads; no writes in this phase).

@@ -15,6 +15,7 @@
     "verify:resource-file": "tsx scripts/verify-resource-file.ts",
     "verify:search": "tsx scripts/verify-search.ts",
     "verify:personal-study": "tsx scripts/verify-personal-study.ts",
+    "verify:admin-cms": "tsx scripts/verify-admin-cms.ts",
     "verify:db": "tsx scripts/verify-db.ts",
     "verify:auth": "tsx scripts/verify-auth.ts",
     "verify:b2": "tsx scripts/verify-b2.ts",
@@ -29,7 +30,8 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.10.1"
+    "mongoose": "^9.10.1",
+    "multer": "^2.4.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -37,6 +39,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.10.2",
     "mongodb-memory-server": "^11.2.0",
     "tsx": "^4.19.2",
