@@ -88,16 +88,30 @@ export function PdfViewer({
     onPageChange?.(p, totalPages);
   };
 
+  // Fullscreen may be unavailable (standalone PWA, iOS, denied) — the
+  // promise rejection must never surface, and system-initiated exits
+  // (gesture, Esc) sync back via the fullscreenchange listener below.
   const handleFullscreen = () => {
-    const el = document.documentElement;
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
+    try {
+      if (document.fullscreenElement) {
+        const pending = document.exitFullscreen();
+        if (pending && typeof pending.catch === "function") pending.catch(() => {});
+        setIsFullscreen(false);
+      } else {
+        const pending = document.documentElement.requestFullscreen();
+        if (pending && typeof pending.catch === "function") pending.catch(() => {});
+        setIsFullscreen(true);
+      }
+    } catch {
       setIsFullscreen(false);
-    } else {
-      el.requestFullscreen();
-      setIsFullscreen(true);
     }
   };
+
+  useEffect(() => {
+    const sync = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
 
   const toggleViewMode = () => {
     setViewMode((v) => (v === 'portrait' ? 'landscape' : 'portrait'));
@@ -117,7 +131,9 @@ export function PdfViewer({
       className={cx(
         "reader-bar flex flex-col overflow-hidden",
         isPage
-          ? "h-screen bg-background"
+          // dvh tracks the mobile browser chrome (URL bar show/hide) so the
+          // reader never jumps or hides content behind it.
+          ? "h-screen supports-[height:100dvh]:h-dvh bg-background"
           : "card-glow overflow-hidden rounded-xl border border-border bg-surface shadow-card",
         className,
       )}
@@ -239,8 +255,9 @@ export function PdfViewer({
             </div>
           </div>
 
-          {/* MOBILE controls row — all PDF controls in one row */}
-          <div className="flex md:hidden items-center gap-1.5 border-b border-border px-3 py-1">
+          {/* MOBILE controls row — scrolls horizontally on narrow screens
+              instead of overflowing; children never shrink. */}
+          <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
             <div className="flex items-center gap-1 rounded-md bg-surface-muted px-1.5">
               <IconButton icon={ChevronLeft} label="Previous page" variant="bar" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
               <div className="flex h-7 items-center gap-0.5">
@@ -249,8 +266,10 @@ export function PdfViewer({
               </div>
               <IconButton icon={ChevronRight} label="Next page" variant="bar" size="sm" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
             </div>
-            <div className="flex h-7 items-center justify-center rounded-md bg-surface-muted px-2">
-              <span className="text-xs font-bold text-foreground">{zoom}%</span>
+            <div className="flex h-7 items-center gap-0.5 rounded-md bg-surface-muted px-1.5">
+              <IconButton icon={Minus} label="Zoom out" variant="bar" size="sm" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex - 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex <= 0} />
+              <span className="min-w-9 text-center text-xs font-bold text-foreground">{zoom}%</span>
+              <IconButton icon={Plus} label="Zoom in" variant="bar" size="sm" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex + 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex >= ZOOM_LEVELS.length - 1} />
             </div>
             <IconButton
               icon={Search}

@@ -56,7 +56,7 @@ export function AppLayout() {
           <SidebarNav />
         </div>
         <div className="border-t border-border p-4 text-xs font-medium text-muted-foreground/70">
-          v0.3.0 — Admin CMS (local data)
+          v0.3.0 — Admin CMS
         </div>
       </aside>
 
