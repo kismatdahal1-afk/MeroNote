@@ -225,7 +225,7 @@ export default function AdminSemesters() {
       </div>
 
       {sortedSemesters.length === 0 ? (
-        <EmptyState title="No semesters" message="No semesters exist yet. Create them via the API seed or admin create." />
+        <EmptyState title="No semesters" message="The 8 fixed semesters (Semester 1–8) are not initialized yet. Run the fixed-semester bootstrap to create them." />
       ) : sortedSemesters.map((semester) => {
         const semSubjects = allSubjects.filter((s) => s.semesterId === semester.id).sort((a, b) => a.name.localeCompare(b.name));
 

@@ -35,7 +35,7 @@ export default function Semesters() {
       {loading && <SemestersSkeleton />}
       {error && !loading && <ErrorState message={error} onRetry={retry} />}
       {!loading && !error && semesters.length === 0 && (
-        <EmptyState title="No semesters yet" message="Semesters will appear here once published." />
+        <EmptyState title="No semesters yet" message="The 8 fixed semesters (Semester 1–8) will appear here once initialized." />
       )}
       {!loading && !error && semesters.length > 0 && (
         <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">

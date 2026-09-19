@@ -23,6 +23,7 @@ import { env } from "../src/config/env";
 import { connectDb, disconnectDb } from "../src/db/connection";
 import { useTestDatabase } from "./testDb";
 import { b2CredsUsable } from "./b2TestEnv";
+import { ensureFixedSemesters } from "../src/seed/fixedSemesters";
 import { User } from "../src/models/index";
 
 let passes = 0;
@@ -97,25 +98,28 @@ async function main(): Promise<void> {
   const anonGet = await call("GET", "/api/admin/semesters", null);
   check("anon → 401, USER → 403", anon.status === 401 && userDenied.status === 403 && anonGet.status === 401);
 
-  // 2. Semester CRUD.
+  // 2. Fixed semesters: bootstrap 8 official, create/delete/order blocked.
+  const fixed = await ensureFixedSemesters();
+  check("fixed bootstrap yields exactly 8", fixed.total === 8, `total=${fixed.total}`);
+  const semListAll = await call("GET", "/api/admin/semesters?limit=100", admin);
+  const officialIds = ((semListAll.json?.data as any[]) ?? []).map((s) => String(s._id ?? s.id));
+  const semId = officialIds[0] ?? "";
+  check("admin lists 8 official semesters", semListAll.status === 200 && officialIds.length === 8, `count=${officialIds.length}`);
   const semCreate = await call("POST", "/api/admin/semesters", admin, { name: "Verify Sem" });
-  const semId = String(semCreate.json?.data?._id ?? "");
-  check(
-    "semester create 201 + draft default + auto number/order",
-    semCreate.status === 201 && semCreate.json?.data?.status === "draft" && typeof semCreate.json?.data?.number === "number",
-  );
-  const semDupNum = await call("POST", "/api/admin/semesters", admin, { name: "Dup", number: semCreate.json?.data?.number });
-  check("duplicate semester number → 409", semDupNum.status === 409);
+  check("semester create blocked (fixed 1–8) → 403", semCreate.status === 403);
+  const semDupNum = await call("POST", "/api/admin/semesters", admin, { name: "Dup", number: 1 });
+  check("duplicate semester number → 403 (create blocked)", semDupNum.status === 403);
   const semGet = await call("GET", `/api/admin/semesters/${semId}`, admin);
   const semMissing = await call("GET", "/api/admin/semesters/000000000000000000000000", admin);
   const semBadId = await call("GET", "/api/admin/semesters/nope", admin);
   check("semester get 200 / missing 404 / bad id 400", semGet.status === 200 && semMissing.status === 404 && semBadId.status === 400);
-  const semPatch = await call("PATCH", `/api/admin/semesters/${semId}`, admin, { name: "Verify Sem v2", status: "published" });
+  const semPatch = await call("PATCH", `/api/admin/semesters/${semId}`, admin, { description: "Verify Sem v2" });
   const semPatchNum = await call("PATCH", `/api/admin/semesters/${semId}`, admin, { number: 5 });
+  const semPatchOrder = await call("PATCH", `/api/admin/semesters/${semId}`, admin, { order: 2 });
   const semPatchEmpty = await call("PATCH", `/api/admin/semesters/${semId}`, admin, { unknownField: 1 });
   check(
-    "semester patch ok / number immutable / empty patch 400",
-    semPatch.status === 200 && semPatch.json?.data?.status === "published" && semPatchNum.status === 400 && semPatchEmpty.status === 400,
+    "semester patch ok / number immutable / order immutable / empty patch 400",
+    semPatch.status === 200 && semPatchNum.status === 400 && semPatchOrder.status === 400 && semPatchEmpty.status === 400,
   );
   const semList = await call("GET", "/api/admin/semesters?status=published", admin);
   const semListBad = await call("GET", "/api/admin/semesters?status=bogus", admin);
@@ -149,7 +153,7 @@ async function main(): Promise<void> {
   const subMove = await call("PATCH", `/api/admin/subjects/${subId}`, admin, { semesterId: "000000000000000000000000" });
   check("subject semesterId immutable → 400", subMove.status === 400);
   const semDelBlocked = await call("DELETE", `/api/admin/semesters/${semId}`, admin);
-  check("semester delete with children → 409", semDelBlocked.status === 409 && /subjects/.test(semDelBlocked.json?.message ?? ""));
+  check("official semester delete blocked → 403 (fixed 1–8)", semDelBlocked.status === 403);
 
   // 4. Topic CRUD.
   const topBad = await call("POST", "/api/admin/topics", admin, { subjectId: "000000000000000000000000", title: "Orphan" });
@@ -172,8 +176,8 @@ async function main(): Promise<void> {
     type: "custom",
   });
   check("custom type without label → 400", resCustomNoLabel.status === 400);
-  const otherSem = await call("POST", "/api/admin/semesters", admin, { name: "Other Sem" });
-  const otherSemId = String(otherSem.json?.data?._id ?? "");
+  // Second official semester (fixed 1–8) for cross-hierarchy checks.
+  const otherSemId = officialIds[1] ?? semId;
   const resCrossSem = await call("POST", "/api/admin/resources", admin, {
     semesterId: otherSemId,
     subjectId: subId,

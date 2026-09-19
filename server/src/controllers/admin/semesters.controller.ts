@@ -2,15 +2,9 @@ import type { Request, Response } from "express";
 import { Semester } from "../../models";
 import { PUBLISH_STATUSES } from "../../models/enums";
 import { detailEnvelope, listEnvelope, parseFlag, parseObjectId, parsePagination } from "../../lib/api";
-import { restoreDoc, softDelete } from "../../repositories/content";
+import { restoreDoc } from "../../repositories/content";
 import { AdminError, sendAdminError } from "../../services/admin/errors";
-import { bodyOf, optEnum, optInt, optNumber, optString, reqString } from "../../services/admin/fields";
-import { childCounts, describeChildren } from "../../services/admin/relations";
-
-async function maxField(field: "number" | "order"): Promise<number> {
-  const top = await Semester.findOne().sort({ [field]: -1 }).select(field).lean().exec();
-  return top ? (top[field] as number) + 1 : 1;
-}
+import { bodyOf, optEnum, optNumber, optString } from "../../services/admin/fields";
 
 export async function listSemesters(req: Request, res: Response): Promise<void> {
   try {
@@ -45,17 +39,11 @@ export async function getSemester(req: Request, res: Response): Promise<void> {
 
 export async function createSemester(req: Request, res: Response): Promise<void> {
   try {
-    const body = bodyOf(req);
-    const name = reqString(body, "name", 1, 80);
-    const description = optString(body, "description", 2000) ?? "";
-    const credits = optNumber(body, "credits", 0) ?? 0;
-    const status = optEnum(body, "status", PUBLISH_STATUSES) ?? "draft";
-    const number = optInt(body, "number", 1, 99) ?? (await maxField("number"));
-    const order = optInt(body, "order", 1) ?? (await maxField("order"));
-    const created = await Semester.create({ number, name, description, credits, order, status });
-    res.status(201).json(detailEnvelope(created.toObject()));
+    // Fixed architecture: exactly 8 official semesters (1–8). No creation
+    // via API — use the idempotent fixed-semester bootstrap instead.
+    throw new AdminError(403, "Semesters are fixed (Semester 1–8) and cannot be created.");
   } catch (err) {
-    if (!sendAdminError(res, err, "Semester number or order already exists.")) throw err;
+    if (!sendAdminError(res, err)) throw err;
   }
 }
 
@@ -77,12 +65,13 @@ export async function updateSemester(req: Request, res: Response): Promise<void>
     if (description !== undefined) update.description = description;
     const credits = optNumber(body, "credits", 0);
     if (credits !== undefined) update.credits = credits;
-    if (body.order !== undefined) update.order = optInt(body, "order", 1);
     const status = optEnum(body, "status", PUBLISH_STATUSES);
     if (status !== undefined) update.status = status;
-    // `number` is immutable: reordering uses `order`; renumbering would break
-    // the stable Semester 1..8 identity.
-    if (body.number !== undefined) throw new AdminError(400, "Field 'number' cannot be changed.");
+    // `number` and `order` are immutable: semesters are fixed 1–8 in stable
+    // order. Renumbering/reordering would break the stable identity that
+    // subjects/resources reference.
+    if (body.number !== undefined) throw new AdminError(400, "Field 'number' cannot be changed (semesters are fixed 1–8).");
+    if (body.order !== undefined) throw new AdminError(400, "Field 'order' cannot be changed (semesters are fixed 1–8).");
     if (Object.keys(update).length === 0) throw new AdminError(400, "No valid fields to update.");
     const updated = await Semester.findByIdAndUpdate(id, { $set: update }, { new: true, runValidators: true }).exec();
     if (!updated) throw new AdminError(404, "Semester not found.");
@@ -98,17 +87,8 @@ export async function deleteSemester(req: Request, res: Response): Promise<void>
     if (!id) throw new AdminError(400, "Invalid semester id.");
     const existing = await Semester.findById(id).lean().exec();
     if (!existing) throw new AdminError(404, "Semester not found.");
-    if (existing.deletedAt) {
-      res.json(detailEnvelope({ id, deleted: true, alreadyDeleted: true }));
-      return;
-    }
-    const counts = await childCounts("semester", id);
-    const detail = describeChildren(counts);
-    if (detail) {
-      throw new AdminError(409, `Semester still has live content (${detail}). Delete it first.`);
-    }
-    await softDelete(Semester, id);
-    res.json(detailEnvelope({ id, deleted: true }));
+    // Fixed architecture: official semesters are never deleted (empty is valid).
+    throw new AdminError(403, "Official semesters cannot be deleted (Semester 1–8 are fixed).");
   } catch (err) {
     if (!sendAdminError(res, err)) throw err;
   }

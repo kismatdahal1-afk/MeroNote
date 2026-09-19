@@ -149,6 +149,24 @@ async function main(): Promise<void> {
         liveHit.json?.data?.expiresIn === 900;
       check("valid resource → presigned URL envelope", okShape, `status=${liveHit.status}`);
       check("URL body leaks no secrets", !leaksSecrets(liveHit.text.replace(liveHit.json?.data?.url ?? "", "<url>")));
+      // Delivery proof (PDF Reader regression): the issued URL must serve
+      // real PDF bytes — correct content type, %PDF- magic, and the exact
+      // size recorded in MongoDB. Server-side fetch has no CORS enforcement,
+      // so this isolates byte delivery from browser CORS (covered in verify:b2).
+      if (okShape) {
+        const pdfRes = await fetch(liveHit.json.data.url);
+        const pdfBytes = Buffer.from(await pdfRes.arrayBuffer());
+        check(
+          "issued URL serves PDF bytes",
+          pdfRes.status === 200 &&
+            (pdfRes.headers.get("content-type") ?? "").includes("application/pdf") &&
+            pdfBytes.subarray(0, 5).toString() === "%PDF-" &&
+            pdfBytes.length === meta.sizeBytes,
+          `status=${pdfRes.status} bytes=${pdfBytes.length}`,
+        );
+      } else {
+        check("issued URL serves PDF bytes", false, "no URL issued");
+      }
     } finally {
       if (liveResId) await Resource.findByIdAndDelete(liveResId).exec().catch(() => {});
       if (liveKey) await deleteObject(liveKey).catch(() => {});

@@ -11,6 +11,7 @@ import { ALL_RESOURCE_TYPES, resourceTypeLabel } from "../../lib/resourceType";
 import { cx, formatFileSize } from "../../lib/utils";
 import { fetchSemesters, fetchSubjects } from "../../lib/contentApi";
 import { adminCreate, adminUpdate, adminUploadFile } from "../../lib/adminApi";
+import { executeResourceSave } from "../../lib/resourceSaveFlow";
 import { ApiError } from "../../lib/contentApi";
 import { useApiQuery } from "../../hooks/useApiQuery";
 import { useToast } from "../../state/ToastProvider";
@@ -191,18 +192,14 @@ export function ResourceEditorModal({
     };
 
     /** Upload the selected file; on failure the modal stays open on the file field. */
-    const uploadSelectedFile = async (resourceId: string): Promise<boolean> => {
-      if (!file) return true;
-      try {
-        await adminUploadFile(resourceId, file, Number(form.pageCount) || undefined);
-        return true;
-      } catch (err) {
-        setErrors((prev) => ({
-          ...prev,
-          file: err instanceof ApiError ? err.message : "Upload failed. Replace the file from Edit.",
-        }));
-        return false;
-      }
+    const failOnFile = (message: string) => {
+      setErrors((prev) => ({ ...prev, file: message }));
+    };
+
+    const deps = {
+      create: (body: Record<string, unknown>) => adminCreate<{ id: string }>("resources", body),
+      update: (id: string, body: Record<string, unknown>) => adminUpdate("resources", id, body),
+      upload: (id: string, f: File, pc?: number) => adminUploadFile(id, f, pc),
     };
 
     try {
@@ -210,22 +207,76 @@ export function ResourceEditorModal({
         // Editing a published/hidden resource + Save as Draft → keep the live
         // version untouched and stage the edits as a new draft.
         if (status === "draft" && editing.status !== "draft") {
-          const created = await adminCreate<{ id: string }>("resources", payload);
-          const uploaded = await uploadSelectedFile(created.id);
-          toast(
-            uploaded
-              ? "Edits saved as a new draft — the published resource is unchanged"
-              : "Draft created, but the file upload failed — replace it from Edit",
-          );
+          const result = await executeResourceSave(deps, {
+            isNew: false,
+            saveAsNewDraft: true,
+            payload,
+            status,
+            file,
+            pageCount: Number(form.pageCount) || undefined,
+            hasStoredFile: Boolean(editing.fileName),
+          });
+          if (!result.ok) {
+            failOnFile(result.message);
+            if (result.reason === "upload-failed") {
+              toast("Draft created, but the file upload failed — replace it from Edit");
+              onSaved?.();
+              onClose();
+            }
+            return;
+          }
+          toast("Edits saved as a new draft — the published resource is unchanged");
         } else {
-          await adminUpdate("resources", editing.id, payload);
-          const uploaded = await uploadSelectedFile(editing.id);
-          toast(uploaded ? "Resource updated" : "Resource updated, but the file upload failed");
+          const result = await executeResourceSave(deps, {
+            isNew: false,
+            editingId: editing.id,
+            payload,
+            status,
+            file,
+            pageCount: Number(form.pageCount) || undefined,
+            hasStoredFile: Boolean(editing.fileName),
+          });
+          if (!result.ok) {
+            if (result.reason === "blocked-no-file") {
+              failOnFile(result.message);
+              return;
+            }
+            if (result.reason === "upload-failed") {
+              failOnFile(result.message);
+              // A staged publish never happened: stay open on the file field.
+              // Otherwise preserve legacy behavior (metadata saved, old file
+              // intact — the backend swap never ran).
+              if (status !== "published" || !file || Boolean(editing.fileName)) {
+                toast("Resource updated, but the file upload failed");
+                onSaved?.();
+                onClose();
+              }
+              return;
+            }
+            toast("File uploaded, but publishing failed — resource kept as draft.", "error");
+            onSaved?.();
+            return;
+          }
+          toast("Resource updated");
         }
       } else {
-        const created = await adminCreate<{ id: string }>("resources", payload);
-        const uploaded = await uploadSelectedFile(created.id);
-        if (!uploaded) return;
+        const result = await executeResourceSave(deps, {
+          isNew: true,
+          payload,
+          status,
+          file,
+          pageCount: Number(form.pageCount) || undefined,
+          hasStoredFile: false,
+        });
+        if (!result.ok) {
+          if (result.reason === "publish-failed") {
+            toast("File uploaded, but publishing failed — resource kept as draft.", "error");
+            onSaved?.();
+            return;
+          }
+          failOnFile(result.message);
+          return;
+        }
         toast("Resource added");
       }
       onSaved?.();

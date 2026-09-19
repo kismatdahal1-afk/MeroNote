@@ -13,7 +13,8 @@ dotenv.config();
  * Tier 2 (live, ONLY when B2_KEY_ID + B2_APPLICATION_KEY + B2_BUCKET_NAME
  * are all set): bucket HEAD → upload temp object
  * `resources/phase5-verify/*.pdf` → HEAD exists → presigned-URL byte
- * round-trip → delete → HEAD confirms removal. Without credentials it
+ * round-trip → browser-consumability (app-origin CORS GET + preflight, the
+ * PDF Reader contract) → delete → HEAD confirms removal. Without credentials it
  * honestly reports LIVE SKIPPED and still exits 0 on Tier 1 pass.
  *
  * Never prints keys, secrets, URIs, or signed URLs. Never touches MongoDB.
@@ -161,6 +162,32 @@ async function main(): Promise<void> {
       const url = await getDownloadUrl(meta.key, 300);
       const fetched = Buffer.from(await (await fetch(url)).arrayBuffer());
       check("presigned-URL byte round-trip", fetched.equals(MINIMAL_PDF));
+
+      // Browser-consumability (PDF Reader regression): the reader fetches the
+      // presigned URL cross-origin from the app origin (plain GET + PDF.js),
+      // so the bucket must answer CORS for that origin. A missing rule leaves
+      // every server-side check green while the browser blocks the bytes
+      // (no Access-Control-Allow-Origin, OPTIONS → 403) — the exact failure
+      // this guards against. Never prints the URL itself.
+      const appOrigin = env.clientUrl.replace(/\/$/, "");
+      const corsGet = await fetch(url, { headers: { Origin: appOrigin } });
+      await corsGet.arrayBuffer().catch(() => {});
+      const allowOrigin = corsGet.headers.get("access-control-allow-origin");
+      check(
+        "presigned URL allows the app origin (browser CORS)",
+        corsGet.status === 200 && (allowOrigin === appOrigin || allowOrigin === "*"),
+        `status=${corsGet.status} allow-origin=${allowOrigin ?? "(absent)"}`,
+      );
+      const preflight = await fetch(url, {
+        method: "OPTIONS",
+        headers: { Origin: appOrigin, "Access-Control-Request-Method": "GET" },
+      });
+      const preflightAllow = preflight.headers.get("access-control-allow-origin");
+      check(
+        "presigned URL answers CORS preflight",
+        preflight.status < 400 && (preflightAllow === appOrigin || preflightAllow === "*"),
+        `status=${preflight.status}`,
+      );
 
       let missingThrows = false;
       try {
