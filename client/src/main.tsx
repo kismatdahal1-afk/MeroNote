@@ -7,7 +7,6 @@ import { ToastProvider } from "./state/ToastProvider";
 import { LibraryProvider } from "./state/LibraryProvider";
 import { UserProvider } from "./state/UserProvider";
 import { SemesterStatusProvider } from "./state/SemesterStatusProvider";
-import { CmsProvider } from "./state/CmsProvider";
 
 // Phase 9: serve cached shell/API offline. Production only — registering in
 // dev would serve stale bundles while iterating. The worker never touches
@@ -27,9 +26,7 @@ createRoot(document.getElementById("root")!).render(
         <UserProvider>
           <LibraryProvider>
             <SemesterStatusProvider>
-              <CmsProvider>
-                <RouterProvider router={router} />
-              </CmsProvider>
+              <RouterProvider router={router} />
             </SemesterStatusProvider>
           </LibraryProvider>
         </UserProvider>

@@ -28,7 +28,7 @@ import { cx, formatFileSize, formatDate } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
 import { fetchResource, fetchSemester, fetchSubject, ApiError } from "../lib/contentApi";
-import { adminDelete, adminUpdate } from "../lib/adminApi";
+import { adminDelete, adminDeleteFile, adminUpdate, adminUploadFile } from "../lib/adminApi";
 import { useApiQuery } from "../hooks/useApiQuery";
 import { ResourceDetailSkeleton } from "../components/skeletons/pages";
 
@@ -140,7 +140,7 @@ export default function ResourceDetail() {
       return;
     }
     addBookmark(resource, progress?.lastPage ?? 1, "");
-    toast("Bookmark saved (mock)");
+    toast("Bookmark saved");
   };
 
   const handleDownload = () => {
@@ -160,6 +160,32 @@ export default function ResourceDetail() {
       retry();
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not update visibility.", "error");
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const handleReplaceFile = async (file: File) => {
+    setBusyAction(true);
+    try {
+      await adminUploadFile(resource.id, file, resource.pageCount || undefined);
+      toast("PDF replaced");
+      retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not replace file.", "error");
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const handleRemoveFile = async () => {
+    setBusyAction(true);
+    try {
+      await adminDeleteFile(resource.id);
+      toast("PDF removed — resource is now a draft");
+      retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not remove file.", "error");
     } finally {
       setBusyAction(false);
     }
@@ -308,6 +334,35 @@ export default function ResourceDetail() {
               )}
               <Button
                 size="sm"
+                variant="outline"
+                title="Replace the PDF file"
+                disabled={busyAction}
+                onClick={() => document.getElementById("admin-replace-file")?.click()}
+              >
+                Replace file
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                title="Remove the PDF file (forces draft)"
+                disabled={busyAction}
+                onClick={() => { void handleRemoveFile(); }}
+              >
+                Remove file
+              </Button>
+              <input
+                id="admin-replace-file"
+                type="file"
+                accept="application/pdf,.pdf"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void handleReplaceFile(f);
+                }}
+              />
+              <Button
+                size="sm"
                 variant="danger"
                 title="Move this resource to trash"
                 className="bg-[#FA003F]/15 text-[#FA003F] transition-transform hover:bg-[#FA003F] hover:text-white hover:opacity-100 active:scale-95"
@@ -425,6 +480,7 @@ export default function ResourceDetail() {
             open={editOpen}
             editing={resource}
             onClose={() => setEditOpen(false)}
+            onSaved={() => retry()}
           />
           <ConfirmDialog
             open={pendingDelete}

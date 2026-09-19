@@ -56,7 +56,7 @@ export function ResourceCard({ resource, showContext = true, via, fromSubject }:
       return;
     }
     addBookmark(resource, 1, "");
-    toast("Bookmark saved (mock)");
+    toast("Bookmark saved");
   };
 
   const handleDownload = () => {

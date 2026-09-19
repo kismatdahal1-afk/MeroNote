@@ -30,7 +30,9 @@ export default function Downloads() {
   const [type, setType] = useState<ResourceType | "all">("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
-  const downloadKey = downloads.map((d) => `${d.id}:${d.status}:${d.progress}`).join(",");
+  // Status transitions (downloading → completed/failed) refetch; per-chunk
+  // progress ticks must not — they would refetch every resource per chunk.
+  const downloadKey = downloads.map((d) => `${d.id}:${d.status}`).join(",");
   const resolved = useApiQuery(`downloads:${downloadKey}`, async (signal) => {
     const rows = await Promise.all(
       downloads.map(async (dl) => {

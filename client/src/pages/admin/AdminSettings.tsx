@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FileText,
   AlertCircle,
@@ -14,17 +14,11 @@ import { Modal } from "../../components/common/Modal";
 import { Input, Select } from "../../components/common/Field";
 import { Toggle } from "../../components/common/Toggle";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { useCms } from "../../state/CmsProvider";
-import {
-  resetDb,
-  getSettings,
-  updateContentDefaults,
-  updateNotices,
-  updateDraftTrash,
-} from "../../state/cmsStore";
+import { adminList } from "../../lib/adminApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
 import { useToast } from "../../state/ToastProvider";
 import { useUser } from "../../state/UserProvider";
-import type { NoticeType, NoticePriority } from "../../types";
+import type { NoticeType, NoticePriority, Resource, Notice } from "../../types";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "draft", label: "Draft" },
@@ -46,6 +40,40 @@ const PRIORITY_OPTIONS: { value: NoticePriority; label: string }[] = [
   { value: "high", label: "High" },
   { value: "urgent", label: "Urgent" },
 ];
+
+/**
+ * AdminSettings stays local-only by design (Phase 12): these are browser
+ * preferences for confirmations/defaults, not server data. No API calls are
+ * made for the toggles. Counts below come from the real Admin API.
+ */
+const SETTINGS_KEY = "meronote.admin.settings.v1";
+
+interface LocalSettings {
+  contentDefaults: { defaultResourceStatus: "draft" | "published" | "hidden"; requireDescription: boolean; requireSemester: boolean; requireSubject: boolean; requirePdf: boolean; confirmDelete: boolean };
+  notices: { defaultNoticeType: NoticeType; defaultPriority: NoticePriority; autoExpireNotices: boolean; showOnDashboard: boolean };
+  draftTrash: { saveAsDraftByDefault: boolean; moveDeletedToTrash: boolean; confirmDeleteForever: boolean };
+}
+
+const DEFAULT_SETTINGS: LocalSettings = {
+  contentDefaults: { defaultResourceStatus: "draft", requireDescription: true, requireSemester: true, requireSubject: true, requirePdf: true, confirmDelete: true },
+  notices: { defaultNoticeType: "announcement", defaultPriority: "normal", autoExpireNotices: true, showOnDashboard: true },
+  draftTrash: { saveAsDraftByDefault: true, moveDeletedToTrash: true, confirmDeleteForever: true },
+};
+
+function loadSettings(): LocalSettings {
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(raw) as Partial<LocalSettings>;
+    return {
+      contentDefaults: { ...DEFAULT_SETTINGS.contentDefaults, ...(parsed.contentDefaults ?? {}) },
+      notices: { ...DEFAULT_SETTINGS.notices, ...(parsed.notices ?? {}) },
+      draftTrash: { ...DEFAULT_SETTINGS.draftTrash, ...(parsed.draftTrash ?? {}) },
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
 
 /* ─── Shared section title — identical to Student Settings ─── */
 
@@ -128,24 +156,33 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function AdminSettings() {
-  const db = useCms();
   const { toast } = useToast();
   const { name, email, role, setName } = useUser();
-  const [settings, setSettings] = useState(getSettings);
+  const [settings, setSettings] = useState<LocalSettings>(loadSettings);
   const [pendingReset, setPendingReset] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [draftName, setDraftName] = useState(name);
   const [nameError, setNameError] = useState("");
 
-  const update = (section: keyof typeof settings, patch: object) => {
-    const updaters = {
-      contentDefaults: updateContentDefaults,
-      notices: updateNotices,
-      draftTrash: updateDraftTrash,
-    };
-    updaters[section](patch);
-    setSettings(getSettings());
+  const countsQuery = useApiQuery("admin-settings-counts", async (signal) => {
+    const [resources, notices] = await Promise.all([
+      adminList<Resource>("resources", { limit: 1 }, signal).catch(() => ({ total: 0 })),
+      adminList<Notice>("notices", { limit: 1 }, signal).catch(() => ({ total: 0 })),
+    ]);
+    return { resources: resources.total, notices: notices.total };
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch {
+      /* private mode — keep in-memory */
+    }
+  }, [settings]);
+
+  const update = (section: keyof LocalSettings, patch: Record<string, unknown>) => {
+    setSettings((prev) => ({ ...prev, [section]: { ...prev[section], ...patch } }));
     toast("Setting updated");
   };
 
@@ -368,23 +405,23 @@ export default function AdminSettings() {
           <div className="mb-3 px-1">
             <SectionTitle icon={Database}>CMS Data</SectionTitle>
             <p className="mt-1 ml-[28px] text-sm font-medium text-muted-foreground">
-              Local browser storage until the real API arrives.
+              Live database counts. Preferences above stay in this browser only.
             </p>
           </div>
           <Card className="p-5 sm:p-6">
             <div className="divide-y divide-border">
-              <DataRow label="Resources" value={db.resources.filter((r) => !r.deletedAt).length} />
-              <DataRow label="Notices" value={db.notices.filter((n) => !n.deletedAt).length} />
+              <DataRow label="Resources" value={countsQuery.data?.resources ?? "—"} />
+              <DataRow label="Notices" value={countsQuery.data?.notices ?? "—"} />
             </div>
             <p className="mt-4 text-xs font-medium text-muted-foreground">
-              Content is stored in this browser (localStorage) until the real API + database
-              arrive.
+              Content lives in MongoDB via the Admin API. Reset below clears only
+              this browser's local admin preferences.
             </p>
             <Button variant="danger" className="mt-4 w-full" onClick={() => setPendingReset(true)}>
-              <RotateCcw className="size-4" aria-hidden="true" /> Reset CMS to seed data
+              <RotateCcw className="size-4" aria-hidden="true" /> Reset local preferences
             </Button>
             <p className="mt-2 text-center text-xs font-medium text-muted-foreground/70">
-              Restores the original demo content and discards admin changes.
+              Restores default toggles in this browser; server content is untouched.
             </p>
           </Card>
         </section>
@@ -430,14 +467,19 @@ export default function AdminSettings() {
 
       <ConfirmDialog
         open={pendingReset}
-        title="Reset CMS data"
-        message="All admin changes will be discarded and the original demo content restored."
+        title="Reset local preferences"
+        message="Browser-only admin preferences will return to defaults. Server content is untouched."
         confirmLabel="Reset"
         danger
         onCancel={() => setPendingReset(false)}
         onConfirm={() => {
-          resetDb();
-          toast("CMS data reset to seed content");
+          try {
+            window.localStorage.removeItem(SETTINGS_KEY);
+          } catch {
+            /* ignore */
+          }
+          setSettings(DEFAULT_SETTINGS);
+          toast("Local preferences reset");
           setPendingReset(false);
         }}
       />

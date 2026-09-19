@@ -51,7 +51,7 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
       return;
     }
     addBookmark(resource, 1, "");
-    toast("Bookmark saved (mock)");
+    toast("Bookmark saved");
   };
 
   return (

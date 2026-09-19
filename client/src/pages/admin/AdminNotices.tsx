@@ -6,15 +6,14 @@ import { Button } from "../../components/common/Button";
 import { IconButton } from "../../components/common/IconButton";
 import { Modal } from "../../components/common/Modal";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { EmptyState } from "../../components/common/States";
+import { EmptyState, ErrorState } from "../../components/common/States";
 import { StatusBadge, StatusToggleGroup } from "../../components/admin/StatusBadge";
 import { NoticeDetailModal } from "../../components/notices/NoticeDetailModal";
 import { Badge } from "../../components/common/Badge";
-import { useCms } from "../../state/CmsProvider";
-import {
-  createNotice, updateNotice, branchNoticeToDraft, toggleNoticePinned,
-  deleteEntity, getSettings, noticeWithState,
-} from "../../state/cmsStore";
+import { ApiError } from "../../lib/contentApi";
+import { adminCreate, adminDelete, adminList, adminUpdate } from "../../lib/adminApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
+import { noticeWithState } from "../../lib/noticeState";
 import { useToast } from "../../state/ToastProvider";
 import { cx, formatDate } from "../../lib/utils";
 import type { Notice, NoticeType, NoticeAnnouncer } from "../../types";
@@ -74,23 +73,19 @@ interface NoticeFormState {
   pinned: boolean;
 }
 
-const emptyForm = (): NoticeFormState => {
-  const s = getSettings().notices;
-  return {
-    heading: "",
-    subtext: "",
-    type: s.defaultNoticeType,
-    announcer: "administration",
-    date: new Date().toISOString().slice(0, 10),
-    priority: s.defaultPriority,
-    status: "published",
-    showOnDashboard: s.showOnDashboard,
-    pinned: false,
-  };
-};
+const emptyForm = (): NoticeFormState => ({
+  heading: "",
+  subtext: "",
+  type: "announcement",
+  announcer: "administration",
+  date: new Date().toISOString().slice(0, 10),
+  priority: "normal",
+  status: "published",
+  showOnDashboard: true,
+  pinned: false,
+});
 
 export default function AdminNotices() {
-  const db = useCms();
   const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<NoticeType | "all">("all");
@@ -100,17 +95,22 @@ export default function AdminNotices() {
   const [errors, setErrors] = useState<Partial<Record<keyof NoticeFormState, string>>>({});
   const [pendingDelete, setPendingDelete] = useState<Notice | null>(null);
   const [detail, setDetail] = useState<Notice | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const listQuery = useApiQuery("admin-notices-list", (signal) =>
+    adminList<Notice>("notices", { limit: 100 }, signal),
+  );
+  const dbNotices = useMemo(() => listQuery.data?.rows ?? [], [listQuery.data]);
 
   const notices = useMemo(
     () =>
-      db.notices
-        .filter((n) => !n.deletedAt)
+      dbNotices
         .slice()
         .sort((a, b) => {
           if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
           return +new Date(b.updatedAt) - +new Date(a.updatedAt);
         }),
-    [db.notices],
+    [dbNotices],
   );
 
   const counts = useMemo(() => {
@@ -162,21 +162,30 @@ export default function AdminNotices() {
     setErrors({});
   };
 
-  /** Delete honoring settings: skip the confirmation when
-   *  "Confirm Before Deleting" is OFF, and permanently delete when
-   *  "Move Deleted to Trash" is OFF. */
   const requestDelete = (n: Notice) => {
-    const s = getSettings();
-    if (!s.contentDefaults.confirmDelete) {
-      deleteEntity("notice", n.id);
-      toast(
-        s.draftTrash.moveDeletedToTrash
-          ? "Notice moved to trash"
-          : "Notice permanently deleted",
-      );
-      return;
-    }
     setPendingDelete(n);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setPendingDelete(null);
+    try {
+      await adminDelete("notices", target.id);
+      toast("Notice moved to trash");
+      listQuery.retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not delete notice.", "error");
+    }
+  };
+
+  const togglePinned = async (n: Notice) => {
+    try {
+      await adminUpdate("notices", n.id, { pinned: !n.pinned });
+      listQuery.retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not update pin.", "error");
+    }
   };
 
   const set = <K extends keyof NoticeFormState>(key: K, value: NoticeFormState[K]) => {
@@ -188,13 +197,14 @@ export default function AdminNotices() {
     const next: typeof errors = {};
     if (!form.heading.trim()) next.heading = "Title is required.";
     if (!form.date) next.date = "Date is required.";
-    if (!form.announcer) (next as any).announcer = "Announcer is required.";
+    if (!form.announcer) (next as Record<string, string>).announcer = "Announcer is required.";
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
-  const save = (status: Notice["status"]) => {
-    if (!validate()) return;
+  const save = async (status: Notice["status"]) => {
+    if (!validate() || saving) return;
+    setSaving(true);
     const draft = {
       heading: form.heading.trim(),
       subtext: form.subtext.trim(),
@@ -206,24 +216,57 @@ export default function AdminNotices() {
       showOnDashboard: form.showOnDashboard,
       pinned: form.pinned,
     };
-    if (editing) {
-      // Editing a published notice + Save as Draft → keep the live
-      // version untouched and stage the edits as a new draft in Drafts.
-      if (status === "draft" && editing.status !== "draft") {
-        branchNoticeToDraft(editing.id, draft);
-        toast("Edits saved as a new draft — the published notice is unchanged");
+    try {
+      if (editing) {
+        // Editing a published notice + Save as Draft → keep the live
+        // version untouched and stage the edits as a new draft in Drafts.
+        if (status === "draft" && editing.status !== "draft") {
+          await adminCreate("notices", draft);
+          toast("Edits saved as a new draft — the published notice is unchanged");
+        } else {
+          await adminUpdate("notices", editing.id, draft);
+          toast("Notice updated");
+        }
       } else {
-        updateNotice(editing.id, draft);
-        toast("Notice updated");
+        await adminCreate("notices", draft);
+        toast(status === "draft" ? "Notice saved as draft" : "Notice published");
       }
-    } else {
-      createNotice(draft);
-      toast(status === "draft" ? "Notice saved as draft" : "Notice published");
+      setFormOpen(false);
+      setEditing(null);
+      setErrors({});
+      listQuery.retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not save notice.", "error");
+    } finally {
+      setSaving(false);
     }
-    setFormOpen(false);
-    setEditing(null);
-    setErrors({});
   };
+
+  if (listQuery.loading) {
+    return (
+      <div aria-busy="true" aria-label="Loading notices">
+        <PageHeader
+          title="Notices"
+          subtitle="Dashboard notices, exam reminders, and deadlines."
+          breadcrumbs={[{ label: "Admin", to: "/admin" }, { label: "Notices" }]}
+        />
+        <Card className="animate-pulse p-8"><div className="h-24 rounded bg-surface-muted" /></Card>
+      </div>
+    );
+  }
+
+  if (listQuery.error) {
+    return (
+      <div>
+        <PageHeader
+          title="Notices"
+          subtitle="Dashboard notices, exam reminders, and deadlines."
+          breadcrumbs={[{ label: "Admin", to: "/admin" }, { label: "Notices" }]}
+        />
+        <ErrorState message={listQuery.error} onRetry={listQuery.retry} />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -379,7 +422,7 @@ export default function AdminNotices() {
                               variant={n.pinned ? "active" : "default"}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toggleNoticePinned(n.id);
+                                void togglePinned(n);
                               }}
                             />
                             <IconButton
@@ -486,7 +529,7 @@ export default function AdminNotices() {
                         variant={n.pinned ? "active" : "default"}
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleNoticePinned(n.id);
+                          void togglePinned(n);
                         }}
                       />
                       <IconButton
@@ -524,7 +567,7 @@ export default function AdminNotices() {
         title={editing ? "Edit Notice" : "Add Notice"}
         className="max-w-lg"
       >
-        <form onSubmit={(e: FormEvent) => { e.preventDefault(); save(form.status); }} noValidate className="mt-2 space-y-4">
+        <form onSubmit={(e: FormEvent) => { e.preventDefault(); void save(form.status); }} noValidate className="mt-2 space-y-4">
             <Input
               id="notice-heading"
               label="Title"
@@ -617,8 +660,8 @@ export default function AdminNotices() {
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button type="submit" className="w-full sm:w-auto sm:flex-1 whitespace-nowrap">
-                {form.status === "draft" ? "Save Draft" : "Save & Publish"}
+              <Button type="submit" disabled={saving} className="w-full sm:w-auto sm:flex-1 whitespace-nowrap">
+                {saving ? "Saving…" : form.status === "draft" ? "Save Draft" : "Save & Publish"}
               </Button>
               <Button variant="outline" type="button" onClick={closeForm} className="w-full sm:w-auto sm:flex-1 whitespace-nowrap">
                 Cancel
@@ -634,25 +677,11 @@ export default function AdminNotices() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete notice"
-        message={
-          getSettings().draftTrash.moveDeletedToTrash
-            ? `"${pendingDelete?.heading}" will be moved to the trash. You can restore it from there.`
-            : `"${pendingDelete?.heading}" will be permanently deleted. This cannot be undone.`
-        }
+        message={`"${pendingDelete?.heading}" will be moved to the trash. You can restore it from there.`}
         confirmLabel="Delete"
         danger
         onCancel={() => setPendingDelete(null)}
-        onConfirm={() => {
-          if (pendingDelete) {
-            deleteEntity("notice", pendingDelete.id);
-            toast(
-              getSettings().draftTrash.moveDeletedToTrash
-                ? "Notice moved to trash"
-                : "Notice permanently deleted",
-            );
-          }
-          setPendingDelete(null);
-        }}
+        onConfirm={() => { void confirmDelete(); }}
       />
     </div>
   );

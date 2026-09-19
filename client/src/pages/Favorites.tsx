@@ -8,16 +8,24 @@ import { SearchBar } from "../components/common/SearchBar";
 import { FilterChips, type TypeFilter } from "../components/resources/FilterChips";
 import { useTaxonomy } from "../hooks/useTaxonomy";
 import { matchesQuery } from "../lib/utils";
-import { fetchSemesters } from "../lib/contentApi";
+import { fetchResource, fetchSemesters, fetchSubject, type SubjectDetail } from "../lib/contentApi";
 import { listFavorites, type StudyFavoriteRow } from "../lib/studyApi";
 import { favoriteRowToResource, favoriteRowToSubject } from "../lib/personalAdapters";
 import { useApiQuery } from "../hooks/useApiQuery";
+import { useLibrary } from "../state/LibraryProvider";
+import { useUser } from "../state/UserProvider";
 import { FavoritesSkeleton } from "../components/skeletons/pages";
-import type { ResourceType } from "../types";
+import type { Resource, ResourceType } from "../types";
 
 type SortKey = "recent" | "title" | "pages";
 
 export default function Favorites() {
+  // Server rows are authoritative when authed; guests keep local-only lists
+  // (LibraryProvider) resolved here so logged-out users never see a false
+  // empty state after tapping the heart icon.
+  const { status } = useUser();
+  const { favorites: localFavResourceIds, favoriteSubjects: localFavSubjectIds } = useLibrary();
+  const isGuest = status !== "authed";
   const { subjects: taxonomySubjects } = useTaxonomy();
   const [query, setQuery] = useState("");
   const [semesterId, setSemesterId] = useState("");
@@ -25,9 +33,9 @@ export default function Favorites() {
   const [type, setType] = useState<TypeFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
-  const { data, error, loading, retry } = useApiQuery("me-favorites", async (signal) => {
+  const { data, error, loading, retry } = useApiQuery(`me-favorites:${status}`, async (signal) => {
     const [favRows, semesters] = await Promise.all([
-      listFavorites(),
+      status === "authed" ? listFavorites() : Promise.resolve(null),
       fetchSemesters(signal).catch(() => ({ rows: [], total: 0 })),
     ]);
     return { favRows: favRows ?? [], semesters: semesters.rows };
@@ -35,23 +43,37 @@ export default function Favorites() {
   const favRows: StudyFavoriteRow[] = useMemo(() => data?.favRows ?? [], [data]);
   const semesters = useMemo(() => data?.semesters ?? [], [data]);
 
-  const allSubjectsFav = useMemo(
-    () =>
-      favRows
-        .filter((row) => row.targetType === "subject")
-        .map((row) => favoriteRowToSubject(row))
-        .filter((s): s is NonNullable<typeof s> => Boolean(s)),
-    [favRows],
-  );
+  const localKey = isGuest
+    ? [...localFavResourceIds, ...localFavSubjectIds].sort().join(",")
+    : "authed";
+  const localResolved = useApiQuery(`local-favorites:${localKey}`, async (signal) => {
+    if (!isGuest) return null;
+    const [resources, subjects] = await Promise.all([
+      Promise.all(localFavResourceIds.map((id) => fetchResource(id, signal).catch(() => null))),
+      Promise.all(localFavSubjectIds.map((id) => fetchSubject(id, signal).catch(() => null))),
+    ]);
+    return {
+      resources: resources.filter((r): r is Resource => r !== null),
+      subjects: subjects.filter((s): s is SubjectDetail => s !== null),
+    };
+  });
+  const showLoading = isGuest ? loading || localResolved.loading : loading;
 
-  const allResources = useMemo(
-    () =>
-      favRows
-        .filter((row) => row.targetType === "resource")
-        .map((row) => favoriteRowToResource(row))
-        .filter((r): r is NonNullable<typeof r> => Boolean(r)),
-    [favRows],
-  );
+  const allSubjectsFav = useMemo(() => {
+    if (isGuest) return localResolved.data?.subjects ?? [];
+    return favRows
+      .filter((row) => row.targetType === "subject")
+      .map((row) => favoriteRowToSubject(row))
+      .filter((s): s is NonNullable<typeof s> => Boolean(s));
+  }, [isGuest, favRows, localResolved.data]);
+
+  const allResources = useMemo(() => {
+    if (isGuest) return localResolved.data?.resources ?? [];
+    return favRows
+      .filter((row) => row.targetType === "resource")
+      .map((row) => favoriteRowToResource(row))
+      .filter((r): r is NonNullable<typeof r> => Boolean(r));
+  }, [isGuest, favRows, localResolved.data]);
 
   const searchedSubjects = useMemo(() => {
     const q = query.trim();
@@ -129,7 +151,7 @@ export default function Favorites() {
         subtitle="Subjects and resources you've marked for quick access."
       />
 
-      {loading ? (
+      {showLoading ? (
         <FavoritesSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={retry} />

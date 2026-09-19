@@ -94,7 +94,7 @@ export default function Welcome() {
       </main>
 
       <footer className="border-t border-border py-6 text-center text-xs font-medium text-muted-foreground/70">
-        Mero Note â€” Phase 2.5 prototype with mock data
+        Mero Note — CSIT Study Library
       </footer>
     </div>
   );

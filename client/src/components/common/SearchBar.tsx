@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { cx } from "../../lib/utils";
@@ -14,6 +14,13 @@ interface SearchBarProps {
 
 export function SearchBar({ initialValue = "", placeholder = "Search resources...", className, onSubmit, onChange }: SearchBarProps) {
   const [value, setValue] = useState(initialValue);
+
+  // The query lives in the URL: when it changes externally (header search
+  // deep-link, clear-filters elsewhere), the input must follow. Setting an
+  // identical value is a no-op, so live-typing pages are unaffected.
+  useEffect(() => {
+    setValue(initialValue);
+  }, [initialValue]);
 
   const update = (next: string) => {
     setValue(next);

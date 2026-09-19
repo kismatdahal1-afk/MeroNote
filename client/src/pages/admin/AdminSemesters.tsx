@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Award, BookOpen, CalendarDays, ChevronRight, FileText, GraduationCap, Pencil, Plus, Trash2,
+  type LucideIcon,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
@@ -9,16 +10,15 @@ import { Button } from "../../components/common/Button";
 import { IconButton } from "../../components/common/IconButton";
 import { Modal } from "../../components/common/Modal";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
+import { EmptyState, ErrorState } from "../../components/common/States";
 import { StatusBadge } from "../../components/admin/StatusBadge";
-import { useCms } from "../../state/CmsProvider";
-import {
-  createSubject, updateSubject,
-  deleteEntity, getSettings,
-} from "../../state/cmsStore";
+import { ApiError } from "../../lib/contentApi";
+import { adminCreate, adminDelete, adminList, adminUpdate } from "../../lib/adminApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
 import { useToast } from "../../state/ToastProvider";
 import { cx } from "../../lib/utils";
 import { RESOURCE_TYPE_CONFIG, resourceTypeLabel } from "../../lib/resourceType";
-import type { Resource, Subject, PublishStatus } from "../../types";
+import type { Resource, Semester, Subject, PublishStatus } from "../../types";
 import { ResourceEditorModal } from "../../components/admin/ResourceEditorModal";
 
 interface SubjectFormState {
@@ -41,7 +41,6 @@ function toRoman(n: number): string {
 }
 
 export default function AdminSemesters() {
-  const db = useCms();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -51,13 +50,26 @@ export default function AdminSemesters() {
   const [resourceFormOpen, setResourceFormOpen] = useState(false);
   const [resourceDefaultSemester, setResourceDefaultSemester] = useState("");
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; type: "subject" } | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const [subjectForm, setSubjectForm] = useState<SubjectFormState>(emptySubjectForm(""));
 
-  const semesters = db.semesters.filter((s) => !s.deletedAt).sort((a, b) => a.order - b.order);
-  const allSubjects = db.subjects.filter((s) => !s.deletedAt);
+  const semestersQuery = useApiQuery("admin-semesters-list", (signal) =>
+    adminList<Semester>("semesters", { limit: 100 }, signal),
+  );
+  const subjectsQuery = useApiQuery("admin-semesters-subjects", (signal) =>
+    adminList<Subject>("subjects", { limit: 200 }, signal),
+  );
+  const resourcesQuery = useApiQuery("admin-semesters-resources", (signal) =>
+    adminList<Resource>("resources", { limit: 200 }, signal),
+  );
+  const retryAll = () => { semestersQuery.retry(); subjectsQuery.retry(); resourcesQuery.retry(); };
 
-  const resourceCountForSubject = (subId: string) => db.resources.filter((r) => !r.deletedAt && r.subjectId === subId).length;
+  const semesters = [...(semestersQuery.data?.rows ?? [])].sort((a, b) => a.order - b.order);
+  const allSubjects = (subjectsQuery.data?.rows ?? []).filter((s) => !(s as Subject & { deletedAt?: string }).deletedAt);
+  const allResources = (resourcesQuery.data?.rows ?? []).filter((r) => !r.deletedAt);
+
+  const resourceCountForSubject = (subId: string) => allResources.filter((r) => r.subjectId === subId).length;
 
   const toggleExpand = (subjectId: string) => {
     setExpandedSubjectId((prev) => (prev === subjectId ? null : subjectId));
@@ -75,53 +87,60 @@ export default function AdminSemesters() {
     setSubjectFormOpen(true);
   };
 
-  const handleSubjectSubmit = (e: React.FormEvent) => {
+  const handleSubjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subjectForm.semesterId || !subjectForm.name.trim() || !subjectForm.code.trim() || !subjectForm.credits || Number(subjectForm.credits) < 1) return;
-
-    const draft = {
-      semesterId: subjectForm.semesterId,
-      name: subjectForm.name.trim(),
-      code: subjectForm.code.trim().toUpperCase(),
-      description: subjectForm.description.trim(),
-      category: subjectForm.category,
-      credits: Number(subjectForm.credits),
-      status: subjectForm.status,
-    };
-
-    if (editingSubject) {
-      updateSubject(editingSubject.id, draft);
-      toast("Subject updated");
-    } else {
-      createSubject(draft);
-      toast("Subject created");
+    if (!subjectForm.semesterId || !subjectForm.name.trim() || !subjectForm.code.trim() || !subjectForm.credits || Number(subjectForm.credits) < 1 || saving) return;
+    setSaving(true);
+    try {
+      if (editingSubject) {
+        // semesterId is immutable server-side — never send it on update.
+        await adminUpdate("subjects", editingSubject.id, {
+          name: subjectForm.name.trim(),
+          code: subjectForm.code.trim().toUpperCase(),
+          description: subjectForm.description.trim(),
+          category: subjectForm.category,
+          credits: Number(subjectForm.credits),
+          status: subjectForm.status,
+        });
+        toast("Subject updated");
+      } else {
+        await adminCreate("subjects", {
+          semesterId: subjectForm.semesterId,
+          name: subjectForm.name.trim(),
+          code: subjectForm.code.trim().toUpperCase(),
+          description: subjectForm.description.trim(),
+          category: subjectForm.category,
+          credits: Number(subjectForm.credits),
+          status: subjectForm.status,
+        });
+        toast("Subject created");
+      }
+      setSubjectFormOpen(false);
+      setEditingSubject(null);
+      subjectsQuery.retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not save subject.", "error");
+    } finally {
+      setSaving(false);
     }
-    setSubjectFormOpen(false);
-    setEditingSubject(null);
   };
 
   const deleteSubject = (s: Subject) => {
-    if (!getSettings().contentDefaults.confirmDelete) {
-      deleteEntity("subject", s.id);
-      toast(
-        getSettings().draftTrash.moveDeletedToTrash
-          ? `"${s.name}" moved to trash`
-          : `"${s.name}" permanently deleted`,
-      );
-      return;
-    }
     setPendingDelete({ id: s.id, name: s.name, type: "subject" });
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!pendingDelete) return;
-    deleteEntity("subject", pendingDelete.id);
-    toast(
-      getSettings().draftTrash.moveDeletedToTrash
-        ? `"${pendingDelete.name}" moved to trash`
-        : `"${pendingDelete.name}" permanently deleted`,
-    );
+    const target = pendingDelete;
     setPendingDelete(null);
+    try {
+      await adminDelete("subjects", target.id);
+      toast(`"${target.name}" moved to trash`);
+      subjectsQuery.retry();
+      resourcesQuery.retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not delete subject.", "error");
+    }
   };
 
   const openAddResource = (semesterId: string) => {
@@ -140,6 +159,29 @@ export default function AdminSemesters() {
   const totalSubjects = allSubjects.length;
   const totalCredits = semesters.reduce((s, sem) => s + sem.credits, 0);
   const currentSemester = semesters.find((s) => s.enrollment === "active") ?? semesters.find((s) => s.order === 4) ?? semesters[0];
+
+  const loading = semestersQuery.loading || subjectsQuery.loading;
+  const error = semestersQuery.error ?? subjectsQuery.error;
+
+  if (loading) {
+    return (
+      <div className="space-y-6" aria-busy="true" aria-label="Loading semesters">
+        <PageHeader title="Semesters" subtitle="Manage the academic structure, subjects, topics and resources." />
+        <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (<Card key={i} className="animate-pulse p-5"><div className="h-10 rounded bg-surface-muted" /></Card>))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Semesters" subtitle="Manage the academic structure, subjects, topics and resources." />
+        <ErrorState message={error} onRetry={retryAll} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -182,7 +224,9 @@ export default function AdminSemesters() {
         />
       </div>
 
-      {sortedSemesters.map((semester) => {
+      {sortedSemesters.length === 0 ? (
+        <EmptyState title="No semesters" message="No semesters exist yet. Create them via the API seed or admin create." />
+      ) : sortedSemesters.map((semester) => {
         const semSubjects = allSubjects.filter((s) => s.semesterId === semester.id).sort((a, b) => a.name.localeCompare(b.name));
 
         return (
@@ -259,18 +303,18 @@ export default function AdminSemesters() {
                         >
                           <div className="border-t border-border bg-surface-muted/60 p-4">
                             {(() => {
-                              const subjectResources = db.resources
-                                .filter((r) => !r.deletedAt && r.subjectId === subject.id)
+                              const subjectResources = allResources
+                                .filter((r) => r.subjectId === subject.id)
                                 .sort((a, b) => +new Date(a.uploadedAt) - +new Date(b.uploadedAt));
                               const mainBook = subjectResources.find((r) => r.type === "book");
                               const childResources = subjectResources.filter((r) => r.id !== mainBook?.id);
                               // Group child resources by actual Resource Type (or custom name) — only types that exist
-                              const grouped = new Map<string, { label: string; icon: any; resources: typeof childResources }>();
+                              const grouped = new Map<string, { label: string; icon: LucideIcon; resources: typeof childResources }>();
                               for (const r of childResources) {
                                 const isCustom = r.type === "custom";
-                                const label = isCustom ? (r.customType?.trim() || "Custom") : resourceTypeLabel(r.type as any);
+                                const label = isCustom ? (r.customType?.trim() || "Custom") : resourceTypeLabel(r.type);
                                 const key = isCustom ? `custom:${label}` : r.type;
-                                const cfg = (RESOURCE_TYPE_CONFIG as any)[r.type] ?? RESOURCE_TYPE_CONFIG.custom;
+                                const cfg = RESOURCE_TYPE_CONFIG[r.type] ?? RESOURCE_TYPE_CONFIG.custom;
                                 if (!grouped.has(key)) grouped.set(key, { label, icon: cfg.icon, resources: [] });
                                 grouped.get(key)!.resources.push(r);
                               }
@@ -363,6 +407,7 @@ export default function AdminSemesters() {
             id="sub-semester"
             label="Semester"
             value={subjectForm.semesterId}
+            disabled={editingSubject !== null}
             onChange={(e) => setSubjectForm((p) => ({ ...p, semesterId: e.target.value }))}
             options={[
               { value: "", label: "Select semester..." },
@@ -371,10 +416,13 @@ export default function AdminSemesters() {
             error={!subjectForm.semesterId ? "Semester is required" : undefined}
             required
           />
+          {editingSubject !== null && (
+            <p className="text-xs font-medium text-muted-foreground">Semester cannot be changed after creation (server immutable).</p>
+          )}
           <Textarea id="sub-desc" label="Description" rows={3} value={subjectForm.description} onChange={(e) => setSubjectForm((p) => ({ ...p, description: e.target.value }))} />
           <div className="flex justify-end gap-3">
             <Button variant="outline" type="button" onClick={() => { setSubjectFormOpen(false); setEditingSubject(null); }}>Cancel</Button>
-            <Button type="submit">{editingSubject ? "Save changes" : "Create subject"}</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Saving…" : editingSubject ? "Save changes" : "Create subject"}</Button>
           </div>
         </form>
       </Modal>
@@ -384,6 +432,7 @@ export default function AdminSemesters() {
         open={resourceFormOpen}
         onClose={() => setResourceFormOpen(false)}
         defaultSemesterId={resourceDefaultSemester || undefined}
+        onSaved={() => resourcesQuery.retry()}
       />
 
       {/* Confirm delete */}

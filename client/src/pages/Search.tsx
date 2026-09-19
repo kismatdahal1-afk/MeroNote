@@ -91,6 +91,7 @@ export default function Search() {
   const [state, setState] = useState<SearchState>("idle");
   const [error, setError] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const requestId = useRef(0);
   const loadMoreController = useRef<AbortController | null>(null);
 
@@ -136,7 +137,9 @@ export default function Search() {
       loadMoreController.current?.abort();
       loadMoreController.current = null;
     };
-  }, [query]);
+    // retryNonce re-runs a failed query without changing the URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, retryNonce]);
 
   const groups = useMemo(() => {
     const byEntity = new Map<string, SearchResultRow[]>();
@@ -204,7 +207,12 @@ export default function Search() {
       {state === "loading" && <SkeletonCards />}
 
       {state === "error" && (
-        <EmptyState title="Search failed" message={error || "Search failed. Please try again."} />
+        <EmptyState
+          title="Search failed"
+          message={error || "Search failed. Please try again."}
+          actionLabel="Try again"
+          onAction={() => setRetryNonce((n) => n + 1)}
+        />
       )}
 
       {state === "ready" &&

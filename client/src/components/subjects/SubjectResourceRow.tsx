@@ -70,7 +70,7 @@ export function SubjectResourceRow({ resource, via, fromSubject }: SubjectResour
       return;
     }
     addBookmark(resource, 1, "");
-    toast("Bookmark saved (mock)");
+    toast("Bookmark saved");
   };
 
   return (

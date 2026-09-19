@@ -3,7 +3,7 @@ import type { Notice, NoticeWithState } from "../../types";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Badge } from "../common/Badge";
-import { noticeWithState } from "../../state/cmsStore";
+import { noticeWithState } from "../../lib/noticeState";
 import { cx, formatDate } from "../../lib/utils";
 
 const PRIORITY_TONE: Record<Notice["priority"], "success" | "warning" | "error"> = {

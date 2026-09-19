@@ -5,10 +5,15 @@ import {
 
 import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
 import { Badge } from "../../components/common/Badge";
-import { useCms } from "../../state/CmsProvider";
-import { getStats, getDashboardNotices } from "../../state/cmsStore";
+import { ErrorState } from "../../components/common/States";
+import { fetchNotices } from "../../lib/contentApi";
+import { adminList } from "../../lib/adminApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
+import { useTaxonomy } from "../../hooks/useTaxonomy";
 import { NoticesBoard } from "../../components/dashboard/NoticesBoard";
+import { noticeWithState } from "../../lib/noticeState";
 import { formatRelativeTime, formatFileSize } from "../../lib/utils";
+import type { Notice, Resource } from "../../types";
 
 const QUICK_ACTIONS = [
   { to: "/admin/resources", label: "Add Resource", icon: Upload },
@@ -18,20 +23,75 @@ const QUICK_ACTIONS = [
 ];
 
 export default function AdminDashboard() {
-  const db = useCms();
-  const stats = getStats();
-  const recentActivity = db.activity.slice(0, 7);
-  const dashboardNotices = getDashboardNotices();
+  const { subjectName } = useTaxonomy();
+  const statsQuery = useApiQuery("admin-dashboard-stats", async (signal) => {
+    const [total, published, drafts, semesters, subjects, notices] = await Promise.all([
+      adminList<Resource>("resources", { limit: 1 }, signal).catch(() => ({ total: 0 })),
+      adminList<Resource>("resources", { status: "published", hidden: "false", limit: 1 }, signal).catch(() => ({ total: 0 })),
+      adminList<Resource>("resources", { status: "draft", limit: 1 }, signal).catch(() => ({ total: 0 })),
+      adminList("semesters", { limit: 1 }, signal).catch(() => ({ total: 0 })),
+      adminList("subjects", { limit: 1 }, signal).catch(() => ({ total: 0 })),
+      adminList("notices", { limit: 1 }, signal).catch(() => ({ total: 0 })),
+    ]);
+    return {
+      totalResources: total.total,
+      publishedResources: published.total,
+      draftResources: drafts.total,
+      semesters: semesters.total,
+      subjects: subjects.total,
+      notices: notices.total,
+    };
+  });
+  const recentQuery = useApiQuery("admin-dashboard-recent", (signal) =>
+    adminList<Resource>("resources", { limit: 7 }, signal),
+  );
+  const sizeQuery = useApiQuery("admin-dashboard-size", async (signal) => {
+    const page = await adminList<Resource>("resources", { limit: 100 }, signal).catch(() => ({ rows: [] as Resource[] }));
+    return (page.rows ?? []).reduce((s, r) => s + (r.fileSize ?? 0), 0);
+  });
+  const noticesQuery = useApiQuery("admin-dashboard-notices", (signal) =>
+    fetchNotices(true, signal).then((list) => list.rows as Notice[]),
+  );
 
-  const recentUploads = db.resources
-    .filter((r) => !r.deletedAt)
-    .slice()
-    .sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt))
-    .slice(0, 7);
+  const stats = statsQuery.data ?? {
+    totalResources: 0, publishedResources: 0, draftResources: 0,
+    semesters: 0, subjects: 0, notices: 0,
+  };
+  const recentUploads = recentQuery.data?.rows ?? [];
+  const totalLibrarySize = sizeQuery.data ?? 0;
+  const dashboardNotices = (noticesQuery.data ?? []).map(noticeWithState);
+  const loading = statsQuery.loading || recentQuery.loading;
+  const error = statsQuery.error ?? recentQuery.error;
 
-  const totalLibrarySize = db.resources
-    .filter((r) => !r.deletedAt)
-    .reduce((s, r) => s + r.fileSize, 0);
+  if (loading) {
+    return (
+      <div>
+        <PageHeader
+          title="Admin Dashboard"
+          subtitle="Library overview and management shortcuts."
+          actions={<Badge tone="warning">ADMIN</Badge>}
+        />
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4" aria-busy="true" aria-label="Loading dashboard">
+          {[0, 1, 2, 3].map((i) => (
+            <Card key={i} className="animate-pulse p-5"><div className="h-10 rounded bg-surface-muted" /></Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <PageHeader
+          title="Admin Dashboard"
+          subtitle="Library overview and management shortcuts."
+          actions={<Badge tone="warning">ADMIN</Badge>}
+        />
+        <ErrorState message={error} onRetry={() => { statsQuery.retry(); recentQuery.retry(); }} />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -114,28 +174,25 @@ export default function AdminDashboard() {
                 No uploads yet. Use &ldquo;Add Resource&rdquo; to get started.
               </p>
             ) : (
-              recentUploads.map((r) => {
-                const subject = db.subjects.find((s) => s.id === r.subjectId);
-                return (
-                  <div key={r.id} className="flex items-center gap-4 p-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-1 text-sm font-medium text-foreground">{r.title}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {subject?.name ?? "—"} · {r.pageCount} pages · {formatFileSize(r.fileSize)}
-                      </p>
-                    </div>
-                    <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground/70">
-                      <Clock className="size-3.5" aria-hidden="true" />
-                      {formatRelativeTime(r.uploadedAt)}
-                    </span>
+              recentUploads.map((r) => (
+                <div key={r.id} className="flex items-center gap-4 p-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-1 text-sm font-medium text-foreground">{r.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {subjectName(r.subjectId) ?? "—"} · {r.pageCount} pages · {formatFileSize(r.fileSize)}
+                    </p>
                   </div>
-                );
-              })
+                  <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground/70">
+                    <Clock className="size-3.5" aria-hidden="true" />
+                    {formatRelativeTime(r.uploadedAt)}
+                  </span>
+                </div>
+              ))
             )}
           </Card>
         </section>
 
-        {/* Recent activity log */}
+        {/* Recent activity log — no backend activity API; preserve section as empty state */}
         <section aria-labelledby="admin-activity">
           <div className="mb-3.5 flex items-center justify-between">
             <h2 id="admin-activity" className="text-lg font-semibold text-foreground">
@@ -147,38 +204,9 @@ export default function AdminDashboard() {
             </Badge>
           </div>
           <Card className="divide-y divide-border">
-            {recentActivity.length === 0 ? (
-              <p className="p-5 text-sm font-medium text-muted-foreground">
-                Admin actions will be logged here.
-              </p>
-            ) : (
-              recentActivity.map((a) => (
-                <div key={a.id} className="flex items-center gap-4 p-4">
-                  <span
-                    className={
-                      "flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold " +
-                      (a.action === "delete"
-                        ? "bg-error-muted text-error"
-                        : a.action === "create"
-                          ? "bg-success-muted text-success"
-                          : "bg-primary-muted text-primary")
-                    }
-                    aria-hidden="true"
-                  >
-                    {a.action === "create" ? "+" : a.action === "delete" ? "×" : "•"}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="line-clamp-1 text-sm font-medium text-foreground">{a.label}</p>
-                    <p className="text-xs capitalize text-muted-foreground">
-                      {a.entity} · {a.action}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-xs text-muted-foreground/70">
-                    {formatRelativeTime(a.at)}
-                  </span>
-                </div>
-              ))
-            )}
+            <p className="p-5 text-sm font-medium text-muted-foreground">
+              Admin actions will be logged here.
+            </p>
           </Card>
         </section>
       </div>

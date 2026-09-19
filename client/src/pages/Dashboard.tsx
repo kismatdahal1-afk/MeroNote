@@ -8,7 +8,7 @@ import { StudySummaryGrid } from "../components/dashboard/StudySummaryGrid";
 import { ContinueReadingSection, DashboardSectionHeader } from "../components/dashboard/ContinueReadingSection";
 import { QuickNavigation, defaultQuickNav } from "../components/dashboard/QuickNavigation";
 import { RecentOpenedCard, TrendingResourceCard, TrendingTitle } from "../components/dashboard/TrendingResourceCard";
-import { programInfo } from "../data/mock";
+import { programInfo } from "../data/program";
 import { useUser } from "../state/UserProvider";
 import { useLibrary } from "../state/LibraryProvider";
 import { fetchCount, fetchNotices, fetchResources, fetchResource, fetchSemesters } from "../lib/contentApi";

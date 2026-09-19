@@ -8,10 +8,10 @@ import {
   type ReactNode,
 } from "react";
 import type { SemesterUserStatus } from "../types";
-import { getAllSemesters } from "../data/selectors";
 
 /**
- * Frontend-only, per-semester enrollment data chosen by the user:
+ * Frontend-only, per-semester enrollment data chosen by the user (local-only
+ * by design — no backend API; preserved through Phase 12):
  *  - status: upcoming | ongoing | passed
  *  - startDate / endDate: term dates, editable while the semester is "ongoing"
  *
@@ -47,7 +47,7 @@ interface SemesterStatusContextValue {
 const SemesterStatusContext = createContext<SemesterStatusContextValue | null>(null);
 
 function isSemesterId(id: string): boolean {
-  return getAllSemesters().some((s) => s.id === id);
+  return typeof id === "string" && id.trim().length > 0;
 }
 
 function readStoredStatuses(): SemesterStatuses {
@@ -100,15 +100,9 @@ function readStoredDates(): SemesterDates {
   }
 }
 
-/** Seed defaults from the CMS data so first run looks sensible. */
+/** No server seed — first run starts empty; UI defaults to upcoming. */
 function seedDefaultStatuses(): SemesterStatuses {
-  const statuses: SemesterStatuses = {};
-  for (const s of getAllSemesters()) {
-    if (s.enrollment === "passed") statuses[s.id] = "passed";
-    if (s.enrollment === "active") statuses[s.id] = "ongoing";
-    if (s.enrollment === "upcoming") statuses[s.id] = "upcoming";
-  }
-  return statuses;
+  return {};
 }
 
 export function SemesterStatusProvider({ children }: { children: ReactNode }) {

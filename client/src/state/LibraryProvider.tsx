@@ -29,6 +29,7 @@ import {
   createBookmark as createServerBookmark,
   deleteBookmarkById as deleteServerBookmarkById,
   deleteFavorite as deleteServerFavorite,
+  isObjectIdLike,
   listBookmarks as listServerBookmarks,
   listFavorites as listServerFavorites,
   listProgress as listServerProgress,
@@ -180,6 +181,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [bookmarkedSubjects, setBookmarkedSubjects] = useState<string[]>(() =>
     readStored(STORAGE_KEYS.bookmarkedSubjects, [], asStringArray),
   );
+  /** Server bookmark ids for subject bookmarks — deletes address `:id`. */
+  const [subjectBookmarkIds, setSubjectBookmarkIds] = useState<Record<string, string>>({});
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [recent, setRecent] = useState<RecentEntry[]>([]);
   const [progress, setProgress] = useState<ReadingProgress[]>([]);
@@ -193,6 +196,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       setFavoriteSubjects([]);
       setBookmarks([]);
       setBookmarkedSubjects([]);
+      setSubjectBookmarkIds({});
       setProgress([]);
       return;
     }
@@ -207,6 +211,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         if (bmRows) {
           setBookmarks(bmRows.map(bookmarkRowToBookmark).filter((b): b is Bookmark => b !== null));
           setBookmarkedSubjects(bmRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
+          const subjectIds: Record<string, string> = {};
+          for (const row of bmRows) {
+            if (row.targetType === "subject" && typeof row._id === "string") subjectIds[row.targetId] = row._id;
+          }
+          setSubjectBookmarkIds(subjectIds);
         }
         if (progRows) setProgress(progRows.map(progressRowToProgress));
       },
@@ -305,10 +314,30 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         ? prev.filter((id) => id !== subjectId)
         : [...prev, subjectId],
     );
-    // Removal has no server id to address pre-integration (delete is by :id),
-    // so only creations sync; full two-way sync arrives with real ids.
-    if (adding) syncPersonal(() => createServerBookmark({ targetType: "subject", targetId: subjectId }));
-  }, [bookmarkedSubjects, status]);
+    if (adding) {
+      syncPersonal(() =>
+        createServerBookmark({ targetType: "subject", targetId: subjectId }).then((row) => {
+          if (row && typeof row._id === "string") {
+            const serverId = row._id;
+            setSubjectBookmarkIds((prev) => ({ ...prev, [subjectId]: serverId }));
+          }
+        }),
+      );
+    } else {
+      const bookmarkId = subjectBookmarkIds[subjectId];
+      setSubjectBookmarkIds((prev) => {
+        if (!(subjectId in prev)) return prev;
+        const next = { ...prev };
+        delete next[subjectId];
+        return next;
+      });
+      syncPersonal(() =>
+        bookmarkId && isObjectIdLike(bookmarkId)
+          ? deleteServerBookmarkById(bookmarkId)
+          : Promise.resolve(false),
+      );
+    }
+  }, [bookmarkedSubjects, status, subjectBookmarkIds]);
 
   const getBookmark = useCallback(
     (resourceId: string) =>
@@ -318,11 +347,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   const addBookmark = useCallback(
     (resource: Resource, page: number, note?: string) => {
+      // Swap the temp id for the server _id on success so a later removal
+      // addresses the real row instead of silently no-op'ing server-side.
+      const tempId = `bm-${++nextId.current}`;
       setBookmarks((prev) => {
         if (prev.some((b) => b.resourceId === resource.id)) return prev;
         return [
           {
-            id: `bm-${++nextId.current}`,
+            id: tempId,
             resourceId: resource.id,
             page,
             note: note ?? "",
@@ -331,14 +363,22 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           ...prev,
         ];
       });
-      syncPersonal(() => createServerBookmark({ targetType: "resource", targetId: resource.id, page, note }));
+      syncPersonal(() =>
+        createServerBookmark({ targetType: "resource", targetId: resource.id, page, note }).then((row) => {
+          if (row && typeof row._id === "string") {
+            const serverId = row._id;
+            setBookmarks((prev) => prev.map((b) => (b.id === tempId ? { ...b, id: serverId } : b)));
+          }
+        }),
+      );
     },
     [status],
   );
 
   const removeBookmark = useCallback((bookmarkId: string) => {
     setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
-    // Mock ids no-op server-side; server-issued ids sync once hydrated.
+    // Temp local ids no-op server-side (guarded by isObjectIdLike); server
+    // ids sync. Newly created rows reconcile to server ids in addBookmark.
     syncPersonal(() => deleteServerBookmarkById(bookmarkId));
   }, [status]);
 

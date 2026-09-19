@@ -11,14 +11,12 @@ import { Button } from "../../components/common/Button";
 import { IconButton } from "../../components/common/IconButton";
 import { Modal } from "../../components/common/Modal";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { EmptyState } from "../../components/common/States";
+import { EmptyState, ErrorState } from "../../components/common/States";
 import { Badge } from "../../components/common/Badge";
 import { ResourceEditorModal } from "../../components/admin/ResourceEditorModal";
-import { useCms } from "../../state/CmsProvider";
-import {
-  setResourceStatus, setNoticeStatus, setSemesterStatus, setSubjectStatus,
-  deleteEntity, getSettings, updateTopic, updateNotice,
-} from "../../state/cmsStore";
+import { ApiError } from "../../lib/contentApi";
+import { adminDelete, adminList, adminUpdate } from "../../lib/adminApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
 import { useToast } from "../../state/ToastProvider";
 import { RESOURCE_TYPE_CONFIG, resourceTypeLabel } from "../../lib/resourceType";
 import { StatusBadge } from "../../components/admin/StatusBadge";
@@ -149,7 +147,6 @@ function KindChip({ active, label, count, onClick }: {
 }
 
 export default function AdminDrafts() {
-  const db = useCms();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -169,100 +166,113 @@ export default function AdminDrafts() {
   const [pendingPublish, setPendingPublish] = useState<DraftRow | null>(null);
   const [pendingDelete, setPendingDelete] = useState<DraftRow | null>(null);
 
+  const semestersAllQuery = useApiQuery("admin-drafts-semesters-all", (signal) =>
+    adminList<Semester>("semesters", { limit: 100 }, signal),
+  );
+  const subjectsAllQuery = useApiQuery("admin-drafts-subjects-all", (signal) =>
+    adminList<Subject>("subjects", { limit: 200 }, signal),
+  );
+  const resQuery = useApiQuery("admin-drafts-resources", (signal) =>
+    adminList<Resource>("resources", { status: "draft", limit: 100 }, signal),
+  );
+  const topicQuery = useApiQuery("admin-drafts-topics", (signal) =>
+    adminList<Topic>("topics", { status: "draft", limit: 100 }, signal),
+  );
+  const noticeQuery = useApiQuery("admin-drafts-notices", (signal) =>
+    adminList<Notice>("notices", { status: "draft", limit: 100 }, signal),
+  );
+  const semQuery = useApiQuery("admin-drafts-semesters", (signal) =>
+    adminList<Semester>("semesters", { status: "draft", limit: 100 }, signal),
+  );
+  const subjQuery = useApiQuery("admin-drafts-subjects", (signal) =>
+    adminList<Subject>("subjects", { status: "draft", limit: 100 }, signal),
+  );
+  const retryAll = () => {
+    resQuery.retry(); topicQuery.retry(); noticeQuery.retry();
+    semQuery.retry(); subjQuery.retry(); semestersAllQuery.retry(); subjectsAllQuery.retry();
+  };
+
   const semesters = useMemo(
-    () => db.semesters.filter((s) => !s.deletedAt).sort((a, b) => a.order - b.order),
-    [db.semesters],
+    () => [...(semestersAllQuery.data?.rows ?? [])].sort((a, b) => a.order - b.order),
+    [semestersAllQuery.data],
   );
   const semesterById = useMemo(() => new Map(semesters.map((s) => [s.id, s])), [semesters]);
-  const subjectsAll = useMemo(
-    () => db.subjects.filter((s) => !s.deletedAt),
-    [db.subjects],
-  );
+  const subjectsAll = useMemo(() => subjectsAllQuery.data?.rows ?? [], [subjectsAllQuery.data]);
   const subjectById = useMemo(() => new Map(subjectsAll.map((s) => [s.id, s])), [subjectsAll]);
 
   const rows = useMemo<DraftRow[]>(() => {
-    const draftResources = db.resources
-      .filter((r) => !r.deletedAt && r.status === "draft")
-      .map((r): DraftRow => {
-        const cfg = RESOURCE_TYPE_CONFIG[r.type];
-        return {
-          kind: "resource",
-          id: r.id,
-          resource: r,
-          title: r.title,
-          subtitle: r.description,
-          semesterId: r.semesterId,
-          subjectId: r.subjectId,
-          updatedAt: r.updatedAt,
-          typeIcon: cfg.icon,
-          typeLabel: resourceTypeLabel(r.type),
-          typeClass: cfg.badgeClass,
-        };
-      });
-    const draftTopics = db.topics
-      .filter((t) => !t.deletedAt && t.status === "draft")
-      .map((t): DraftRow => ({
-        kind: "topic",
-        id: t.id,
-        topic: t,
-        title: t.title,
-        subtitle: t.description ?? "",
-        semesterId: subjectById.get(t.subjectId)?.semesterId ?? "",
-        subjectId: t.subjectId,
-        updatedAt: t.updatedAt,
-        typeIcon: ListChecks,
-        typeLabel: "Topic",
-        typeClass: "bg-accent/15 text-accent",
-      }));
-    const draftNotices = db.notices
-      .filter((n) => !n.deletedAt && n.status === "draft")
-      .map((n): DraftRow => ({
-        kind: "notice",
-        id: n.id,
-        notice: n,
-        title: n.heading,
-        subtitle: n.subtext,
-        semesterId: "",
-        subjectId: "",
-        updatedAt: n.updatedAt,
-        typeIcon: Bell,
-        typeLabel: `${NOTICE_LABEL[n.type]} Notice`,
-        typeClass: "bg-warning-muted text-warning",
-      }));
-    const draftSemesters = db.semesters
-      .filter((s) => !s.deletedAt && s.status === "draft")
-      .map((s): DraftRow => ({
-        kind: "semester",
-        id: s.id,
-        semester: s,
-        title: s.name,
-        subtitle: s.description,
-        semesterId: s.id,
-        subjectId: "",
-        updatedAt: s.updatedAt,
-        typeIcon: GraduationCap,
-        typeLabel: "Semester",
-        typeClass: "bg-secondary/15 text-secondary",
-      }));
-    const draftSubjects = db.subjects
-      .filter((s) => !s.deletedAt && s.status === "draft")
-      .map((s): DraftRow => ({
-        kind: "subject",
-        id: s.id,
-        subject: s,
-        title: s.name,
-        subtitle: s.description,
-        semesterId: s.semesterId,
-        subjectId: s.id,
-        updatedAt: s.updatedAt,
-        typeIcon: BookMarked,
-        typeLabel: "Subject",
-        typeClass: "bg-success-muted text-success",
-      }));
+    const draftResources = (resQuery.data?.rows ?? []).map((r): DraftRow => {
+      const cfg = RESOURCE_TYPE_CONFIG[r.type];
+      return {
+        kind: "resource",
+        id: r.id,
+        resource: r,
+        title: r.title,
+        subtitle: r.description,
+        semesterId: r.semesterId,
+        subjectId: r.subjectId,
+        updatedAt: r.updatedAt,
+        typeIcon: cfg.icon,
+        typeLabel: resourceTypeLabel(r.type),
+        typeClass: cfg.badgeClass,
+      };
+    });
+    const draftTopics = (topicQuery.data?.rows ?? []).map((t): DraftRow => ({
+      kind: "topic",
+      id: t.id,
+      topic: t,
+      title: t.title,
+      subtitle: t.description ?? "",
+      semesterId: subjectById.get(t.subjectId)?.semesterId ?? "",
+      subjectId: t.subjectId,
+      updatedAt: t.updatedAt,
+      typeIcon: ListChecks,
+      typeLabel: "Topic",
+      typeClass: "bg-accent/15 text-accent",
+    }));
+    const draftNotices = (noticeQuery.data?.rows ?? []).map((n): DraftRow => ({
+      kind: "notice",
+      id: n.id,
+      notice: n,
+      title: n.heading,
+      subtitle: n.subtext,
+      semesterId: "",
+      subjectId: "",
+      updatedAt: n.updatedAt,
+      typeIcon: Bell,
+      typeLabel: `${NOTICE_LABEL[n.type]} Notice`,
+      typeClass: "bg-warning-muted text-warning",
+    }));
+    const draftSemesters = (semQuery.data?.rows ?? []).map((s): DraftRow => ({
+      kind: "semester",
+      id: s.id,
+      semester: s,
+      title: s.name,
+      subtitle: s.description,
+      semesterId: s.id,
+      subjectId: "",
+      updatedAt: s.updatedAt,
+      typeIcon: GraduationCap,
+      typeLabel: "Semester",
+      typeClass: "bg-secondary/15 text-secondary",
+    }));
+    const draftSubjects = (subjQuery.data?.rows ?? []).map((s): DraftRow => ({
+      kind: "subject",
+      id: s.id,
+      subject: s,
+      title: s.name,
+      subtitle: s.description,
+      semesterId: s.semesterId,
+      subjectId: s.id,
+      updatedAt: s.updatedAt,
+      typeIcon: BookMarked,
+      typeLabel: "Subject",
+      typeClass: "bg-success-muted text-success",
+    }));
     return [...draftResources, ...draftTopics, ...draftNotices, ...draftSemesters, ...draftSubjects].sort(
       (a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt),
     );
-  }, [db.resources, db.topics, db.notices, db.semesters, db.subjects, subjectById]);
+  }, [resQuery.data, topicQuery.data, noticeQuery.data, semQuery.data, subjQuery.data, subjectById]);
 
   const stats = useMemo(
     () => ({
@@ -317,22 +327,26 @@ export default function AdminDrafts() {
     });
   };
 
-  const saveTopic = (status: Topic["status"]) => {
+  const saveTopic = async (status: Topic["status"]) => {
     if (!topicEdit) return;
     const next: typeof topicErrors = {};
     if (!topicForm.title.trim()) next.title = "Topic name is required.";
-    if (!topicForm.order || Number(topicForm.order) < 1) next.order = "Order must be â‰¥ 1.";
+    if (!topicForm.order || Number(topicForm.order) < 1) next.order = "Order must be ≥ 1.";
     setTopicErrors(next);
     if (Object.keys(next).length > 0) return;
-    updateTopic(topicEdit.id, {
-      subjectId: topicEdit.subjectId,
-      title: topicForm.title.trim(),
-      description: topicForm.description.trim(),
-      order: Number(topicForm.order),
-      status,
-    });
-    toast(status === "published" ? `"${topicForm.title.trim()}" published` : "Draft topic updated");
-    setTopicEdit(null);
+    try {
+      await adminUpdate("topics", topicEdit.id, {
+        title: topicForm.title.trim(),
+        description: topicForm.description.trim(),
+        order: Number(topicForm.order),
+        status,
+      });
+      toast(status === "published" ? `"${topicForm.title.trim()}" published` : "Draft topic updated");
+      setTopicEdit(null);
+      topicQuery.retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not save topic.", "error");
+    }
   };
 
   const openNoticeEdit = (n: Notice) => {
@@ -350,26 +364,31 @@ export default function AdminDrafts() {
     });
   };
 
-  const saveNotice = (status: Notice["status"]) => {
+  const saveNotice = async (status: Notice["status"]) => {
     if (!noticeEdit) return;
     const next: typeof noticeErrors = {};
     if (!noticeForm.heading.trim()) next.heading = "Title is required.";
     if (!noticeForm.date) next.date = "Date is required.";
     setNoticeErrors(next);
     if (Object.keys(next).length > 0) return;
-    updateNotice(noticeEdit.id, {
-      heading: noticeForm.heading.trim(),
-      subtext: noticeForm.subtext.trim(),
-      type: noticeForm.type,
-      announcer: noticeForm.announcer,
-      date: new Date(`${noticeForm.date}T00:00:00`).toISOString(),
-      priority: noticeForm.priority,
-      showOnDashboard: noticeForm.showOnDashboard,
-      pinned: noticeForm.pinned,
-      status,
-    });
-    toast(status === "published" ? `"${noticeForm.heading.trim()}" published` : "Draft notice updated");
-    setNoticeEdit(null);
+    try {
+      await adminUpdate("notices", noticeEdit.id, {
+        heading: noticeForm.heading.trim(),
+        subtext: noticeForm.subtext.trim(),
+        type: noticeForm.type,
+        announcer: noticeForm.announcer,
+        date: new Date(`${noticeForm.date}T00:00:00`).toISOString(),
+        priority: noticeForm.priority,
+        showOnDashboard: noticeForm.showOnDashboard,
+        pinned: noticeForm.pinned,
+        status,
+      });
+      toast(status === "published" ? `"${noticeForm.heading.trim()}" published` : "Draft notice updated");
+      setNoticeEdit(null);
+      noticeQuery.retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not save notice.", "error");
+    }
   };
 
   const idOf = (row: DraftRow): string =>
@@ -388,50 +407,72 @@ export default function AdminDrafts() {
     else if (row.kind === "notice") openNoticeEdit(row.notice);
   };
 
-  const deleteRow = (row: DraftRow) => {
-    deleteEntity(
-      row.kind,
-      row.kind === "resource"
-        ? row.resource.id
-        : row.kind === "topic"
-          ? row.topic.id
-          : row.kind === "notice"
-            ? row.notice.id
-            : row.kind === "semester"
-              ? row.semester.id
-              : row.subject.id,
-    );
-    toast(
-      getSettings().draftTrash.moveDeletedToTrash
-        ? "Draft moved to trash"
-        : "Draft permanently deleted",
-    );
+  const entityOf = (row: DraftRow): "resources" | "topics" | "notices" | "semesters" | "subjects" =>
+    row.kind === "resource" ? "resources"
+      : row.kind === "topic" ? "topics"
+        : row.kind === "notice" ? "notices"
+          : row.kind === "semester" ? "semesters" : "subjects";
+
+  const deleteRow = async (row: DraftRow) => {
+    try {
+      await adminDelete(entityOf(row), idOf(row));
+      toast("Draft moved to trash");
+      retryAll();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not delete draft.", "error");
+    }
   };
 
-  /** Delete honoring "Confirm Before Deleting". */
+  /** Delete always confirms (AdminSettings local confirm flags retired). */
   const requestDelete = (row: DraftRow) => {
-    if (!getSettings().contentDefaults.confirmDelete) {
-      deleteRow(row);
-      return;
-    }
     setPendingDelete(row);
   };
 
-  const publishRow = (row: DraftRow) => {
-    if (row.kind === "resource") setResourceStatus(row.resource.id, "published");
-    else if (row.kind === "topic") updateTopic(row.topic.id, { status: "published" });
-    else if (row.kind === "semester") setSemesterStatus(row.semester.id, "published");
-    else if (row.kind === "subject") setSubjectStatus(row.subject.id, "published");
-    else setNoticeStatus(row.notice.id, "published");
-    toast(`"${row.title}" published`);
-    setPendingPublish(null);
+  const publishRow = async (row: DraftRow) => {
+    try {
+      await adminUpdate(entityOf(row), idOf(row), { status: "published" });
+      toast(`"${row.title}" published`);
+      setPendingPublish(null);
+      retryAll();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not publish.", "error");
+    }
   };
+
+  const loading = resQuery.loading || topicQuery.loading || noticeQuery.loading || semQuery.loading || subjQuery.loading;
+  const loadError = resQuery.error ?? topicQuery.error ?? noticeQuery.error ?? semQuery.error ?? subjQuery.error;
+
+  if (loading) {
+    return (
+      <div className="space-y-5" aria-busy="true" aria-label="Loading drafts">
+        <PageHeader
+          title="Drafts"
+          subtitle="Unpublished content across the library — review, edit, and publish when ready."
+          breadcrumbs={[{ label: "Admin", to: "/admin" }, { label: "Drafts" }]}
+        />
+        <Card className="animate-pulse p-8"><div className="h-24 rounded bg-surface-muted" /></Card>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-5">
+        <PageHeader
+          title="Drafts"
+          subtitle="Unpublished content across the library — review, edit, and publish when ready."
+          breadcrumbs={[{ label: "Admin", to: "/admin" }, { label: "Drafts" }]}
+        />
+        <ErrorState message={loadError} onRetry={retryAll} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Drafts"
-        subtitle="Unpublished content across the library â€” review, edit, and publish when ready."
+        subtitle="Unpublished content across the library — review, edit, and publish when ready."
         breadcrumbs={[
           { label: "Admin", to: "/admin" },
           { label: "Drafts" },
@@ -482,7 +523,7 @@ export default function AdminDrafts() {
             aria-label="Filter by subject"
             options={[
               { value: "", label: "All Subjects" },
-              ...subjectOptions.map((s) => ({ value: s.id, label: `${s.code} â€” ${s.name}` })),
+              ...subjectOptions.map((s) => ({ value: s.id, label: `${s.code} — ${s.name}` })),
             ]}
           />
           {anyFilterActive && (
@@ -583,10 +624,10 @@ export default function AdminDrafts() {
                           </span>
                         </td>
                         <td className="px-4 py-3.5 text-sm text-muted-foreground">
-                          {semester?.name ?? "â€”"}
+                          {semester?.name ?? "—"}
                         </td>
                         <td className="max-w-[200px] px-4 py-3.5">
-                          <p className="truncate text-sm text-foreground/80">{subject?.name ?? "â€”"}</p>
+                          <p className="truncate text-sm text-foreground/80">{subject?.name ?? "—"}</p>
                           {subject && (
                             <p className="mt-0.5 font-mono text-[11px] text-muted-foreground/70">{subject.code}</p>
                           )}
@@ -746,6 +787,7 @@ export default function AdminDrafts() {
         open={editingResource !== null}
         editing={editingResource ?? undefined}
         onClose={() => setEditingResource(null)}
+        onSaved={() => retryAll()}
       />
 
       <Modal
@@ -757,7 +799,7 @@ export default function AdminDrafts() {
         <form
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
-            saveTopic(topicForm.status);
+            void saveTopic(topicForm.status);
           }}
           noValidate
           className="mt-2 space-y-4"
@@ -768,9 +810,9 @@ export default function AdminDrafts() {
               {topicEdit
                 ? (() => {
                     const s = subjectById.get(topicEdit.subjectId);
-                    return s ? `${s.code} â€” ${s.name}` : "â€”";
+                    return s ? `${s.code} — ${s.name}` : "—";
                   })()
-                : "â€”"}
+                : "—"}
             </p>
           </div>
           <Input
@@ -828,7 +870,7 @@ export default function AdminDrafts() {
             <Button variant="outline" type="submit">
               Save as Draft
             </Button>
-            <Button variant="secondary" type="button" onClick={() => saveTopic("published")}>
+            <Button variant="secondary" type="button" onClick={() => void saveTopic("published")}>
               <Send className="size-4" aria-hidden="true" /> Save &amp; Publish
             </Button>
           </div>
@@ -844,7 +886,7 @@ export default function AdminDrafts() {
         <form
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
-            saveNotice("draft");
+            void saveNotice("draft");
           }}
           noValidate
           className="mt-2 space-y-4"
@@ -852,7 +894,7 @@ export default function AdminDrafts() {
           <Input
             id="draft-notice-heading"
             label="Notice Title"
-            placeholder="e.g. TU Board Exam â€” Sem IV"
+            placeholder="e.g. TU Board Exam — Sem IV"
             value={noticeForm.heading}
             onChange={(e) => setNoticeForm((p) => ({ ...p, heading: e.target.value }))}
             error={noticeErrors.heading}
@@ -929,7 +971,7 @@ export default function AdminDrafts() {
             <Button variant="outline" type="submit">
               Save as Draft
             </Button>
-            <Button variant="secondary" type="button" onClick={() => saveNotice("published")}>
+            <Button variant="secondary" type="button" onClick={() => void saveNotice("published")}>
               <Rocket className="size-4" aria-hidden="true" /> Save &amp; Publish
             </Button>
           </div>
@@ -943,23 +985,19 @@ export default function AdminDrafts() {
         confirmLabel="Publish"
         onCancel={() => setPendingPublish(null)}
         onConfirm={() => {
-          if (pendingPublish) publishRow(pendingPublish);
+          if (pendingPublish) void publishRow(pendingPublish);
         }}
       />
 
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete draft"
-        message={
-          getSettings().draftTrash.moveDeletedToTrash
-            ? `"${pendingDelete?.title}" will move to the trash. You can restore it from Trash, or delete it permanently there.`
-            : `"${pendingDelete?.title}" will be permanently deleted. This cannot be undone.`
-        }
+        message={`"${pendingDelete?.title}" will move to the trash. You can restore it from Trash.`}
         confirmLabel="Delete"
         danger
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => {
-          if (pendingDelete) deleteRow(pendingDelete);
+          if (pendingDelete) void deleteRow(pendingDelete);
           setPendingDelete(null);
         }}
       />

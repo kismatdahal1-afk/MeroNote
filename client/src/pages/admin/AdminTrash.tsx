@@ -1,17 +1,18 @@
 import { useMemo, useState } from "react";
 import {
-  AlertTriangle, Bell, BookMarked, FileText, GraduationCap, HardDrive,
+  Bell, BookMarked, FileText, GraduationCap, HardDrive,
   Layers, Library, ListChecks, RotateCcw, Trash2, type LucideIcon,
 } from "lucide-react";
 import { PageHeader, Card } from "../../components/common/PageHeader";
 import { IconButton } from "../../components/common/IconButton";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { EmptyState } from "../../components/common/States";
+import { EmptyState, ErrorState } from "../../components/common/States";
 import { Button } from "../../components/common/Button";
 import { Badge } from "../../components/common/Badge";
 import { StatusBadge } from "../../components/admin/StatusBadge";
-import { useCms } from "../../state/CmsProvider";
-import { restoreEntity, restoreAll, purgeEntity, emptyTrash, getSettings } from "../../state/cmsStore";
+import { ApiError } from "../../lib/contentApi";
+import { adminList, adminRestore, type AdminEntity } from "../../lib/adminApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
 import { useToast } from "../../state/ToastProvider";
 import { cx, formatDate, formatFileSize, formatRelativeTime } from "../../lib/utils";
 import type { CmsEntity, Semester, Subject } from "../../types";
@@ -28,6 +29,8 @@ interface TrashItem {
   /** File size in bytes, when applicable (resources/books). */
   fileSize?: number;
 }
+
+type AdminTrashRow = { id: string; deletedAt?: string; [k: string]: unknown };
 
 const ENTITY_CONFIG: Record<CmsEntity, { label: string; icon: LucideIcon; badgeClass: string }> = {
   resource: { label: "Resource", icon: FileText, badgeClass: "bg-primary-muted text-primary" },
@@ -111,59 +114,89 @@ function EntityChips({
   );
 }
 
-/** Trash: soft-deleted content with restore + permanent delete. */
+function str(v: unknown, fallback = ""): string {
+  return typeof v === "string" ? v : fallback;
+}
+
+/** Trash: soft-deleted content with restore. Permanent delete is not
+ *  supported by the backend (soft-delete only) — purge controls explain this. */
 export default function AdminTrash() {
-  const db = useCms();
   const { toast } = useToast();
   const [entityFilter, setEntityFilter] = useState<EntityFilter>("all");
-  const [pendingPurge, setPendingPurge] = useState<TrashItem | null>(null);
-  const [pendingEmpty, setPendingEmpty] = useState(false);
   const [pendingRestoreAll, setPendingRestoreAll] = useState(false);
 
-  /** Every soft-deleted item across the store, newest first. */
+  const semQuery = useApiQuery("admin-trash-semesters", (signal) =>
+    adminList<AdminTrashRow>("semesters", { includeDeleted: true, limit: 100 }, signal),
+  );
+  const subjQuery = useApiQuery("admin-trash-subjects", (signal) =>
+    adminList<AdminTrashRow>("subjects", { includeDeleted: true, limit: 100 }, signal),
+  );
+  const topicQuery = useApiQuery("admin-trash-topics", (signal) =>
+    adminList<AdminTrashRow>("topics", { includeDeleted: true, limit: 100 }, signal),
+  );
+  const resQuery = useApiQuery("admin-trash-resources", (signal) =>
+    adminList<AdminTrashRow>("resources", { includeDeleted: true, limit: 100 }, signal),
+  );
+  const noticeQuery = useApiQuery("admin-trash-notices", (signal) =>
+    adminList<AdminTrashRow>("notices", { includeDeleted: true, limit: 100 }, signal),
+  );
+  const bookQuery = useApiQuery("admin-trash-books", (signal) =>
+    adminList<AdminTrashRow>("books", { includeDeleted: true, limit: 100 }, signal),
+  );
+  const semAllQuery = useApiQuery("admin-trash-semesters-all", (signal) =>
+    adminList<Semester>("semesters", { includeDeleted: true, limit: 100 }, signal),
+  );
+  const subjAllQuery = useApiQuery("admin-trash-subjects-all", (signal) =>
+    adminList<Subject>("subjects", { includeDeleted: true, limit: 200 }, signal),
+  );
+  const retryAll = () => {
+    semQuery.retry(); subjQuery.retry(); topicQuery.retry();
+    resQuery.retry(); noticeQuery.retry(); bookQuery.retry();
+  };
+
+  /** Every soft-deleted item across the API, newest first. */
   const items: TrashItem[] = useMemo(() => {
     const out: TrashItem[] = [];
-    for (const s of db.semesters) {
+    for (const s of semQuery.data?.rows ?? []) {
       if (!s.deletedAt) continue;
-      out.push({ id: s.id, entity: "semester", label: s.name, detail: s.description, semesterId: "", subjectId: "", deletedAt: s.deletedAt });
+      out.push({ id: s.id, entity: "semester", label: str(s.name, "Semester"), detail: str(s.description), semesterId: "", subjectId: "", deletedAt: str(s.deletedAt) });
     }
-    for (const s of db.subjects) {
+    for (const s of subjQuery.data?.rows ?? []) {
       if (!s.deletedAt) continue;
-      out.push({ id: s.id, entity: "subject", label: s.name, detail: s.code, semesterId: s.semesterId, subjectId: "", deletedAt: s.deletedAt });
+      out.push({ id: s.id, entity: "subject", label: str(s.name, "Subject"), detail: str(s.code), semesterId: str(s.semesterId), subjectId: "", deletedAt: str(s.deletedAt) });
     }
-    for (const t of db.topics) {
+    for (const t of topicQuery.data?.rows ?? []) {
       if (!t.deletedAt) continue;
-      const sub = db.subjects.find((x) => x.id === t.subjectId);
       out.push({
-        id: t.id, entity: "topic", label: t.title, detail: t.description ?? "",
-        semesterId: sub?.semesterId ?? "", subjectId: t.subjectId, deletedAt: t.deletedAt,
+        id: t.id, entity: "topic", label: str(t.title, "Topic"), detail: str(t.description),
+        semesterId: "", subjectId: str(t.subjectId), deletedAt: str(t.deletedAt),
       });
     }
-    for (const r of db.resources) {
+    for (const r of resQuery.data?.rows ?? []) {
       if (!r.deletedAt) continue;
       out.push({
-        id: r.id, entity: "resource", label: r.title, detail: r.description,
-        semesterId: r.semesterId, subjectId: r.subjectId, deletedAt: r.deletedAt,
-        fileSize: r.fileSize,
+        id: r.id, entity: "resource", label: str(r.title, "Resource"), detail: str(r.description),
+        semesterId: str(r.semesterId), subjectId: str(r.subjectId), deletedAt: str(r.deletedAt),
+        fileSize: typeof r.fileSize === "number" ? r.fileSize : undefined,
       });
     }
-    for (const n of db.notices) {
+    for (const n of noticeQuery.data?.rows ?? []) {
       if (!n.deletedAt) continue;
       out.push({
-        id: n.id, entity: "notice", label: n.heading, detail: n.subtext,
-        semesterId: "", subjectId: "", deletedAt: n.deletedAt,
+        id: n.id, entity: "notice", label: str(n.heading, "Notice"), detail: str(n.subtext),
+        semesterId: "", subjectId: "", deletedAt: str(n.deletedAt),
       });
     }
-    for (const b of db.books) {
+    for (const b of bookQuery.data?.rows ?? []) {
       if (!b.deletedAt) continue;
       out.push({
-        id: b.id, entity: "book", label: b.title, detail: b.author,
-        semesterId: b.semesterId, subjectId: b.subjectId, deletedAt: b.deletedAt,
-        fileSize: b.fileSize,
+        id: b.id, entity: "book", label: str(b.title, "Book"), detail: str(b.author),
+        semesterId: str(b.semesterId), subjectId: str(b.subjectId), deletedAt: str(b.deletedAt),
+        fileSize: typeof b.fileSize === "number" ? b.fileSize : undefined,
       });
     }
     return out.sort((a, b) => +new Date(b.deletedAt) - +new Date(a.deletedAt));
-  }, [db]);
+  }, [semQuery.data, subjQuery.data, topicQuery.data, resQuery.data, noticeQuery.data, bookQuery.data]);
 
   const counts: Record<EntityFilter, number> = useMemo(
     () => ({
@@ -179,8 +212,8 @@ export default function AdminTrash() {
 
   /** Total file size of soft-deleted resources. */
   const deletedStorage = useMemo(
-    () => db.resources.filter((r) => r.deletedAt).reduce((sum, r) => sum + r.fileSize, 0),
-    [db.resources],
+    () => items.reduce((sum, i) => sum + (i.fileSize ?? 0), 0),
+    [items],
   );
 
   const filtered = useMemo(
@@ -188,54 +221,68 @@ export default function AdminTrash() {
     [items, entityFilter],
   );
 
+  const semestersAll = useMemo(() => semAllQuery.data?.rows ?? [], [semAllQuery.data]);
+  const subjectsAll = useMemo(() => subjAllQuery.data?.rows ?? [], [subjAllQuery.data]);
+
   /** Name lookup against the FULL store (parents may themselves be trashed). */
   const nameOf = (collection: Semester[] | Subject[], id: string) =>
     collection.find((x) => x.id === id)?.name ?? "—";
 
-  const restore = (item: TrashItem) => {
-    restoreEntity(item.entity, item.id);
-    toast(`Restored "${item.label}"`);
-  };
+  const adminEntityOf = (entity: CmsEntity): AdminEntity =>
+    entity === "resource" ? "resources"
+      : entity === "topic" ? "topics"
+        : entity === "notice" ? "notices"
+          : entity === "semester" ? "semesters"
+            : entity === "subject" ? "subjects" : "books";
 
-  const purgeNow = (item: TrashItem) => {
-    purgeEntity(item.entity, item.id);
-    toast(`"${item.label}" permanently deleted`, "error");
-  };
-
-  /** Permanent delete honoring "Confirm Delete Forever". */
-  const requestPurge = (item: TrashItem) => {
-    if (!getSettings().draftTrash.confirmDeleteForever) {
-      purgeNow(item);
-      return;
+  const restore = async (item: TrashItem) => {
+    try {
+      await adminRestore(adminEntityOf(item.entity), item.id);
+      toast(`Restored "${item.label}"`);
+      retryAll();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not restore item.", "error");
     }
-    setPendingPurge(item);
   };
 
-  const emptyNow = () => {
-    emptyTrash();
-    toast("Trash emptied", "error");
-    setEntityFilter("all");
-  };
-
-  /** Empty-trash honoring "Confirm Delete Forever". */
-  const requestEmpty = () => {
-    if (!getSettings().draftTrash.confirmDeleteForever) {
-      emptyNow();
-      return;
+  const restoreAllNow = async () => {
+    try {
+      await Promise.all(items.map((i) => adminRestore(adminEntityOf(i.entity), i.id).catch(() => null)));
+      toast(items.length === 1 ? "Restored 1 item" : `Restored ${items.length} items`);
+      setEntityFilter("all");
+      setPendingRestoreAll(false);
+      retryAll();
+    } catch {
+      toast("Could not restore all items.", "error");
     }
-    setPendingEmpty(true);
   };
 
-  const purgeCascade =
-    pendingPurge && (pendingPurge.entity === "semester" || pendingPurge.entity === "subject")
-      ? " — everything inside it will be deleted too"
-      : "";
+  const loading = semQuery.loading || subjQuery.loading || topicQuery.loading || resQuery.loading || noticeQuery.loading || bookQuery.loading;
+  const loadError = semQuery.error ?? subjQuery.error ?? topicQuery.error ?? resQuery.error ?? noticeQuery.error ?? bookQuery.error;
+
+  if (loading) {
+    return (
+      <div className="space-y-5" aria-busy="true" aria-label="Loading trash">
+        <PageHeader title="Trash" subtitle="Recover deleted content, or remove it permanently." breadcrumbs={[{ label: "Trash" }]} />
+        <Card className="animate-pulse p-8"><div className="h-24 rounded bg-surface-muted" /></Card>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-5">
+        <PageHeader title="Trash" subtitle="Recover deleted content, or remove it permanently." breadcrumbs={[{ label: "Trash" }]} />
+        <ErrorState message={loadError} onRetry={retryAll} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Trash"
-        subtitle="Recover deleted content, or remove it permanently."
+        subtitle="Recover deleted content. Permanent deletion is not supported by the API — trashed items stay recoverable."
         breadcrumbs={[
           { label: "Trash" },
         ]}
@@ -249,9 +296,6 @@ export default function AdminTrash() {
                 onClick={() => setPendingRestoreAll(true)}
               >
                 <RotateCcw className="size-4" aria-hidden="true" /> Restore All
-              </Button>
-              <Button variant="danger" onClick={requestEmpty}>
-                <Trash2 className="size-4" aria-hidden="true" /> Empty Trash
               </Button>
             </div>
           ) : (
@@ -323,8 +367,8 @@ export default function AdminTrash() {
                         </div>
                       </td>
                       <td className="px-3 py-3.5 text-xs text-muted-foreground">
-                        <p className="truncate font-semibold text-foreground/80">{item.semesterId ? nameOf(db.semesters, item.semesterId) : "—"}</p>
-                        <p className="mt-0.5 truncate">{item.subjectId ? nameOf(db.subjects, item.subjectId) : "—"}</p>
+                        <p className="truncate font-semibold text-foreground/80">{item.semesterId ? nameOf(semestersAll, item.semesterId) : "—"}</p>
+                        <p className="mt-0.5 truncate">{item.subjectId ? nameOf(subjectsAll, item.subjectId) : "—"}</p>
                       </td>
                       <td className="px-2 py-3.5">
                         <span className={cx("inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold", config.badgeClass)}>
@@ -355,20 +399,18 @@ export default function AdminTrash() {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              restore(item);
+                              void restore(item);
                             }}
                           >
                             <RotateCcw className="size-3.5" aria-hidden="true" /> Restore
                           </Button>
                           <IconButton
                             icon={Trash2}
-                            label={`Delete ${item.label} forever`}
+                            label="Permanent delete is not supported by the API"
                             size="sm"
                             variant="danger"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              requestPurge(item);
-                            }}
+                            disabled
+                            title="Permanent delete is not supported by the API"
                           />
                         </div>
                       </td>
@@ -398,7 +440,7 @@ export default function AdminTrash() {
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold text-foreground">{item.label}</p>
                         <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                          {item.semesterId ? nameOf(db.semesters, item.semesterId) : "—"} · {item.subjectId ? nameOf(db.subjects, item.subjectId) : "—"}
+                          {item.semesterId ? nameOf(semestersAll, item.semesterId) : "—"} · {item.subjectId ? nameOf(subjectsAll, item.subjectId) : "—"}
                         </p>
                       </div>
                     </div>
@@ -425,21 +467,12 @@ export default function AdminTrash() {
                       variant="outline"
                       onClick={(e) => {
                         e.stopPropagation();
-                        restore(item);
+                        void restore(item);
                       }}
                     >
                       <RotateCcw className="size-3.5" aria-hidden="true" /> Restore
                     </Button>
-                    <IconButton
-                      icon={Trash2}
-                      label={`Delete ${item.label} forever`}
-                      size="sm"
-                      variant="danger"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        requestPurge(item);
-                      }}
-                    />
+                    <span className="text-[11px] font-medium text-muted-foreground/70">Permanent delete unavailable</span>
                   </div>
                 </Card>
               );
@@ -449,54 +482,12 @@ export default function AdminTrash() {
       )}
 
       <ConfirmDialog
-        open={pendingPurge !== null}
-        title="Delete permanently"
-        message={
-          <>
-            <AlertTriangle className="mb-2 size-5 text-error" aria-hidden="true" />
-            &ldquo;{pendingPurge?.label}&rdquo; will be <strong>permanently deleted</strong>
-            {purgeCascade}. This cannot be undone.
-          </>
-        }
-        confirmLabel="Delete forever"
-        danger
-        onCancel={() => setPendingPurge(null)}
-        onConfirm={() => {
-          if (pendingPurge) purgeNow(pendingPurge);
-          setPendingPurge(null);
-        }}
-      />
-
-      <ConfirmDialog
         open={pendingRestoreAll}
         title="Restore all"
         message={`All ${items.length} trashed item${items.length === 1 ? "" : "s"} will be restored to ${items.length === 1 ? "its" : "their"} original location${items.length === 1 ? "" : "s"}.`}
         confirmLabel="Restore all"
         onCancel={() => setPendingRestoreAll(false)}
-        onConfirm={() => {
-          const count = restoreAll();
-          toast(count === 1 ? 'Restored 1 item' : `Restored ${count} items`);
-          setEntityFilter("all");
-          setPendingRestoreAll(false);
-        }}
-      />
-
-      <ConfirmDialog
-        open={pendingEmpty}
-        title="Empty trash"
-        message={
-          <>
-            <AlertTriangle className="mb-2 size-5 text-error" aria-hidden="true" />
-            All {items.length} trashed items will be <strong>permanently deleted</strong>. This cannot be undone.
-          </>
-        }
-        confirmLabel="Delete everything"
-        danger
-        onCancel={() => setPendingEmpty(false)}
-        onConfirm={() => {
-          emptyNow();
-          setPendingEmpty(false);
-        }}
+        onConfirm={() => { void restoreAllNow(); }}
       />
     </div>
   );

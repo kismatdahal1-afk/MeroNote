@@ -9,8 +9,10 @@ import { SearchBar } from "../components/common/SearchBar";
 import { FilterChips, type TypeFilter } from "../components/resources/FilterChips";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
+import { useUser } from "../state/UserProvider";
 import { useTaxonomy } from "../hooks/useTaxonomy";
 import { matchesQuery } from "../lib/utils";
+import { fetchResource, fetchSubject, type SubjectDetail } from "../lib/contentApi";
 import { listBookmarks, type StudyBookmarkRow } from "../lib/studyApi";
 import { bookmarkRowToBookmark, bookmarkRowToSubject, targetToResource } from "../lib/personalAdapters";
 import { useApiQuery } from "../hooks/useApiQuery";
@@ -26,7 +28,12 @@ interface BookmarkEntry {
 }
 
 export default function Bookmarks() {
-  const { removeBookmark } = useLibrary();
+  // Server rows are authoritative when authed; guests keep local-only lists
+  // (LibraryProvider) resolved here so logged-out users never see a false
+  // empty state after saving a page.
+  const { status } = useUser();
+  const { bookmarks: localBookmarks, bookmarkedSubjects: localSubjectIds, removeBookmark } = useLibrary();
+  const isGuest = status !== "authed";
   const { toast } = useToast();
   const { subjects: taxonomySubjects, semesters } = useTaxonomy();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
@@ -37,31 +44,53 @@ export default function Bookmarks() {
   const [type, setType] = useState<TypeFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
-  const { data, error, loading, retry } = useApiQuery("me-bookmarks", () => listBookmarks());
+  const { data, error, loading, retry } = useApiQuery(`me-bookmarks:${status}`, () =>
+    status === "authed" ? listBookmarks().then((rows) => rows ?? []) : Promise.resolve([]),
+  );
   const rows: StudyBookmarkRow[] = useMemo(() => data ?? [], [data]);
 
-  const allSavedSubjects = useMemo(
-    () =>
-      rows
-        .filter((row) => row.targetType === "subject")
-        .map((row) => bookmarkRowToSubject(row))
-        .filter((s): s is NonNullable<typeof s> => Boolean(s)),
-    [rows],
-  );
+  const localKey = isGuest
+    ? `${localBookmarks.map((b) => `${b.id}:${b.resourceId}:${b.page}`).join(",")}|${[...localSubjectIds].sort().join(",")}`
+    : "authed";
+  const localResolved = useApiQuery(`local-bookmarks:${localKey}`, async (signal) => {
+    if (!isGuest) return null;
+    const [entries, subjects] = await Promise.all([
+      Promise.all(
+        localBookmarks.map((bm) =>
+          fetchResource(bm.resourceId, signal)
+            .then((resource): BookmarkEntry => ({ bm, resource }))
+            .catch(() => null),
+        ),
+      ),
+      Promise.all(localSubjectIds.map((id) => fetchSubject(id, signal).catch(() => null))),
+    ]);
+    return {
+      entries: entries.filter((e): e is BookmarkEntry => e !== null),
+      subjects: subjects.filter((s): s is SubjectDetail => s !== null),
+    };
+  });
+  const showLoading = isGuest ? loading || localResolved.loading : loading;
 
-  const entries: BookmarkEntry[] = useMemo(
-    () =>
-      rows
-        .filter((row) => row.targetType === "resource")
-        .map((row) => {
-          const bm = bookmarkRowToBookmark(row);
-          const resource = row.target ? targetToResource(row.targetId, { ...row.target, id: row.targetId }) : null;
-          if (!bm || !resource) return null;
-          return { bm, resource };
-        })
-        .filter((e): e is BookmarkEntry => Boolean(e)),
-    [rows],
-  );
+  const allSavedSubjects = useMemo(() => {
+    if (isGuest) return localResolved.data?.subjects ?? [];
+    return rows
+      .filter((row) => row.targetType === "subject")
+      .map((row) => bookmarkRowToSubject(row))
+      .filter((s): s is NonNullable<typeof s> => Boolean(s));
+  }, [isGuest, rows, localResolved.data]);
+
+  const entries: BookmarkEntry[] = useMemo(() => {
+    if (isGuest) return localResolved.data?.entries ?? [];
+    return rows
+      .filter((row) => row.targetType === "resource")
+      .map((row) => {
+        const bm = bookmarkRowToBookmark(row);
+        const resource = row.target ? targetToResource(row.targetId, { ...row.target, id: row.targetId }) : null;
+        if (!bm || !resource) return null;
+        return { bm, resource };
+      })
+      .filter((e): e is BookmarkEntry => Boolean(e));
+  }, [isGuest, rows, localResolved.data]);
 
   const searchedSubjects = useMemo(() => {
     const q = query.trim();
@@ -142,7 +171,7 @@ export default function Bookmarks() {
         subtitle="Pages you saved while reading — available offline."
       />
 
-      {loading ? (
+      {showLoading ? (
         <BookmarksSkeleton />
       ) : error ? (
         <ErrorState message={error} onRetry={retry} />

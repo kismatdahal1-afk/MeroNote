@@ -5,7 +5,7 @@ import { Card } from "../common/PageHeader";
 import { ProgressBar } from "../common/ProgressBar";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import { cx, formatTimestamp } from "../../lib/utils";
-import { getSubjectById } from "../../data/selectors";
+import { useTaxonomy } from "../../hooks/useTaxonomy";
 import { useLibrary } from "../../state/LibraryProvider";
 
 /** Primary Continue Reading card — the dashboard's strongest element. */
@@ -31,7 +31,8 @@ export function ContinueReadingSection({ resource }: { resource: Resource | null
     .split(" ")
     .filter((c) => !c.startsWith("bg-"))
     .join(" ");
-  const subject = getSubjectById(resource.subjectId);
+  const { subjectName } = useTaxonomy();
+  const subject = resource.subjectId ? { name: subjectName(resource.subjectId) } : undefined;
   const lastPage = progress?.lastPage ?? 1;
   const ratio = progress?.progress ?? 0;
   const pct = Math.round(ratio * 100);
