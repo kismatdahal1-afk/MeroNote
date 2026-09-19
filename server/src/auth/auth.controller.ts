@@ -34,7 +34,7 @@ function setSessionCookie(res: Response, userId: string, role: "USER" | "ADMIN",
   const token = signSessionToken({ sub: userId, role }, days);
   res.cookie(sessionCookieName(), token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: env.nodeEnv === "production" ? "none" : "lax",
     secure: env.nodeEnv === "production",
     path: "/",
     maxAge: days * 24 * 60 * 60 * 1000,
@@ -115,7 +115,7 @@ export async function login(req: Request, res: Response): Promise<void> {
 export function logout(_req: Request, res: Response): void {
   res.clearCookie(sessionCookieName(), {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: env.nodeEnv === "production" ? "none" : "lax",
     secure: env.nodeEnv === "production",
     path: "/",
   });
