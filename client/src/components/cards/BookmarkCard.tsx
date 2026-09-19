@@ -4,7 +4,7 @@ import type { Bookmark, Resource } from "../../types";
 import { Card } from "../common/PageHeader";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import { cx, formatDate } from "../../lib/utils";
-import { getSubjectById, getSemesterById } from "../../data/selectors";
+import { useTaxonomy } from "../../hooks/useTaxonomy";
 import { useLibrary } from "../../state/LibraryProvider";
 import { IconButton } from "../common/IconButton";
 
@@ -26,8 +26,9 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
     .split(" ")
     .filter((c) => !c.startsWith("bg-"))
     .join(" ");
-  const subject = getSubjectById(resource.subjectId);
-  const semester = getSemesterById(resource.semesterId);
+  const { subjectName, semesterName } = useTaxonomy();
+  const subjectDisplayName = subjectName(resource.subjectId);
+  const semesterDisplayName = semesterName(resource.semesterId);
 
   return (
     <Card interactive className="group relative flex h-full flex-col p-4 sm:p-5">
@@ -53,9 +54,9 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
             <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
               {typeConfig.label} · Page {bookmark.page} · {formatDate(bookmark.createdAt)}
             </p>
-            {(subject || semester) && (
+            {(subjectDisplayName || semesterDisplayName) && (
               <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground/80">
-                {[subject?.name, semester?.name].filter(Boolean).join(" · ")}
+                {[subjectDisplayName, semesterDisplayName].filter(Boolean).join(" · ")}
               </p>
             )}
           </div>
@@ -104,10 +105,9 @@ export function BookmarkCard({ bookmark, resource, onRemove }: BookmarkCardProps
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground group-hover:text-primary">
           {resource.title}
         </h3>
-        {(subject || semester) && (
+        {(subjectDisplayName || semesterDisplayName) && (
           <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
-            {[subject?.name, semester?.name].filter(Boolean).join(" · ")
-            }
+            {[subjectDisplayName, semesterDisplayName].filter(Boolean).join(" · ")}
           </p>
         )}
       </div>

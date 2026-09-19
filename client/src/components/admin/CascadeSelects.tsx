@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { useCms } from "../../state/CmsProvider";
 import { Select } from "../common/Field";
+import { fetchSemesters, fetchSubjects, fetchTopics } from "../../lib/contentApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
 import type { Subject, Topic } from "../../types";
 
 /**
@@ -32,27 +33,24 @@ export function CascadeSelects({
   showErrors,
   disabled = false,
 }: CascadeSelectsProps) {
-  const db = useCms();
+  // Admin taxonomy for selects. Failures degrade to empty option lists —
+  // the parent form surfaces its own validation errors on submit.
+  const { data: semestersData } = useApiQuery("admin-taxonomy-semesters", () => fetchSemesters());
+  const { data: subjectsData } = useApiQuery(`admin-taxonomy-subjects-${semesterId}`, (signal) =>
+    semesterId ? fetchSubjects(semesterId, signal) : Promise.resolve({ rows: [], total: 0 }),
+  );
+  const { data: topicsData } = useApiQuery(`admin-taxonomy-topics-${subjectId}`, (signal) =>
+    subjectId ? fetchTopics(subjectId, signal) : Promise.resolve({ rows: [], total: 0 }),
+  );
 
   const semesters = useMemo(
-    () => db.semesters.filter((s) => !s.deletedAt).sort((a, b) => a.order - b.order),
-    [db.semesters],
+    () => [...(semestersData?.rows ?? [])].sort((a, b) => a.order - b.order),
+    [semestersData],
   );
-  const subjects: Subject[] = useMemo(
-    () =>
-      semesterId
-        ? db.subjects.filter((s) => !s.deletedAt && s.semesterId === semesterId)
-        : [],
-    [db.subjects, semesterId],
-  );
+  const subjects: Subject[] = useMemo(() => subjectsData?.rows ?? [], [subjectsData]);
   const topics: Topic[] = useMemo(
-    () =>
-      subjectId
-        ? db.topics
-            .filter((t) => !t.deletedAt && t.subjectId === subjectId)
-            .sort((a, b) => a.order - b.order)
-        : [],
-    [db.topics, subjectId],
+    () => [...(topicsData?.rows ?? [])].sort((a, b) => a.order - b.order),
+    [topicsData],
   );
 
   return (

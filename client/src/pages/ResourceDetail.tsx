@@ -13,7 +13,6 @@ import { Badge } from "../components/common/Badge";
 import { StatusBadge } from "../components/admin/StatusBadge";
 import { ResourceEditorModal } from "../components/admin/ResourceEditorModal";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
-import { getResourceById, getSubjectById, getSemesterById } from "../data/selectors";
 import { RESOURCE_TYPE_CONFIG } from "../lib/resourceType";
 import {
   entryPointFromState,
@@ -28,8 +27,10 @@ import {
 import { cx, formatFileSize, formatDate } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
-import { setResourceHidden, softDelete } from "../state/cmsStore";
-import { useCmsSync } from "../components/common/CmsSync";
+import { fetchResource, fetchSemester, fetchSubject, ApiError } from "../lib/contentApi";
+import { adminDelete, adminUpdate } from "../lib/adminApi";
+import { useApiQuery } from "../hooks/useApiQuery";
+import { ResourceDetailSkeleton } from "../components/skeletons/pages";
 
 /**
  * THE canonical Resource Detail page — shared by the student panel
@@ -40,7 +41,6 @@ import { useCmsSync } from "../components/common/CmsSync";
  * identical.
  */
 export default function ResourceDetail() {
-  useCmsSync();
   const { resourceId } = useParams<{ resourceId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,6 +49,7 @@ export default function ResourceDetail() {
   const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, markOpened, getProgress } = useLibrary();
   const [editOpen, setEditOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
+  const [busyAction, setBusyAction] = useState(false);
 
   const isAdmin = pathname.startsWith("/admin");
   const readerRoute = isAdmin ? "/admin/reader" : "/reader";
@@ -69,14 +70,29 @@ export default function ResourceDetail() {
   const adminEntry = adminEntryPointFromState(state);
   const adminRoot = adminEntryRootFor(adminEntry);
 
-  const resource = getResourceById(resourceId);
+  const { data, error, loading, retry } = useApiQuery(`resource-${resourceId ?? ""}`, async (signal) => {
+    if (!resourceId) throw new Error("Missing resource.");
+    const resource = await fetchResource(resourceId, signal);
+    const [subject, semester] = await Promise.all([
+      fetchSubject(resource.subjectId, signal).catch(() => null),
+      fetchSemester(resource.semesterId, signal).catch(() => null),
+    ]);
+    return { resource, subject, semester };
+  });
+  const resource = data?.resource ?? null;
+  const subject = data?.subject;
+  const semester = data?.semester;
 
-  if (!resource) {
+  if (loading) {
+    return <ResourceDetailSkeleton adminStrip={isAdmin} />;
+  }
+
+  if (error || !resource) {
     return (
       <ErrorState
         title="Resource not found"
-        message="This resource does not exist or has been removed."
-        onRetry={() => navigate(isAdmin ? "/admin/resources" : "/resources")}
+        message={error ?? "This resource does not exist or has been removed."}
+        onRetry={error ? retry : () => navigate(isAdmin ? "/admin/resources" : "/resources")}
       />
     );
   }
@@ -91,8 +107,6 @@ export default function ResourceDetail() {
     );
   }
 
-  const subject = getSubjectById(resource.subjectId);
-  const semester = getSemesterById(resource.semesterId);
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
   const TypeIcon = typeConfig.icon;
   const favorite = isFavorite(resource.id);
@@ -138,17 +152,37 @@ export default function ResourceDetail() {
     toast(download ? "Retrying download" : "Download started");
   };
 
-  const handleDelete = () => {
-    softDelete("resource", resource.id);
-    toast("Resource moved to trash");
-    // Return one level back to the exact parent context the item was opened
-    // from (same target as the Back button) — never to an unrelated page.
-    const fallback = isAdmin
-      ? adminRoot.to
-      : (entryRoot ? entryRoot.to : "/resources");
-    const idx = window.history.state?.idx;
-    if (typeof idx === "number" && idx > 0) navigate(-1);
-    else navigate(fallback, { replace: true });
+  const handleAdminHide = async (hidden: boolean) => {
+    setBusyAction(true);
+    try {
+      await adminUpdate("resources", resource.id, { hidden });
+      toast(hidden ? `"${resource.title}" hidden from students` : `"${resource.title}" visible to students again`);
+      retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not update visibility.", "error");
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setBusyAction(true);
+    try {
+      await adminDelete("resources", resource.id);
+      toast("Resource moved to trash");
+      // Return one level back to the exact parent context the item was opened
+      // from (same target as the Back button) — never to an unrelated page.
+      const fallback = isAdmin
+        ? adminRoot.to
+        : (entryRoot ? entryRoot.to : "/resources");
+      const idx = window.history.state?.idx;
+      if (typeof idx === "number" && idx > 0) navigate(-1);
+      else navigate(fallback, { replace: true });
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not delete resource.", "error");
+    } finally {
+      setBusyAction(false);
+    }
   };
 
   return (
@@ -254,10 +288,8 @@ export default function ResourceDetail() {
                   title="Currently hidden from students — click to make visible"
                   aria-pressed={true}
                   className="bg-warning-muted text-warning transition-transform hover:bg-warning-muted hover:text-warning active:scale-95"
-                  onClick={() => {
-                    setResourceHidden(resource.id, false);
-                    toast(`"${resource.title}" visible to students again`);
-                  }}
+                  disabled={busyAction}
+                  onClick={() => handleAdminHide(false)}
                 >
                   <Eye className="size-4" aria-hidden="true" /> Show
                 </Button>
@@ -268,10 +300,8 @@ export default function ResourceDetail() {
                   title="Hide this resource from students (stays in Admin)"
                   aria-pressed={false}
                   className="border-warning/50 text-warning transition-transform hover:bg-warning-muted hover:text-warning active:scale-95"
-                  onClick={() => {
-                    setResourceHidden(resource.id, true);
-                    toast(`"${resource.title}" hidden from students`);
-                  }}
+                  disabled={busyAction}
+                  onClick={() => handleAdminHide(true)}
                 >
                   <EyeOff className="size-4" aria-hidden="true" /> Hide
                 </Button>
@@ -281,6 +311,7 @@ export default function ResourceDetail() {
                 variant="danger"
                 title="Move this resource to trash"
                 className="bg-[#FA003F]/15 text-[#FA003F] transition-transform hover:bg-[#FA003F] hover:text-white hover:opacity-100 active:scale-95"
+                disabled={busyAction}
                 onClick={() => setPendingDelete(true)}
               >
                 <Trash2 className="size-4" aria-hidden="true" /> Delete

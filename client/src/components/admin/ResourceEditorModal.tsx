@@ -9,8 +9,10 @@ import { Button } from "../common/Button";
 import { StatusToggleGroup } from "./StatusBadge";
 import { ALL_RESOURCE_TYPES, resourceTypeLabel } from "../../lib/resourceType";
 import { cx, formatFileSize } from "../../lib/utils";
-import { useCms } from "../../state/CmsProvider";
-import { createResource, updateResource, branchResourceToDraft, getAllTags, getSettings, defaultNewResourceStatus } from "../../state/cmsStore";
+import { fetchSemesters, fetchSubjects } from "../../lib/contentApi";
+import { adminCreate, adminUpdate, adminUploadFile } from "../../lib/adminApi";
+import { ApiError } from "../../lib/contentApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
 import { useToast } from "../../state/ToastProvider";
 
 /**
@@ -30,6 +32,8 @@ interface ResourceEditorModalProps {
   /** Preselected semester/subject (from the page's filter context). */
   defaultSemesterId?: string;
   defaultSubjectId?: string;
+  /** Refresh callback after a successful save (parent refetches its list). */
+  onSaved?: () => void;
 }
 
 interface FormState {
@@ -50,8 +54,7 @@ interface FormState {
   hidden?: boolean;
 }
 
-function emptyForm(defaultSemesterId?: string, defaultSubjectId?: string): FormState {
-  return {
+function emptyForm(defaultSemesterId?: string, defaultSubjectId?: string): FormState {  return {
     title: "",
     description: "",
     semesterId: defaultSemesterId ?? "",
@@ -65,7 +68,7 @@ function emptyForm(defaultSemesterId?: string, defaultSubjectId?: string): FormS
     paperFullMarks: "",
     paperDuration: "",
     featured: false,
-    status: defaultNewResourceStatus(),
+    status: "draft",
     hidden: false,
   };
 }
@@ -96,8 +99,8 @@ export function ResourceEditorModal({
   editing,
   defaultSemesterId,
   defaultSubjectId,
+  onSaved,
 }: ResourceEditorModalProps) {
-  const db = useCms();
   const { toast } = useToast();
   const [form, setForm] = useState<FormState>(() =>
     editing ? toForm(editing) : emptyForm(defaultSemesterId, defaultSubjectId),
@@ -105,20 +108,18 @@ export function ResourceEditorModal({
   const [errors, setErrors] = useState<Partial<Record<keyof FormState | "file" | "customType", string>>>({});
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const suggestions = useMemo(() => getAllTags().slice(0, 8), [db]);
+  const { data: semestersData } = useApiQuery("admin-modal-semesters", () => fetchSemesters());
+  const { data: subjectsData } = useApiQuery(`admin-modal-subjects-${form.semesterId}`, (signal) =>
+    form.semesterId ? fetchSubjects(form.semesterId, signal) : Promise.resolve({ rows: [], total: 0 }),
+  );
 
   const semesters = useMemo(
-    () => db.semesters.filter((s) => !s.deletedAt).sort((a, b) => a.order - b.order),
-    [db.semesters],
+    () => [...(semestersData?.rows ?? [])].sort((a, b) => a.order - b.order),
+    [semestersData],
   );
-  const subjects = useMemo(
-    () =>
-      form.semesterId
-        ? db.subjects.filter((s) => !s.deletedAt && s.semesterId === form.semesterId)
-        : [],
-    [db.subjects, form.semesterId],
-  );
+  const subjects = useMemo(() => subjectsData?.rows ?? [], [subjectsData]);
 
   useEffect(() => {
     if (!open) return;
@@ -142,14 +143,12 @@ export function ResourceEditorModal({
 
   const validate = (): boolean => {
     const next: typeof errors = {};
-    const s = getSettings().contentDefaults;
     if (!form.title.trim()) next.title = "Title is required.";
-    if (s.requireDescription && !form.description.trim())
-      next.description = "Description is required.";
-    if (s.requireSemester && !form.semesterId) next.semesterId = "Select a semester.";
-    if (s.requireSubject && !form.subjectId) next.subjectId = "Select a subject.";
+    if (!form.description.trim()) next.description = "Description is required.";
+    if (!form.semesterId) next.semesterId = "Select a semester.";
+    if (!form.subjectId) next.subjectId = "Select a subject.";
     if (form.type === "custom" && !form.customType.trim()) next.customType = "Enter custom type.";
-    if (!editing && s.requirePdf && !file) next.file = "Select a PDF file to upload.";
+    if (!editing && !file) next.file = "Select a PDF file to upload.";
     if (!form.pageCount || Number(form.pageCount) < 1) next.pageCount = "Enter the page count.";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -168,11 +167,12 @@ export function ResourceEditorModal({
     setErrors((prev) => ({ ...prev, file: undefined }));
   };
 
-  const save = (status: Resource["status"]) => {
-    if (!validate()) return;
+  const save = async (status: Resource["status"]) => {
+    if (!validate() || saving) return;
+    setSaving(true);
 
     const tags = parseTags(form.tags);
-    const base = {
+    const payload = {
       title: form.title.trim(),
       description: form.description.trim(),
       semesterId: form.semesterId,
@@ -190,38 +190,56 @@ export function ResourceEditorModal({
       hidden: form.hidden,
     };
 
-    if (editing) {
-      // Editing a published/hidden resource + Save as Draft → keep the live
-      // version untouched and stage the edits as a new draft in Drafts.
-      if (status === "draft" && editing.status !== "draft") {
-        branchResourceToDraft(editing.id, {
-          ...base,
-          fileName: file?.name ?? editing.fileName,
-          fileSize: file?.size ?? editing.fileSize,
-        });
-        toast("Edits saved as a new draft — the published resource is unchanged");
-      } else {
-        updateResource(editing.id, {
-          ...base,
-          fileName: file?.name ?? editing.fileName,
-          fileSize: file?.size ?? editing.fileSize,
-        });
-        toast("Resource updated");
+    /** Upload the selected file; on failure the modal stays open on the file field. */
+    const uploadSelectedFile = async (resourceId: string): Promise<boolean> => {
+      if (!file) return true;
+      try {
+        await adminUploadFile(resourceId, file, Number(form.pageCount) || undefined);
+        return true;
+      } catch (err) {
+        setErrors((prev) => ({
+          ...prev,
+          file: err instanceof ApiError ? err.message : "Upload failed. Replace the file from Edit.",
+        }));
+        return false;
       }
-    } else {
-      createResource({
-        ...base,
-        fileName: file!.name,
-        fileSize: file!.size,
-      });
-      toast("Resource added");
+    };
+
+    try {
+      if (editing) {
+        // Editing a published/hidden resource + Save as Draft → keep the live
+        // version untouched and stage the edits as a new draft.
+        if (status === "draft" && editing.status !== "draft") {
+          const created = await adminCreate<{ id: string }>("resources", payload);
+          const uploaded = await uploadSelectedFile(created.id);
+          toast(
+            uploaded
+              ? "Edits saved as a new draft — the published resource is unchanged"
+              : "Draft created, but the file upload failed — replace it from Edit",
+          );
+        } else {
+          await adminUpdate("resources", editing.id, payload);
+          const uploaded = await uploadSelectedFile(editing.id);
+          toast(uploaded ? "Resource updated" : "Resource updated, but the file upload failed");
+        }
+      } else {
+        const created = await adminCreate<{ id: string }>("resources", payload);
+        const uploaded = await uploadSelectedFile(created.id);
+        if (!uploaded) return;
+        toast("Resource added");
+      }
+      onSaved?.();
+      onClose();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not save the resource.", "error");
+    } finally {
+      setSaving(false);
     }
-    onClose();
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    save(form.status);
+    void save(form.status);
   };
 
   return (
@@ -281,7 +299,7 @@ export function ResourceEditorModal({
                 placeholder="comma-separated"
                 value={form.tags}
                 onChange={(e) => set("tags", e.target.value)}
-                hint={suggestions.length > 0 ? `Existing: ${suggestions.slice(0, 5).map((t) => t.name).join(", ")}` : undefined}
+                hint="Separate multiple tags with commas"
               />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Select
@@ -485,7 +503,7 @@ export function ResourceEditorModal({
             />
             <p className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
               <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-              PDFs will be stored using Cloudinary later — for now the file is kept locally in this form.
+              PDFs are stored in secure file storage and served to readers.
             </p>
           </fieldset>
         </div>
@@ -495,8 +513,8 @@ export function ResourceEditorModal({
           <Button variant="ghost" onClick={onClose} type="button">
             Cancel
           </Button>
-          <Button type="submit">
-            {form.status === "hidden" ? "Save as Hidden" : form.status === "draft" ? "Save as Draft" : "Save & Publish"}
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving…" : form.status === "hidden" ? "Save as Hidden" : form.status === "draft" ? "Save as Draft" : "Save & Publish"}
           </Button>
         </div>
       </form>

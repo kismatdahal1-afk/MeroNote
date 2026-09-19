@@ -2,17 +2,20 @@
 import { PageHeader } from "../components/common/PageHeader";
 import { BookmarkCard } from "../components/cards/BookmarkCard";
 import { SubjectCard } from "../components/cards/SubjectCard";
-import { EmptyState } from "../components/common/States";
+import { EmptyState, ErrorState } from "../components/common/States";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { Select } from "../components/common/Field";
 import { SearchBar } from "../components/common/SearchBar";
 import { FilterChips, type TypeFilter } from "../components/resources/FilterChips";
-import { getAllSemesters, getResourceById, getSubjectById, getAllSubjects } from "../data/selectors";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
+import { useTaxonomy } from "../hooks/useTaxonomy";
 import { matchesQuery } from "../lib/utils";
+import { listBookmarks, type StudyBookmarkRow } from "../lib/studyApi";
+import { bookmarkRowToBookmark, bookmarkRowToSubject, targetToResource } from "../lib/personalAdapters";
+import { useApiQuery } from "../hooks/useApiQuery";
+import { BookmarksSkeleton } from "../components/skeletons/pages";
 import type { Bookmark, Resource, ResourceType } from "../types";
-import { useCmsSync } from "../components/common/CmsSync";
 
 type SortKey = "recent" | "title" | "pages";
 
@@ -23,11 +26,9 @@ interface BookmarkEntry {
 }
 
 export default function Bookmarks() {
-  const cmsDb = useCmsSync();
-  const { bookmarks, removeBookmark, bookmarkedSubjects } = useLibrary();
+  const { removeBookmark } = useLibrary();
   const { toast } = useToast();
-  const semesters = getAllSemesters();
-  const allSubjects = getAllSubjects();
+  const { subjects: taxonomySubjects, semesters } = useTaxonomy();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
@@ -36,21 +37,30 @@ export default function Bookmarks() {
   const [type, setType] = useState<TypeFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
+  const { data, error, loading, retry } = useApiQuery("me-bookmarks", () => listBookmarks());
+  const rows: StudyBookmarkRow[] = useMemo(() => data ?? [], [data]);
+
   const allSavedSubjects = useMemo(
     () =>
-      bookmarkedSubjects
-        .map((id) => getSubjectById(id))
+      rows
+        .filter((row) => row.targetType === "subject")
+        .map((row) => bookmarkRowToSubject(row))
         .filter((s): s is NonNullable<typeof s> => Boolean(s)),
-    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
-    [bookmarkedSubjects, cmsDb],
+    [rows],
   );
 
   const entries: BookmarkEntry[] = useMemo(
     () =>
-      bookmarks
-        .map((bm) => ({ bm, resource: getResourceById(bm.resourceId) }))
-        .filter((e): e is BookmarkEntry => Boolean(e.resource)),
-    [bookmarks, cmsDb],
+      rows
+        .filter((row) => row.targetType === "resource")
+        .map((row) => {
+          const bm = bookmarkRowToBookmark(row);
+          const resource = row.target ? targetToResource(row.targetId, { ...row.target, id: row.targetId }) : null;
+          if (!bm || !resource) return null;
+          return { bm, resource };
+        })
+        .filter((e): e is BookmarkEntry => Boolean(e)),
+    [rows],
   );
 
   const searchedSubjects = useMemo(() => {
@@ -90,9 +100,9 @@ export default function Bookmarks() {
   const subjectOptions = useMemo(
     () =>
       semesterId
-        ? allSubjects.filter((s) => s.semesterId === semesterId)
-        : allSubjects,
-    [semesterId, allSubjects],
+        ? taxonomySubjects.filter((s) => s.semesterId === semesterId)
+        : taxonomySubjects,
+    [semesterId, taxonomySubjects],
   );
 
   const filtered = useMemo(() => {
@@ -132,7 +142,11 @@ export default function Bookmarks() {
         subtitle="Pages you saved while reading — available offline."
       />
 
-      {isEmpty ? (
+      {loading ? (
+        <BookmarksSkeleton />
+      ) : error ? (
+        <ErrorState message={error} onRetry={retry} />
+      ) : isEmpty ? (
         <EmptyState
           title="No bookmarks yet"
           message="While reading, tap the bookmark icon to save a page or subject for later."

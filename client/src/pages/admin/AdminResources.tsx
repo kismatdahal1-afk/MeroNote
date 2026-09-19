@@ -8,15 +8,18 @@ import { PageHeader, Card, StatCard } from "../../components/common/PageHeader";
 import { SearchBar, useSearchQuery } from "../../components/common/SearchBar";
 import { IconButton } from "../../components/common/IconButton";
 import { ConfirmDialog } from "../../components/common/ConfirmDialog";
-import { EmptyState } from "../../components/common/States";
+import { EmptyState, ErrorState } from "../../components/common/States";
 import { Select } from "../../components/common/Field";
 import { Button } from "../../components/common/Button";
 import { FilterChips } from "../../components/resources/FilterChips";
 import { StatusBadge } from "../../components/admin/StatusBadge";
 import { ResourceEditorModal } from "../../components/admin/ResourceEditorModal";
-import { useCms } from "../../state/CmsProvider";
-import { deleteEntity, getSettings } from "../../state/cmsStore";
 import { useToast } from "../../state/ToastProvider";
+import { fetchSemesters, fetchTopics, ApiError } from "../../lib/contentApi";
+import { adminDelete, adminList } from "../../lib/adminApi";
+import { useTaxonomy } from "../../hooks/useTaxonomy";
+import { useApiQuery } from "../../hooks/useApiQuery";
+import { ResourcesSkeleton } from "../../components/skeletons/pages";
 import { RESOURCE_TYPE_CONFIG, resourceTypeLabel } from "../../lib/resourceType";
 import { cx, formatFileSize, formatDate, formatRelativeTime } from "../../lib/utils";
 import type { Resource, ResourceType } from "../../types";
@@ -24,7 +27,6 @@ import type { Resource, ResourceType } from "../../types";
 type StatusFilter = "all" | "published" | "draft" | "hidden";
 
 export default function AdminResources() {
-  const db = useCms();
   const { toast } = useToast();
   const navigate = useNavigate();
   /** Search text lives in the URL (shared hook with the student Resources
@@ -36,51 +38,69 @@ export default function AdminResources() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Resource | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Resource | null>(null);
+  const { subjects: allSubjects } = useTaxonomy();
 
-  const semesters = useMemo(
-    () => db.semesters.filter((s) => !s.deletedAt).sort((a, b) => a.order - b.order),
-    [db.semesters],
+  const listKey = `admin-resources:${semesterId}:${type}:${statusFilter}:${query}`;
+  const { data, error, loading, retry } = useApiQuery(listKey, (signal) =>
+    adminList<Resource>("resources", {
+      ...(semesterId ? { semesterId } : {}),
+      ...(type !== "all" ? { type } : {}),
+      ...(statusFilter === "hidden"
+        ? { hidden: "true" }
+        : statusFilter === "all"
+          ? {}
+          : { status: statusFilter, hidden: "false" }),
+      limit: 100,
+    }, signal),
+  );
+  const { data: semestersData } = useApiQuery("admin-resources-semesters", (signal) =>
+    fetchSemesters(signal).then((list) => list.rows),
+  );
+  const semesters = useMemo(() => semestersData ?? [], [semestersData]);
+
+  const serverRows = useMemo(() => data?.rows ?? [], [data]);
+  const q = query.trim().toLowerCase();
+  const all = useMemo(
+    () => (q ? serverRows.filter((r) => r.title.toLowerCase().includes(q) || r.description.toLowerCase().includes(q) || r.tags.some((t) => t.toLowerCase().includes(q))) : serverRows),
+    [serverRows, query],
   );
 
-  const all = useMemo(() => db.resources.filter((r) => !r.deletedAt), [db.resources]);
+  const stats = useApiQuery(`admin-resources-stats:${semesterId}`, async (signal) => {
+    const base = semesterId ? { semesterId } : {};
+    const [total, published, drafts, hidden] = await Promise.all([
+      adminList<Resource>("resources", { ...base, limit: 1 }, signal).catch(() => ({ total: 0 })),
+      adminList<Resource>("resources", { ...base, status: "published", hidden: "false", limit: 1 }, signal).catch(() => ({ total: 0 })),
+      adminList<Resource>("resources", { ...base, status: "draft", limit: 1 }, signal).catch(() => ({ total: 0 })),
+      adminList<Resource>("resources", { ...base, hidden: "true", limit: 1 }, signal).catch(() => ({ total: 0 })),
+    ]);
+    return { total: total.total, published: published.total, drafts: drafts.total, hidden: hidden.total };
+  });
 
-  const stats = useMemo(
-    () => ({
-      total: all.length,
-      published: all.filter((r) => r.status === "published" && !r.hidden).length,
-      drafts: all.filter((r) => r.status === "draft").length,
-      hidden: all.filter((r) => r.hidden).length,
-    }),
+  const subjectIdsKey = useMemo(
+    () => [...new Set(all.map((r) => r.subjectId))].sort().join(","),
     [all],
   );
-
-  /** Semester filter + search + type + status. */
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = all;
-    if (q) {
-      list = list.filter(
-        (r) =>
-          r.title.toLowerCase().includes(q) ||
-          r.description.toLowerCase().includes(q) ||
-          r.tags.some((t) => t.toLowerCase().includes(q)),
-      );
-    }
-    if (semesterId) list = list.filter((r) => r.semesterId === semesterId);
-    if (type !== "all") list = list.filter((r) => r.type === type);
-    if (statusFilter === "hidden") list = list.filter((r) => r.hidden);
-    else if (statusFilter !== "all") list = list.filter((r) => !r.hidden && r.status === statusFilter);
-    return list.sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt));
-  }, [all, query, semesterId, type, statusFilter]);
+  const { data: topicsData } = useApiQuery(`admin-resources-topics:${subjectIdsKey}`, async (signal) => {
+    if (!subjectIdsKey) return [];
+    const lists = await Promise.all(
+      subjectIdsKey.split(",").map((id) => fetchTopics(id, signal).catch(() => ({ rows: [], total: 0 }))),
+    );
+    return lists.flatMap((list) => list.rows);
+  });
+  const topicsById = useMemo(() => {
+    const map = new Map<string, { id: string; title: string }>();
+    for (const t of topicsData ?? []) map.set(t.id, t);
+    return map;
+  }, [topicsData]);
 
   const counts = useMemo(() => {
-    let base = all;
-    if (semesterId) base = base.filter((r) => r.semesterId === semesterId);
-    if (statusFilter !== "all") base = base.filter((r) => r.status === statusFilter);
     const map: Partial<Record<ResourceType, number>> = {};
-    for (const r of base) map[r.type] = (map[r.type] ?? 0) + 1;
+    for (const r of all) map[r.type] = (map[r.type] ?? 0) + 1;
     return map;
-  }, [all, semesterId, statusFilter]);
+  }, [all]);
+
+  const filtered = all;
+  const totals = stats.data ?? { total: 0, published: 0, drafts: 0, hidden: 0 };
 
   const anyFilterActive =
     query.trim() !== "" || type !== "all" || statusFilter !== "all" ||
@@ -98,27 +118,25 @@ export default function AdminResources() {
     setFormOpen(true);
   };
 
-  /** Delete honoring settings:skip the confirmation when
-   *  "Confirm Before Deleting" is OFF, and permanently delete when
-   *  "Move Deleted to Trash" is OFF. */
+  /** Delete always moves to trash (backend soft-deletes); confirm first. */
   const requestDelete = (r: Resource) => {
-    const s = getSettings();
-    if (!s.contentDefaults.confirmDelete) {
-      deleteEntity("resource", r.id);
-      toast(
-        s.draftTrash.moveDeletedToTrash
-          ? "Resource moved to trash"
-          : "Resource permanently deleted",
-      );
-      return;
-    }
     setPendingDelete(r);
   };
 
+  const confirmDelete = async (target: Resource) => {
+    try {
+      await adminDelete("resources", target.id);
+      toast("Resource moved to trash");
+      retry();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not delete resource.", "error");
+    }
+  };
+
   const contextOf = (r: Resource) => {
-    const semester = db.semesters.find((s) => s.id === r.semesterId);
-    const subject = db.subjects.find((s) => s.id === r.subjectId);
-    const topic = r.topicId ? db.topics.find((t) => t.id === r.topicId) : undefined;
+    const semester = semesters.find((s) => s.id === r.semesterId);
+    const subject = allSubjects.find((s) => s.id === r.subjectId);
+    const topic = r.topicId ? topicsById.get(r.topicId) : undefined;
     return { semester, subject, topic };
   };
 
@@ -139,10 +157,10 @@ export default function AdminResources() {
       />
 
       <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard label="Total Resources" value={stats.total} hint="All resources" icon={<LibraryBig className="size-5" aria-hidden="true" />} />
-        <StatCard label="Published" value={stats.published} hint="Live resources" icon={<CheckCircle2 className="size-5" aria-hidden="true" />} />
-        <StatCard label="Drafts" value={stats.drafts} hint="Unpublished" icon={<FileEdit className="size-5" aria-hidden="true" />} />
-        <StatCard label="Hidden" value={stats.hidden} hint="Not visible" icon={<EyeOff className="size-5" aria-hidden="true" />} />
+        <StatCard label="Total Resources" value={totals.total} hint="All resources" icon={<LibraryBig className="size-5" aria-hidden="true" />} />
+        <StatCard label="Published" value={totals.published} hint="Live resources" icon={<CheckCircle2 className="size-5" aria-hidden="true" />} />
+        <StatCard label="Drafts" value={totals.drafts} hint="Unpublished" icon={<FileEdit className="size-5" aria-hidden="true" />} />
+        <StatCard label="Hidden" value={totals.hidden} hint="Not visible" icon={<EyeOff className="size-5" aria-hidden="true" />} />
       </div>
 
       {/* Search + dropdown filters */}
@@ -198,7 +216,11 @@ export default function AdminResources() {
         <FilterChips selected={type} counts={counts} onChange={setType} />
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <ResourcesSkeleton />
+      ) : error ? (
+        <ErrorState message={error} onRetry={retry} />
+      ) : filtered.length === 0 ? (
         <EmptyState
           title="No resources match"
           message={query ? `Nothing matched "${query}".` : "No resources match the current filters."}
@@ -387,29 +409,20 @@ export default function AdminResources() {
         editing={editing ?? undefined}
         defaultSemesterId={semesterId || undefined}
         onClose={() => setFormOpen(false)}
+        onSaved={() => retry()}
       />
 
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete resource"
-        message={
-          getSettings().draftTrash.moveDeletedToTrash
-            ? `"${pendingDelete?.title}" will move to the trash. You can restore it from Trash, or delete it permanently there.`
-            : `"${pendingDelete?.title}" will be permanently deleted. This cannot be undone.`
-        }
+        message={`"${pendingDelete?.title}" will move to the trash. You can restore it from Trash.`}
         confirmLabel="Delete"
         danger
         onCancel={() => setPendingDelete(null)}
         onConfirm={() => {
-          if (pendingDelete) {
-            deleteEntity("resource", pendingDelete.id);
-            toast(
-              getSettings().draftTrash.moveDeletedToTrash
-                ? "Resource moved to trash"
-                : "Resource permanently deleted",
-            );
-          }
+          const target = pendingDelete;
           setPendingDelete(null);
+          if (target) void confirmDelete(target);
         }}
       />
 

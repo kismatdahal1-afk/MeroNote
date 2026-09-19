@@ -4,10 +4,9 @@ import { GraduationCap, BookOpen, CreditCard, CalendarClock, CalendarDays, Play 
 import { Card } from "../common/PageHeader";
 import { ProgressRing } from "../common/ProgressRing";
 import { calculateSemesterProgress } from "../../lib/semesterProgress";
-import { getSemesterById } from "../../data/selectors";
-import { getSubjectsBySemester, countResourcesBySemester } from "../../data/selectors";
+import { fetchCount, fetchSemester } from "../../lib/contentApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
 import { useSemesterStatus, type SemesterTermDates } from "../../state/SemesterStatusProvider";
-import { useCmsSync } from "../common/CmsSync";
 import { StatPill } from "./StatPill";
 import { cx } from "../../lib/utils";
 
@@ -30,11 +29,17 @@ function toDateInputValue(d: Date): string {
  * numbers derive from the user-chosen start/end dates — nothing is hardcoded.
  */
 export function ActiveSemesterBanner({ semesterId, showLauncher = true }: ActiveSemesterBannerProps) {
-  useCmsSync();
   const { getStatus, getDates, setDates } = useSemesterStatus();
-  const semester = getSemesterById(semesterId);
-  const subjects = getSubjectsBySemester(semesterId);
-  const resourceCount = countResourcesBySemester(semesterId);
+  const { data } = useApiQuery(`banner-semester-${semesterId}`, async (signal) => {
+    const [detail, resourceTotal] = await Promise.all([
+      fetchSemester(semesterId, signal),
+      fetchCount("/api/resources", { semesterId }, signal),
+    ]);
+    return { detail, resourceTotal };
+  });
+  const semester = data?.detail ?? null;
+  const subjects = data?.detail.subjects ?? [];
+  const resourceCount = data?.resourceTotal ?? 0;
 
   const stored = getDates(semesterId);
   const today = toDateInputValue(new Date());
@@ -50,6 +55,7 @@ export function ActiveSemesterBanner({ semesterId, showLauncher = true }: Active
 
   const status = getStatus(semesterId);
   if (status !== "ongoing") return null;
+  if (!data) return null;
 
   const save = () => {
     if (!datesValid) return;

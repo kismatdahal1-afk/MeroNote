@@ -10,45 +10,92 @@ import { QuickNavigation, defaultQuickNav } from "../components/dashboard/QuickN
 import { RecentOpenedCard, TrendingResourceCard, TrendingTitle } from "../components/dashboard/TrendingResourceCard";
 import { programInfo } from "../data/mock";
 import { useUser } from "../state/UserProvider";
-import {
-  getResourceById,
-  getTrendingExamResources,
-} from "../data/selectors";
 import { useLibrary } from "../state/LibraryProvider";
-import { getDashboardNotices } from "../state/cmsStore";
+import { fetchCount, fetchNotices, fetchResources, fetchResource, fetchSemesters } from "../lib/contentApi";
+import { noticeSort, noticeWithState } from "../lib/noticeState";
+import { useApiQuery } from "../hooks/useApiQuery";
 import { NoticesBoard } from "../components/dashboard/NoticesBoard";
-import { useCmsSync } from "../components/common/CmsSync";
 import { formatTimestamp, getGreeting } from "../lib/utils";
-import type { ReadingProgress, Resource } from "../types";
+import { DashboardSkeleton } from "../components/skeletons/pages";
+import { ErrorState } from "../components/common/States";
+import type { Resource } from "../types";
 
 export default function Dashboard() {
-  useCmsSync();
   const { favorites, favoriteSubjects, bookmarks, bookmarkedSubjects, downloads, recent, progress } = useLibrary();
   const { name } = useUser();
   const navigate = useNavigate();
 
+  const board = useApiQuery("dashboard-board", async (signal) => {
+    const [semesters, resourcesTotal, notices, pastPapers, recentFallback] = await Promise.all([
+      fetchSemesters(signal),
+      fetchCount("/api/resources", {}, signal),
+      fetchNotices(true, signal),
+      fetchResources({ type: "past_paper", limit: 6 }, signal),
+      fetchResources({ limit: 6 }, signal),
+    ]);
+    const subjectTotals = await Promise.all(
+      semesters.rows.map((semester) => fetchCount("/api/subjects", { semesterId: semester.id }, signal)),
+    );
+    return {
+      semesters: semesters.rows,
+      subjectsTotal: subjectTotals.reduce((sum, n) => sum + n, 0),
+      resourcesTotal,
+      notices: notices.rows.map(noticeWithState).sort(noticeSort),
+      trending: (pastPapers.rows.length > 0 ? pastPapers.rows : recentFallback.rows).slice(0, 3),
+    };
+  });
+
+  const progressKey = progress.map((p) => `${p.resourceId}:${p.updatedAt}`).join(",");
+  const recentKey = recent.map((r) => `${r.resourceId}:${r.openedAt}`).join(",");
+  const resolved = useApiQuery(`dashboard-resolved:${progressKey}:${recentKey}`, async (signal) => {
+    const sorted = [...progress].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+    const heroId = sorted[0]?.resourceId;
+    const recentIds = recent.slice(0, 4).map((r) => r.resourceId);
+    const ids = [...new Set([heroId, ...recentIds].filter((id): id is string => Boolean(id)))];
+    const entries = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          return await fetchResource(id, signal);
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const byId = new Map<string, Resource>();
+    for (const resource of entries) {
+      if (resource) byId.set(resource.id, resource);
+    }
+    return { byId, heroId };
+  });
+
+  if (board.loading) return <DashboardSkeleton />;
+  if (board.error || !board.data) {
+    return (
+      <div className="py-16">
+        <ErrorState message={board.error ?? "Couldn't load the dashboard."} onRetry={board.retry} />
+      </div>
+    );
+  }
+
   const hero =
-    progress
-      .map((p) => ({ p, resource: getResourceById(p.resourceId) }))
-      .filter((x): x is { p: ReadingProgress; resource: Resource } => Boolean(x.resource))
-      .sort((a, b) => +new Date(b.p.updatedAt) - +new Date(a.p.updatedAt))[0]?.resource ?? null;
+    (resolved.data?.heroId ? resolved.data.byId.get(resolved.data.heroId) ?? null : null);
+  const heroProgress = hero ? progress.find((p) => p.resourceId === hero.id) : undefined;
 
   const recentResources = recent
     .slice(0, 4)
-    .map((r) => getResourceById(r.resourceId))
+    .map((r) => resolved.data?.byId.get(r.resourceId))
     .filter((r): r is NonNullable<typeof r> => Boolean(r))
     .slice(0, 2);
 
-  const trending = getTrendingExamResources().slice(0, 3);
-  /** Logged-in user's downloaded-resource total: reads the user's library
-   *  (mock-backed for now), so it follows real user data once connected. */
+  const trending = board.data.trending;
+  /** Permanently downloaded on this device (real IndexedDB state). */
   const completedDownloads = downloads.filter((d) => d.status === "completed").length;
-  const notices = getDashboardNotices();
+  const notices = board.data.notices;
 
   const stats = [
-    { label: "Semesters", value: "8", hint: "Syllabus & Qs", icon: GraduationCap },
-    { label: "Subjects", value: "45+", hint: "Theory & Lab", icon: BookOpen },
-    { label: "Archived", value: "60+", hint: "Notes & Papers", icon: FileStack },
+    { label: "Semesters", value: board.data.semesters.length, hint: "Syllabus & Qs", icon: GraduationCap },
+    { label: "Subjects", value: board.data.subjectsTotal, hint: "Theory & Lab", icon: BookOpen },
+    { label: "Archived", value: board.data.resourcesTotal, hint: "Notes & Papers", icon: FileStack },
     { label: "Downloaded", value: completedDownloads, hint: "Offline Ready", icon: HardDriveDownload },
   ];
 
@@ -57,7 +104,7 @@ export default function Dashboard() {
     favorites.length + favoriteSubjects.length,
     bookmarks.length + bookmarkedSubjects.length,
   );
-  const heroUpdatedAt = hero ? progress.find((p) => p.resourceId === hero.id)?.updatedAt : undefined;
+  const heroUpdatedAt = heroProgress?.updatedAt;
 
   return (
     <div className="student-dashboard relative">

@@ -95,3 +95,67 @@ export function putServerProgress(resourceId: string, lastPage: number): Promise
     body: JSON.stringify({ lastPage }),
   });
 }
+
+export interface TargetSummary {
+  title?: string;
+  name?: string;
+  code?: string;
+  description?: string;
+  category?: string;
+  type?: string;
+  tags?: string[];
+  pageCount?: number;
+  fileSize?: number;
+  subjectId?: string;
+  semesterId?: string;
+  subjectName?: string;
+  semesterName?: string;
+}
+
+export interface StudyFavoriteRow {
+  targetType: StudyTargetType;
+  targetId: string;
+  createdAt: string;
+  target?: TargetSummary | null;
+}
+
+export interface StudyBookmarkRow {
+  _id: string;
+  targetType: StudyTargetType;
+  targetId: string;
+  page?: number;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+  target?: TargetSummary | null;
+}
+
+export interface StudyProgressRow {
+  resourceId: string;
+  lastPage: number;
+  progress: number;
+  updatedAt: string;
+}
+
+async function list<T>(path: string): Promise<T[] | null> {
+  try {
+    const res = await fetch(`${API_URL}${path}`, { credentials: "include" });
+    if (!res.ok) return null;
+    const json = (await res.json().catch(() => null)) as { data?: T[] } | null;
+    return Array.isArray(json?.data) ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export function listFavorites(): Promise<StudyFavoriteRow[] | null> {
+  return list<StudyFavoriteRow>("/api/me/favorites?limit=100");
+}
+
+export function listBookmarks(): Promise<StudyBookmarkRow[] | null> {
+  return list<StudyBookmarkRow>("/api/me/bookmarks?limit=100");
+}
+
+export function listProgress(): Promise<StudyProgressRow[] | null> {
+  return list<StudyProgressRow>("/api/me/progress?limit=100");
+}

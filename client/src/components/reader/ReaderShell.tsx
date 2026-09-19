@@ -2,7 +2,9 @@ import { useParams, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
-import { getResourceById, getSemesterById, getSubjectById } from "../../data/selectors";
+import { fetchResource, fetchSemester, fetchSubject } from "../../lib/contentApi";
+import { useApiQuery } from "../../hooks/useApiQuery";
+import { ReaderSkeleton } from "../skeletons/pages";
 import {
   entryPointFromState,
   entryRootFor,
@@ -22,7 +24,6 @@ import { resolveLocalFileUrl, revokeLocalFileUrl } from "../../lib/downloadManag
 import { getTempPdf, putTempPdf } from "../../lib/tempPdfCache";
 import { decideReadingSource, readingSourceLabel, type ReadingSource } from "../../lib/cachePolicy";
 import { BackButton } from "../common/BackButton";
-import { useCmsSync } from "../common/CmsSync";
 import { PdfViewer } from "./PdfViewer";
 
 /**
@@ -34,7 +35,6 @@ import { PdfViewer } from "./PdfViewer";
  * sidebar keeps highlighting the section the admin came from.
  */
 export function ReaderShell({ admin = false }: { admin?: boolean }) {
-  useCmsSync();
   const { resourceId } = useParams<{ resourceId: string }>();
   const { state } = useLocation();
   const via = (state as ResourceNavState | null)?.via;
@@ -56,7 +56,16 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
    *  Stateless visits (direct URL, refresh) fall back to Resources. */
   const adminEntry = adminEntryPointFromState(state);
   const adminRoot = adminEntryRootFor(adminEntry);
-  const resource = getResourceById(resourceId);
+  const { data: meta, error: metaError } = useApiQuery(`reader-meta-${resourceId ?? ""}`, async (signal) => {
+    if (!resourceId) throw new Error("Missing resource.");
+    const resource = await fetchResource(resourceId, signal);
+    const [subject, semester] = await Promise.all([
+      fetchSubject(resource.subjectId, signal).catch(() => null),
+      fetchSemester(resource.semesterId, signal).catch(() => null),
+    ]);
+    return { resource, subject, semester };
+  });
+  const resource = meta?.resource ?? null;
   const { toast } = useToast();
   const { getProgress, setReadingProgress, addBookmark, getBookmark, getDownload, startDownload, markOpened } = useLibrary();
   const baseRoute = admin ? "/admin/resources" : "/resources";
@@ -76,8 +85,10 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   // remote presigned-URL flow runs. Corrupt local records are dropped.
   const localObjectUrl = useRef<string | null>(null);
 
+  const metaResource = meta?.resource ?? null;
+
   useEffect(() => {
-    if (!openResourceId) return;
+    if (!openResourceId || !metaResource) return;
     const rid = openResourceId;
     let cancelled = false;
     setFileUrl(null);
@@ -148,8 +159,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       }
 
       // 3/4. Network: fetch-and-cache when small enough, stream when large.
-      const fileSize = getResourceById(rid)?.fileSize ?? 0;
-      const decision = decideReadingSource({ hasPermanentDownload: false, hasTempCache: false, fileSize });
+      const decision = decideReadingSource({ hasPermanentDownload: false, hasTempCache: false, fileSize: metaResource.fileSize });
       if (decision === "network-fetch") {
         try {
           const { url } = await fetchResourceFileUrl(rid);
@@ -192,7 +202,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
         localObjectUrl.current = null;
       }
     };
-  }, [openResourceId, retryNonce]);
+  }, [openResourceId, retryNonce, metaResource]);
 
   // Phase 7 progress sync (best-effort; local state stays authoritative).
   // Persists page changes debounced (1.5s trailing edge, flushed on unmount)
@@ -225,7 +235,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     let cancelled = false;
     void getServerProgress(rid).then((server) => {
       if (cancelled || !server || touchedLocally.current || getProgress(rid)) return;
-      const total = getResourceById(rid)?.pageCount ?? server.lastPage;
+      const total = metaResource?.pageCount ?? server.lastPage;
       setReadingProgress(rid, Math.min(server.lastPage, total), total);
     });
     return () => {
@@ -241,13 +251,23 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     // getProgress/setReadingProgress intentionally excluded: re-running on
     // every local progress write would refetch in a loop post-integration.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openResourceId, authStatus]);
+  }, [openResourceId, authStatus, metaResource]);
 
   if (!resource) {
     return (
       <div className="reader-bar flex min-h-screen items-center justify-center bg-background p-6">
         <div className="text-center">
-          <p className="text-lg font-bold text-foreground">Resource not found</p>
+          {metaError ? (
+            <>
+              <p className="text-lg font-bold text-foreground">Couldn't load this resource</p>
+              <p className="mt-2 text-sm text-muted-foreground">{metaError}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-bold text-foreground">Resource not found</p>
+              <ReaderSkeleton />
+            </>
+          )}
           <div className="mt-3 flex justify-center">
             <BackButton
               fallbackTo={admin ? adminRoot.to : "/dashboard"}
@@ -273,8 +293,8 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     );
   }
 
-  const subject = getSubjectById(resource.subjectId);
-  const semester = getSemesterById(resource.semesterId);
+  const subject = meta?.subject ?? null;
+  const semester = meta?.semester ?? null;
   const bookmarked = Boolean(getBookmark(resource.id));
   const download = getDownload(resource.id);
   const totalPages = resource.pageCount;
@@ -292,7 +312,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       return;
     }
     addBookmark(resource, page, "");
-    toast(`Bookmarked page ${page} (mock)`);
+    toast(`Bookmarked page ${page}`);
   };
 
   const handleDownload = () => {

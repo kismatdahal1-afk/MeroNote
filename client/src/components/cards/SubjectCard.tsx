@@ -4,13 +4,14 @@ import type { Subject } from "../../types";
 import { Card } from "../common/PageHeader";
 import { Badge } from "../common/Badge";
 import { IconButton } from "../common/IconButton";
-import { countResourcesBySubject } from "../../data/selectors";
 import type { ResourceEntryPoint } from "../../lib/resourceNavigation";
+import { useCounts } from "../../hooks/useCounts";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 
 export function SubjectCard({ subject, via }: { subject: Subject; via?: ResourceEntryPoint }) {
-  const count = countResourcesBySubject(subject.id);
+  const counts = useCounts({ subjectId: subject.id });
+  const count = counts.resources;
   const { isFavoriteSubject, toggleFavoriteSubject, isSubjectBookmarked, toggleBookmarkSubject } =
     useLibrary();
   const { toast } = useToast();
@@ -83,7 +84,7 @@ export function SubjectCard({ subject, via }: { subject: Subject; via?: Resource
         <div className="mt-4 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <FileStack className="size-3.5" aria-hidden="true" />
-            {count} resources
+            {count === null ? "–" : `${count} resources`}
           </div>
           <ChevronRight
             className="size-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-primary"

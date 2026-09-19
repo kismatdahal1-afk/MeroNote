@@ -5,25 +5,22 @@ import { SemesterCard } from "../components/cards/SemesterCard";
 import { SubjectCard } from "../components/cards/SubjectCard";
 import { ResourceCard } from "../components/cards/ResourceCard";
 import { PageHeader, Card } from "../components/common/PageHeader";
-import { EmptyState } from "../components/common/States";
+import { EmptyState, ErrorState } from "../components/common/States";
 import { BackButton } from "../components/common/BackButton";
 import { ActiveSemesterBanner } from "../components/semesters/ActiveSemesterBanner";
 import { SemesterStatusControl, type SemesterStatusKind } from "../components/semesters/SemesterStatus";
 import { StatPill as SemesterStatPill } from "../components/semesters/StatPill";
 import { FilterChips } from "../components/resources/FilterChips";
 import { useSemesterStatus } from "../state/SemesterStatusProvider";
-import {
-  getSemesterById,
-  getSubjectsBySemester,
-  getAllSemesters,
-  getResourcesBySemester,
-} from "../data/selectors";
+import { fetchResources, fetchSemester, fetchSemesters } from "../lib/contentApi";
+import { useApiQuery } from "../hooks/useApiQuery";
+import { SemestersSkeleton, SemesterSubjectsSkeleton } from "../components/skeletons/pages";
 import type { ResourceType } from "../types";
-import { useCmsSync } from "../components/common/CmsSync";
 
 export default function Semesters() {
-  useCmsSync();
   const { ongoingSemesterId } = useSemesterStatus();
+  const { data, error, loading, retry } = useApiQuery("semesters", () => fetchSemesters());
+  const semesters = useMemo(() => data?.rows ?? [], [data]);
 
   return (
     <div>
@@ -35,40 +32,41 @@ export default function Semesters() {
       {/* Ongoing semester banner (renders only while a semester is Ongoing) */}
       {ongoingSemesterId && <ActiveSemesterBanner semesterId={ongoingSemesterId} />}
 
-      <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
-        {getAllSemesters().map((sem) => (
-          <SemesterCard key={sem.id} semester={sem} />
-        ))}
-      </div>
+      {loading && <SemestersSkeleton />}
+      {error && !loading && <ErrorState message={error} onRetry={retry} />}
+      {!loading && !error && semesters.length === 0 && (
+        <EmptyState title="No semesters yet" message="Semesters will appear here once published." />
+      )}
+      {!loading && !error && semesters.length > 0 && (
+        <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
+          {semesters.map((sem) => (
+            <SemesterCard key={sem.id} semester={sem} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export function SemesterSubjects() {
-  const cmsDb = useCmsSync();
   const { semesterId } = useParams<{ semesterId: string }>();
   const navigate = useNavigate();
   const { getStatus, setStatus } = useSemesterStatus();
   const [query, setQuery] = useState("");
   const [type, setType] = useState<ResourceType | "all">("all");
 
-  const semester = getSemesterById(semesterId);
-  const subjects = useMemo(
-    () => (semester ? getSubjectsBySemester(semester.id) : []),
-    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
-    [semester, cmsDb],
-  );
-  /** Semester resources, most recently added first. */
-  const recentResources = useMemo(
-    () =>
-      semester
-        ? [...getResourcesBySemester(semester.id)].sort(
-            (a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt),
-          )
-        : [],
-    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
-    [semester, cmsDb],
-  );
+  const { data, error, loading, retry } = useApiQuery(`semester-${semesterId ?? ""}`, async (signal) => {
+    if (!semesterId) throw new Error("Missing semester.");
+    const [detail, resourceList] = await Promise.all([
+      fetchSemester(semesterId, signal),
+      fetchResources({ semesterId, limit: 100 }, signal),
+    ]);
+    return { detail, resources: resourceList.rows };
+  });
+  const semester = data?.detail ?? null;
+  const subjects = useMemo(() => data?.detail.subjects ?? [], [data]);
+  /** Semester resources, most recently added first (API default order). */
+  const recentResources = useMemo(() => data?.resources ?? [], [data]);
 
   const filteredSubjects = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -103,13 +101,31 @@ export function SemesterSubjects() {
     return map;
   }, [recentResources]);
 
-  if (!semester) {
+  if (loading) {
     return (
-      <div className="py-16 text-center font-medium text-muted-foreground">
-        Semester not found.{" "}
-        <button type="button" onClick={() => navigate("/semesters")} className="font-bold text-primary hover:underline">
-          Back to semesters
-        </button>
+      <div>
+        <div className="mb-1 -ml-1 sm:-ml-1">
+          <BackButton fallbackTo="/semesters" label="Back to semesters" />
+        </div>
+        <SemesterSubjectsSkeleton />
+      </div>
+    );
+  }
+
+  if (error || !semester) {
+    if (!semester && !error) {
+      return (
+        <div className="py-16 text-center font-medium text-muted-foreground">
+          Semester not found.{" "}
+          <button type="button" onClick={() => navigate("/semesters")} className="font-bold text-primary hover:underline">
+            Back to semesters
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div className="py-16">
+        <ErrorState message={error ?? "Semester not found."} onRetry={retry} />
       </div>
     );
   }

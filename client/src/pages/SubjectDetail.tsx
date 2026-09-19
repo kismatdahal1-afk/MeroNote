@@ -7,12 +7,6 @@ import { SubjectHeader } from "../components/subjects/SubjectHeader";
 import { SubjectResourceGroup } from "../components/subjects/SubjectResourceGroup";
 import { SubjectResourceRow } from "../components/subjects/SubjectResourceRow";
 import { ResourceCard } from "../components/cards/ResourceCard";
-import {
-  getSubjectById,
-  getSemesterById,
-  getTopicsBySubject,
-  getResourcesBySubject,
-} from "../data/selectors";
 import { entryPointFromState, entryRootFor, entryShowsSubject } from "../lib/resourceNavigation";
 import {
   ALL_RESOURCE_TYPES,
@@ -22,7 +16,9 @@ import {
 import type { Resource, ResourceType } from "../types";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
-import { useCmsSync } from "../components/common/CmsSync";
+import { fetchSemester, fetchSubject } from "../lib/contentApi";
+import { useApiQuery } from "../hooks/useApiQuery";
+import { SubjectDetailSkeleton } from "../components/skeletons/pages";
 
 /** Back-compat: old persisted resources may carry type "other" (now custom). */
 function normalizeType(type: ResourceType): ResourceType {
@@ -63,7 +59,6 @@ function byNewest(a: Resource, b: Resource): number {
 }
 
 export default function SubjectDetail() {
-  const cmsDb = useCmsSync();
   const { subjectId } = useParams<{ subjectId: string }>();
   const navigate = useNavigate();
   const { state } = useLocation();
@@ -73,8 +68,14 @@ export default function SubjectDetail() {
   const showsSavedEntry = entryShowsSubject(entry);
   const entryRoot = showsSavedEntry ? entryRootFor(entry) : undefined;
   const subjectVia = showsSavedEntry ? entry : undefined;
-  const subject = getSubjectById(subjectId);
-  const semester = subject ? getSemesterById(subject.semesterId) : undefined;
+  const { data, error, loading, retry } = useApiQuery(`subject-${subjectId ?? ""}`, async (signal) => {
+    if (!subjectId) throw new Error("Missing subject.");
+    const detail = await fetchSubject(subjectId, signal);
+    const semester = await fetchSemester(detail.semesterId, signal);
+    return { detail, semester };
+  });
+  const subject = data?.detail ?? null;
+  const semester = data?.semester ?? null;
   /** Only a saved-list subject open carries the origin forward: resources
    *  opened here must show Favorites/Bookmarks → Subject → Resource, while
    *  resources opened directly from those lists carry no fromSubject and
@@ -88,16 +89,8 @@ export default function SubjectDetail() {
     toggleBookmarkSubject,
   } = useLibrary();
 
-  const topics = useMemo(
-    () => (subject ? getTopicsBySubject(subject.id) : []),
-    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
-    [subject, cmsDb],
-  );
-  const allResources = useMemo(
-    () => (subject ? getResourcesBySubject(subject.id) : []),
-    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
-    [subject, cmsDb],
-  );
+  const topics = useMemo(() => data?.detail.topics ?? [], [data]);
+  const allResources = useMemo(() => data?.detail.resources ?? [], [data]);
 
   /**
    * Read-only presentation of the existing resource data:
@@ -135,14 +128,28 @@ export default function SubjectDetail() {
 
   const hasResources = standardGroups.length > 0 || customGroups.length > 0;
 
-  if (!subject || !semester) {
+  if (loading) {
     return (
-      <ErrorState
-        title="Subject not found"
-        message="The subject you are looking for does not exist or has been removed."
-        onRetry={() => navigate("/semesters")}
-      />
+      <div>
+        <div className="mb-1 -ml-1 sm:-ml-1">
+          <BackButton label="Back" fallbackTo="/semesters" />
+        </div>
+        <SubjectDetailSkeleton />
+      </div>
     );
+  }
+
+  if (error || !subject || !semester) {
+    if (!error) {
+      return (
+        <ErrorState
+          title="Subject not found"
+          message="The subject you are looking for does not exist or has been removed."
+          onRetry={() => navigate("/semesters")}
+        />
+      );
+    }
+    return <ErrorState message={error} onRetry={retry} />;
   }
 
   const favorite = isFavoriteSubject(subject.id);

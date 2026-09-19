@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { Bell } from "lucide-react";
 import { PageHeader, Card } from "../components/common/PageHeader";
-import { EmptyState } from "../components/common/States";
+import { EmptyState, ErrorState } from "../components/common/States";
 import { SearchBar } from "../components/common/SearchBar";
 import { NoticeRow } from "../components/dashboard/NoticesBoard";
-import { getStudentNotices } from "../state/cmsStore";
+import { fetchNotices } from "../lib/contentApi";
+import { noticeSort, noticeWithState } from "../lib/noticeState";
+import { useApiQuery } from "../hooks/useApiQuery";
+import { NoticesSkeleton } from "../components/skeletons/pages";
 import type { NoticeType } from "../types";
 import { cx } from "../lib/utils";
-import { useCmsSync } from "../components/common/CmsSync";
 
 /** Filter chips: notice type + all. Kept local to this page. */
 const TYPE_FILTERS: { value: NoticeType | "all"; label: string }[] = [
@@ -20,12 +22,14 @@ const TYPE_FILTERS: { value: NoticeType | "all"; label: string }[] = [
 ];
 
 export default function Notices() {
-  const cmsDb = useCmsSync();
   const [query, setQuery] = useState("");
   const [type, setType] = useState<NoticeType | "all">("all");
 
-  // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
-  const notices = useMemo(() => getStudentNotices(), [cmsDb]);
+  const { data, error, loading, retry } = useApiQuery("notices", (signal) => fetchNotices(false, signal));
+  const notices = useMemo(
+    () => (data?.rows ?? []).map(noticeWithState).sort(noticeSort),
+    [data],
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -97,7 +101,11 @@ export default function Notices() {
         })}
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <NoticesSkeleton />
+      ) : error ? (
+        <ErrorState message={error} onRetry={retry} />
+      ) : filtered.length === 0 ? (
         <EmptyState
           title={query ? "No matching notices" : "No notices yet"}
           message={

@@ -7,21 +7,22 @@ import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { ProgressBar } from "../components/common/ProgressBar";
 import { Select } from "../components/common/Field";
 import { FilterChips } from "../components/resources/FilterChips";
-import { getAllSemesters, getResourceById, getAllSubjects } from "../data/selectors";
 import { formatFileSize } from "../lib/utils";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
-import type { ResourceType } from "../types";
-import { useCmsSync } from "../components/common/CmsSync";
+import { fetchResource } from "../lib/contentApi";
+import { useTaxonomy } from "../hooks/useTaxonomy";
+import { useApiQuery } from "../hooks/useApiQuery";
+import { DownloadsSkeleton } from "../components/skeletons/pages";
+import { ErrorState } from "../components/common/States";
+import type { Resource, ResourceType } from "../types";
 
 type SortKey = "recent" | "oldest" | "title" | "size";
 
 export default function Downloads() {
-  const cmsDb = useCmsSync();
   const { downloads, removeDownload, totalDownloadSize } = useLibrary();
   const { toast } = useToast();
-  const semesters = getAllSemesters();
-  const allSubjects = getAllSubjects();
+  const { semesters, subjects: taxonomySubjects } = useTaxonomy();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const [semesterId, setSemesterId] = useState("");
@@ -29,16 +30,24 @@ export default function Downloads() {
   const [type, setType] = useState<ResourceType | "all">("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
-  const entries = useMemo(
-    () =>
-      downloads
-        .map((dl) => ({ dl, resource: getResourceById(dl.resourceId) }))
-        .filter((e): e is { dl: (typeof downloads)[number]; resource: NonNullable<ReturnType<typeof getResourceById>> } =>
-          Boolean(e.resource),
-        ),
-    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
-    [downloads, cmsDb],
-  );
+  const downloadKey = downloads.map((d) => `${d.id}:${d.status}:${d.progress}`).join(",");
+  const resolved = useApiQuery(`downloads:${downloadKey}`, async (signal) => {
+    const rows = await Promise.all(
+      downloads.map(async (dl) => {
+        try {
+          const resource = await fetchResource(dl.resourceId, signal);
+          return { dl, resource };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    return rows.filter((e): e is { dl: (typeof downloads)[number]; resource: Resource } => Boolean(e));
+  });
+  const entries = useMemo(() => resolved.data ?? [], [resolved.data]);
+  const entriesLoading = resolved.loading;
+  const entriesError = resolved.error;
+  const allSubjects = taxonomySubjects;
 
   const subjectOptions = useMemo(
     () =>
@@ -125,6 +134,10 @@ export default function Downloads() {
           title="No downloads yet"
           message="Press the download button on any resource to keep it available offline."
         />
+      ) : entriesLoading && entries.length === 0 ? (
+        <DownloadsSkeleton />
+      ) : entriesError && entries.length === 0 ? (
+        <ErrorState message={entriesError} onRetry={resolved.retry} />
       ) : (
         <>
           <div className="mb-5 grid grid-cols-2 gap-3 sm:flex sm:flex-nowrap">

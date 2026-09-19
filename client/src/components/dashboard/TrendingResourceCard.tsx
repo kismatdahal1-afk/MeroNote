@@ -5,13 +5,14 @@ import { Card } from "../common/PageHeader";
 import { ProgressBar } from "../common/ProgressBar";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import { cx, formatFileSize, formatRelativeTime } from "../../lib/utils";
-import { getSubjectById } from "../../data/selectors";
+import { useTaxonomy } from "../../hooks/useTaxonomy";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 
 /** Compact "recently opened" card with progress. */
 export function RecentOpenedCard({ resource }: { resource: Resource }) {
   const { getProgress, markOpened } = useLibrary();
+  const { subjectName } = useTaxonomy();
   const progress = getProgress(resource.id);
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
   // Icon-only / plain-text presentation: assigned color on the icon/text only,
@@ -20,7 +21,7 @@ export function RecentOpenedCard({ resource }: { resource: Resource }) {
     .split(" ")
     .filter((c) => !c.startsWith("bg-"))
     .join(" ");
-  const subject = getSubjectById(resource.subjectId);
+  const subjectDisplayName = subjectName(resource.subjectId);
   const pct = Math.round((progress?.progress ?? 0) * 100);
 
   return (
@@ -35,7 +36,7 @@ export function RecentOpenedCard({ resource }: { resource: Resource }) {
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className={cx("text-[10px] font-bold", typeIconColor)}>
-            {subject?.name}
+            {subjectDisplayName}
           </p>
           <p className="mt-1.5 line-clamp-1 text-sm font-bold text-foreground group-hover:text-primary">
             {resource.title}

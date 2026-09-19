@@ -1,91 +1,98 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/common/PageHeader";
 import { ResourceCard } from "../components/cards/ResourceCard";
-import { EmptyState } from "../components/common/States";
+import { EmptyState, ErrorState } from "../components/common/States";
 import { Select } from "../components/common/Field";
-import { SearchBar, useSearchQuery } from "../components/common/SearchBar";
+import { SearchBar } from "../components/common/SearchBar";
 import { FilterChips } from "../components/resources/FilterChips";
-import {
-  getAllSemesters,
-  getAllResources,
-  searchResources,
-  getAllSubjects,
-} from "../data/selectors";
+import { fetchResources, fetchSemesters, fetchSubjects } from "../lib/contentApi";
+import { useApiQuery } from "../hooks/useApiQuery";
+import { ResourcesSkeleton } from "../components/skeletons/pages";
 import type { ResourceType } from "../types";
-import { useCmsSync } from "../components/common/CmsSync";
 
 type SortKey = "recent" | "title" | "pages";
 
 export default function Resources() {
-  useCmsSync();
-  const semesters = getAllSemesters();
-  const all = getAllResources();
-  const allSubjects = getAllSubjects();
   const [params, setParams] = useSearchParams();
-  const [query, updateQuery] = useSearchQuery();
-
+  const navigate = useNavigate();
   const [subjectId, setSubjectId] = useState("");
   const [type, setType] = useState<ResourceType | "all">("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
-  const subjectOptions = useMemo(
-    () =>
-      querySemesterParam(params)
-        ? allSubjects.filter((s) => s.semesterId === querySemesterParam(params))
-        : allSubjects,
-    [params],
-  );
-
   const semesterId = querySemesterParam(params);
 
-  const searchPool = useMemo(
-    () => (query ? searchResources(query) : all),
-    [query, all],
+  const { data: taxonomy, error: taxonomyError } = useApiQuery("resources-taxonomy", async (signal) => {
+    const semesters = await fetchSemesters(signal);
+    const perSemester = await Promise.all(
+      semesters.rows.map((semester) => fetchSubjects(semester.id, signal)),
+    );
+    return {
+      semesters: semesters.rows,
+      subjects: perSemester.flatMap((list) => list.rows),
+    };
+  });
+  const semesters = useMemo(() => taxonomy?.semesters ?? [], [taxonomy]);
+  const allSubjects = useMemo(() => taxonomy?.subjects ?? [], [taxonomy]);
+
+  const subjectOptions = useMemo(
+    () =>
+      semesterId
+        ? allSubjects.filter((s) => s.semesterId === semesterId)
+        : allSubjects,
+    [allSubjects, semesterId],
   );
 
+  const filterKey = `resources:${semesterId}:${subjectId}:${type}`;
+  const { data, error, loading, retry } = useApiQuery(filterKey, (signal) =>
+    fetchResources(
+      {
+        ...(semesterId ? { semesterId } : {}),
+        ...(subjectId ? { subjectId } : {}),
+        ...(type !== "all" ? { type } : {}),
+        limit: 100,
+      },
+      signal,
+    ),
+  );
+  const pool = useMemo(() => data?.rows ?? [], [data]);
+
   const filtered = useMemo(() => {
-    let list = searchPool;
-    if (semesterId) list = list.filter((r) => r.semesterId === semesterId);
-    if (subjectId) list = list.filter((r) => r.subjectId === subjectId);
-    if (type !== "all") list = list.filter((r) => r.type === type);
-    const sorted = [...list];
+    const sorted = [...pool];
     if (sort === "title") sorted.sort((a, b) => a.title.localeCompare(b.title));
     if (sort === "pages") sorted.sort((a, b) => b.pageCount - a.pageCount);
     if (sort === "recent")
       sorted.sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt));
     return sorted;
-  }, [searchPool, semesterId, subjectId, type, sort]);
+  }, [pool, sort]);
 
   const counts = useMemo(() => {
-    let base = searchPool;
-    if (semesterId) base = base.filter((r) => r.semesterId === semesterId);
-    if (subjectId) base = base.filter((r) => r.subjectId === subjectId);
     const map: Partial<Record<ResourceType, number>> = {};
-    for (const r of base) map[r.type] = (map[r.type] ?? 0) + 1;
+    for (const r of pool) map[r.type] = (map[r.type] ?? 0) + 1;
     return map;
-  }, [searchPool, semesterId, subjectId]);
+  }, [pool]);
 
   return (
     <div>
       <PageHeader
         title="Resources"
-        subtitle={`Browse all ${all.length} study resources — books, notes, past papers, and more.`}
+        subtitle="Browse study resources — books, notes, past papers, and more."
       />
 
       <SearchBar
-        initialValue={query}
+        initialValue=""
         className="mb-5 max-w-xl"
         placeholder="Search notes, subjects, past questions…"
-        onSubmit={updateQuery}
-        onChange={updateQuery}
+        onSubmit={(q) => {
+          const trimmed = q.trim();
+          navigate(trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : "/resources");
+        }}
       />
 
-      {query && (
-        <p className="mb-4 text-sm text-muted-foreground">
-          {filtered.length} result{filtered.length === 1 ? "" : "s"} for{" "}
-          <span className="font-semibold text-foreground">&ldquo;{query}&rdquo;</span>
-        </p>
+      {taxonomyError && !taxonomy && (
+        <div className="mb-5">
+          <ErrorState message={taxonomyError} onRetry={() => window.location.reload()} />
+        </div>
       )}
 
       <div className="mb-5 grid grid-cols-2 gap-3 sm:flex sm:flex-nowrap">
@@ -138,18 +145,15 @@ export default function Resources() {
         <FilterChips selected={type} counts={counts} onChange={setType} />
       </div>
 
-      {filtered.length === 0 ? (
-        query ? (
-          <EmptyState
-            title="No results found"
-            message={`Nothing matched "${query}". Try a different term or check the spelling.`}
-          />
-        ) : (
-          <EmptyState
-            title="No resources"
-            message="No resources match the current filters."
-          />
-        )
+      {loading ? (
+        <ResourcesSkeleton />
+      ) : error ? (
+        <ErrorState message={error} onRetry={retry} />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="No resources"
+          message="No resources match the current filters."
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {filtered.map((r) => (

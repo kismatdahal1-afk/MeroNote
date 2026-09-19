@@ -2,45 +2,55 @@
 import { PageHeader } from "../components/common/PageHeader";
 import { ResourceCard } from "../components/cards/ResourceCard";
 import { SubjectCard } from "../components/cards/SubjectCard";
-import { EmptyState } from "../components/common/States";
+import { EmptyState, ErrorState } from "../components/common/States";
 import { Select } from "../components/common/Field";
 import { SearchBar } from "../components/common/SearchBar";
 import { FilterChips, type TypeFilter } from "../components/resources/FilterChips";
-import { getAllSemesters, getResourceById, getSubjectById, getAllSubjects } from "../data/selectors";
-import { useLibrary } from "../state/LibraryProvider";
+import { useTaxonomy } from "../hooks/useTaxonomy";
 import { matchesQuery } from "../lib/utils";
+import { fetchSemesters } from "../lib/contentApi";
+import { listFavorites, type StudyFavoriteRow } from "../lib/studyApi";
+import { favoriteRowToResource, favoriteRowToSubject } from "../lib/personalAdapters";
+import { useApiQuery } from "../hooks/useApiQuery";
+import { FavoritesSkeleton } from "../components/skeletons/pages";
 import type { ResourceType } from "../types";
-import { useCmsSync } from "../components/common/CmsSync";
 
 type SortKey = "recent" | "title" | "pages";
 
 export default function Favorites() {
-  const cmsDb = useCmsSync();
-  const { favorites, favoriteSubjects } = useLibrary();
-  const semesters = getAllSemesters();
-  const allSubjects = getAllSubjects();
-
+  const { subjects: taxonomySubjects } = useTaxonomy();
   const [query, setQuery] = useState("");
   const [semesterId, setSemesterId] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [type, setType] = useState<TypeFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
+  const { data, error, loading, retry } = useApiQuery("me-favorites", async (signal) => {
+    const [favRows, semesters] = await Promise.all([
+      listFavorites(),
+      fetchSemesters(signal).catch(() => ({ rows: [], total: 0 })),
+    ]);
+    return { favRows: favRows ?? [], semesters: semesters.rows };
+  });
+  const favRows: StudyFavoriteRow[] = useMemo(() => data?.favRows ?? [], [data]);
+  const semesters = useMemo(() => data?.semesters ?? [], [data]);
+
   const allSubjectsFav = useMemo(
     () =>
-      favoriteSubjects
-        .map((id) => getSubjectById(id))
+      favRows
+        .filter((row) => row.targetType === "subject")
+        .map((row) => favoriteRowToSubject(row))
         .filter((s): s is NonNullable<typeof s> => Boolean(s)),
-    // cmsDb: re-resolve after CMS mutations so edits/deletions show immediately.
-    [favoriteSubjects, cmsDb],
+    [favRows],
   );
 
   const allResources = useMemo(
     () =>
-      favorites
-        .map((id) => getResourceById(id))
+      favRows
+        .filter((row) => row.targetType === "resource")
+        .map((row) => favoriteRowToResource(row))
         .filter((r): r is NonNullable<typeof r> => Boolean(r)),
-    [favorites, cmsDb],
+    [favRows],
   );
 
   const searchedSubjects = useMemo(() => {
@@ -79,9 +89,9 @@ export default function Favorites() {
   const subjectOptions = useMemo(
     () =>
       semesterId
-        ? allSubjects.filter((s) => s.semesterId === semesterId)
-        : allSubjects,
-    [semesterId, allSubjects],
+        ? taxonomySubjects.filter((s) => s.semesterId === semesterId)
+        : taxonomySubjects,
+    [semesterId, taxonomySubjects],
   );
 
   const filtered = useMemo(() => {
@@ -119,7 +129,11 @@ export default function Favorites() {
         subtitle="Subjects and resources you've marked for quick access."
       />
 
-      {isEmpty ? (
+      {loading ? (
+        <FavoritesSkeleton />
+      ) : error ? (
+        <ErrorState message={error} onRetry={retry} />
+      ) : isEmpty ? (
         <EmptyState
           title="No favorites yet"
           message="Tap the heart icon on any subject or resource and it will appear here."

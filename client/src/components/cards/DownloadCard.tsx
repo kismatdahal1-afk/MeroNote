@@ -5,7 +5,7 @@ import { Card } from "../common/PageHeader";
 import { ProgressBar } from "../common/ProgressBar";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import { cx, formatFileSize, formatRelativeTime } from "../../lib/utils";
-import { getSubjectById, getSemesterById } from "../../data/selectors";
+import { useTaxonomy } from "../../hooks/useTaxonomy";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
 import { IconButton } from "../common/IconButton";
@@ -29,8 +29,9 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
     .split(" ")
     .filter((c) => !c.startsWith("bg-"))
     .join(" ");
-  const subject = getSubjectById(resource.subjectId);
-  const semester = getSemesterById(resource.semesterId);
+  const { subjectName, semesterName } = useTaxonomy();
+  const subjectDisplayName = subjectName(resource.subjectId);
+  const semesterDisplayName = semesterName(resource.semesterId);
   const completed = download.status === "completed";
   const favorite = isFavorite(resource.id);
   const bookmarked = Boolean(getBookmark(resource.id));
@@ -77,9 +78,9 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
             <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
               {typeConfig.label} · {resource.pageCount} pages · {formatFileSize(download.sizeBytes)}
             </p>
-            {(subject || semester) && (
+            {(subjectDisplayName || semesterDisplayName) && (
               <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground/80">
-                {[subject?.name, semester?.name].filter(Boolean).join(" · ")}
+                {[subjectDisplayName, semesterDisplayName].filter(Boolean).join(" · ")}
               </p>
             )}
           </div>
@@ -187,10 +188,9 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground group-hover:text-primary">
           {resource.title}
         </h3>
-        {(subject || semester) && (
+        {(subjectDisplayName || semesterDisplayName) && (
           <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
-            {[subject?.name, semester?.name].filter(Boolean).join(" · ")
-            }
+            {[subjectDisplayName, semesterDisplayName].filter(Boolean).join(" · ")}
           </p>
         )}
       </div>

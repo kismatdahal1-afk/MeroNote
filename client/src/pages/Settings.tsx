@@ -322,12 +322,12 @@ export default function Settings() {
           </div>
           <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-muted-foreground/70">
             <ShieldCheck className="size-4 shrink-0" aria-hidden="true" />
-            Phase 2.5 prototype — mock data
+            Connected library with offline-ready downloads
           </p>
         </Card>
       </div>
 
-      {/* Edit profile — renames the account (mock) */}
+      {/* Edit profile — renames the account (local display name) */}
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}

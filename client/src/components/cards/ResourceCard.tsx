@@ -5,7 +5,7 @@ import { Card } from "../common/PageHeader";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import { ProgressBar } from "../common/ProgressBar";
 import { cx, formatFileSize } from "../../lib/utils";
-import { getSubjectById, getSemesterById } from "../../data/selectors";
+import { useTaxonomy } from "../../hooks/useTaxonomy";
 import { buildResourceNavState, type ResourceEntryPoint } from "../../lib/resourceNavigation";
 import { useLibrary } from "../../state/LibraryProvider";
 import { useToast } from "../../state/ToastProvider";
@@ -37,8 +37,9 @@ export function ResourceCard({ resource, showContext = true, via, fromSubject }:
     .split(" ")
     .filter((c) => !c.startsWith("bg-"))
     .join(" ");
-  const subject = getSubjectById(resource.subjectId);
-  const semester = getSemesterById(resource.semesterId);
+  const { subjectName, semesterName } = useTaxonomy();
+  const subjectDisplayName = subjectName(resource.subjectId);
+  const semesterDisplayName = semesterName(resource.semesterId);
   const favorite = isFavorite(resource.id);
   const bookmarked = Boolean(getBookmark(resource.id));
   const download = getDownload(resource.id);
@@ -91,9 +92,9 @@ export function ResourceCard({ resource, showContext = true, via, fromSubject }:
             <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
               {typeConfig.label} · {resource.pageCount} pages · {formatFileSize(resource.fileSize)}
             </p>
-            {showContext && (subject || semester) && (
+            {showContext && (subjectDisplayName || semesterDisplayName) && (
               <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground/80">
-                {[subject?.name, semester?.name].filter(Boolean).join(" · ")}
+                {[subjectDisplayName, semesterDisplayName].filter(Boolean).join(" · ")}
               </p>
             )}
           </div>
@@ -170,10 +171,9 @@ export function ResourceCard({ resource, showContext = true, via, fromSubject }:
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground group-hover:text-primary">
           {resource.title}
         </h3>
-        {showContext && (subject || semester) && (
+        {showContext && (subjectDisplayName || semesterDisplayName) && (
           <p className="mt-1 truncate text-xs font-medium text-muted-foreground">
-            {[subject?.name, semester?.name].filter(Boolean).join(" · ")
-            }
+            {[subjectDisplayName, semesterDisplayName].filter(Boolean).join(" · ")}
           </p>
         )}
       </div>

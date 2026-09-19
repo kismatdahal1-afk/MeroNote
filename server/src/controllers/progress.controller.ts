@@ -17,7 +17,7 @@ export async function listProgress(req: Request, res: Response): Promise<void> {
       .sort({ updatedAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("resourceId", "title")
+      .populate("resourceId", "title description type tags pageCount fileSize subjectId semesterId")
       .lean()
       .exec(),
   ]);

@@ -2,17 +2,19 @@ import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, FileText } from "lucide-react";
 import type { Semester } from "../../types";
 import { Card } from "../common/PageHeader";
-import { countResourcesBySemester } from "../../data/selectors";
 import { cx } from "../../lib/utils";
 import { useSemesterStatus } from "../../state/SemesterStatusProvider";
 import { SemesterStatusChip, type SemesterStatusKind } from "../semesters/SemesterStatus";
+import { useCounts } from "../../hooks/useCounts";
 
 interface SemesterCardProps {
   semester: Semester;
 }
 
 export function SemesterCard({ semester }: SemesterCardProps) {
-  const resourceCount = countResourcesBySemester(semester.id);
+  const counts = useCounts({ semesterId: semester.id });
+  const subjectCount = counts.subjects ?? semester.subjectCount;
+  const resourceCount = counts.resources;
   const { getStatus, ongoingSemesterId } = useSemesterStatus();
 
   const ongoing = ongoingSemesterId === semester.id;
@@ -60,11 +62,11 @@ export function SemesterCard({ semester }: SemesterCardProps) {
         <div className="mt-auto flex items-center gap-3 pt-3 text-xs font-medium text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 truncate">
             <BookOpen className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-            <span className="truncate">{semester.subjectCount} subjects</span>
+            <span className="truncate">{subjectCount} subjects</span>
           </span>
           <span className="inline-flex items-center gap-1.5 truncate">
             <FileText className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
-            <span className="truncate">{resourceCount} resources</span>
+            <span className="truncate">{resourceCount === null ? "–" : `${resourceCount} resources`}</span>
           </span>
           <span className="ml-auto hidden shrink-0 items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-primary opacity-0 transition-opacity group-hover:opacity-100 sm:inline-flex">
             Open <ArrowRight className="size-3.5" aria-hidden="true" />

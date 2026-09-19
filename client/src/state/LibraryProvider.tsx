@@ -15,16 +15,6 @@ import type {
   ReadingProgress,
   Resource,
 } from "../types";
-import {
-  getResourceById,
-  getResourcesBySubject,
-} from "../data/selectors";
-import {
-  seedBookmarks,
-  seedFavorites,
-  seedProgress,
-  seedRecent,
-} from "../data/mock";
 import { deleteFile, listStoredIds } from "../lib/downloadStore";
 import {
   cancelDownloadRequest,
@@ -32,16 +22,23 @@ import {
 } from "../lib/downloadManager";
 import { useUser } from "./UserProvider";
 import {
+  bookmarkRowToBookmark,
+  progressRowToProgress,
+} from "../lib/personalAdapters";
+import {
   createBookmark as createServerBookmark,
   deleteBookmarkById as deleteServerBookmarkById,
   deleteFavorite as deleteServerFavorite,
+  listBookmarks as listServerBookmarks,
+  listFavorites as listServerFavorites,
+  listProgress as listServerProgress,
   putFavorite as putServerFavorite,
 } from "../lib/studyApi";
 
 /**
- * Phase 2 mock application state.
- * All actions are local/UI-only; they will be replaced by API
- * calls + local storage layers in later phases.
+ * Personal study state: server-authoritative lists (hydrated on login),
+ * local-only downloads/recent. Toggles stay optimistic with best-effort
+ * write-through; localStorage keeps favorites/bookmarks for guests.
  */
 
 interface LibraryContextValue {
@@ -164,30 +161,60 @@ function asBookmarkArray(raw: unknown): Bookmark[] | null {
 }
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
-  // Server sync is best-effort only (see lib/studyApi): local state stays
-  // authoritative until academic-content integration swaps in real ids.
-  // Work is lazy so guests never fire pointless requests.
+  // Server is authoritative after hydration; toggles stay optimistic with
+  // best-effort write-through. Work is lazy so guests never fire requests.
   const { status } = useUser();
   const syncPersonal = (makeWork: () => Promise<unknown>): void => {
     if (status !== "authed") return;
     makeWork().catch(() => {});
   };
   const [favorites, setFavorites] = useState<string[]>(() =>
-    readStored(STORAGE_KEYS.favorites, seedFavorites, asStringArray),
+    readStored(STORAGE_KEYS.favorites, [], asStringArray),
   );
   const [favoriteSubjects, setFavoriteSubjects] = useState<string[]>(() =>
     readStored(STORAGE_KEYS.favoriteSubjects, [], asStringArray),
   );
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() =>
-    readStored(STORAGE_KEYS.bookmarks, seedBookmarks, asBookmarkArray),
+    readStored(STORAGE_KEYS.bookmarks, [], asBookmarkArray),
   );
   const [bookmarkedSubjects, setBookmarkedSubjects] = useState<string[]>(() =>
     readStored(STORAGE_KEYS.bookmarkedSubjects, [], asStringArray),
   );
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
-  const [recent, setRecent] = useState<RecentEntry[]>(seedRecent);
-  const [progress, setProgress] = useState<ReadingProgress[]>(seedProgress);
+  const [recent, setRecent] = useState<RecentEntry[]>([]);
+  const [progress, setProgress] = useState<ReadingProgress[]>([]);
   const nextId = useRef(100);
+
+  /* Server hydration on login: API lists replace local state (guests keep
+   * their local lists). Failures keep current state — never wipe on error. */
+  useEffect(() => {
+    if (status !== "authed") {
+      setFavorites([]);
+      setFavoriteSubjects([]);
+      setBookmarks([]);
+      setBookmarkedSubjects([]);
+      setProgress([]);
+      return;
+    }
+    let cancelled = false;
+    void Promise.all([listServerFavorites(), listServerBookmarks(), listServerProgress()]).then(
+      ([favRows, bmRows, progRows]) => {
+        if (cancelled) return;
+        if (favRows) {
+          setFavorites(favRows.filter((r) => r.targetType === "resource").map((r) => r.targetId));
+          setFavoriteSubjects(favRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
+        }
+        if (bmRows) {
+          setBookmarks(bmRows.map(bookmarkRowToBookmark).filter((b): b is Bookmark => b !== null));
+          setBookmarkedSubjects(bmRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
+        }
+        if (progRows) setProgress(progRows.map(progressRowToProgress));
+      },
+    ).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
 
   /* Write-through: every save/unsave survives reloads on desktop and mobile. */
   useEffect(() => {
@@ -500,14 +527,4 @@ export function useLibrary(): LibraryContextValue {
   const ctx = useContext(LibraryContext);
   if (!ctx) throw new Error("useLibrary must be used within LibraryProvider");
   return ctx;
-}
-
-/** Unused helper kept out of context: resources of a subject (mock layer). */
-export function subjectResources(subjectId: string): Resource[] {
-  return getResourcesBySubject(subjectId);
-}
-
-/** Find a resource by id (mock layer convenience). */
-export function findResource(resourceId: string): Resource | undefined {
-  return getResourceById(resourceId);
 }
