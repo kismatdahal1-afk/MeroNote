@@ -56,9 +56,9 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
    *  Stateless visits (direct URL, refresh) fall back to Resources. */
   const adminEntry = adminEntryPointFromState(state);
   const adminRoot = adminEntryRootFor(adminEntry);
-  const { data: meta, error: metaError } = useApiQuery(`reader-meta-${resourceId ?? ""}`, async (signal) => {
-    if (!resourceId) throw new Error("Missing resource.");
-    const resource = await fetchResource(resourceId, signal);
+    const { data: meta, error: metaError } = useApiQuery(`reader-meta-${resourceId ?? ""}`, async (signal) => {
+     if (!resourceId || resourceId === "null" || resourceId === "undefined") throw new Error("Invalid resource id.");
+     const resource = await fetchResource(resourceId, signal);
     const [subject, semester] = await Promise.all([
       fetchSubject(resource.subjectId, signal).catch(() => null),
       fetchSemester(resource.semesterId, signal).catch(() => null),
@@ -160,11 +160,14 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
 
       // 3/4. Network: fetch-and-cache when small enough, stream when large.
       const decision = decideReadingSource({ hasPermanentDownload: false, hasTempCache: false, fileSize: metaResource.fileSize });
-      if (decision === "network-fetch") {
-        try {
-          const { url } = await fetchResourceFileUrl(rid);
-          const res = await fetch(url, { credentials: "omit" });
-          if (!res.ok) throw new Error(`PDF fetch failed with status ${res.status}.`);
+       if (decision === "network-fetch") {
+         try {
+           const { url } = await fetchResourceFileUrl(rid);
+           const controller = new AbortController();
+           const timeout = setTimeout(() => controller.abort(), 15000);
+           const res = await fetch(url, { credentials: "omit", signal: controller.signal });
+           clearTimeout(timeout);
+           if (!res.ok) throw new Error(`PDF fetch failed with status ${res.status}.`);
           const buffer = await res.arrayBuffer();
           const head = new TextDecoder().decode(new Uint8Array(buffer).slice(0, 5));
           if (head !== "%PDF-") {
@@ -177,16 +180,20 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           if (!cancelled) showObjectUrl(URL.createObjectURL(blob), "network-fetch");
           return;
         } catch (err) {
-          // Fall back to streaming (e.g. transient failure); offline lands
-          // in the friendly error path there.
-          if (cancelled) return;
-          if (err instanceof FileApiError && !navigator.onLine) {
-            fail(err.message);
-            return;
-          }
-          openRemoteStream();
-          return;
-        }
+           // Fall back to streaming (e.g. transient failure); offline lands
+           // in the friendly error path there.
+           if (cancelled) return;
+           if (err instanceof DOMException && err.name === "AbortError") {
+             fail("The file request timed out. Check your connection and try again.");
+             return;
+           }
+           if (err instanceof FileApiError && !navigator.onLine) {
+             fail(err.message);
+             return;
+           }
+           openRemoteStream();
+           return;
+         }
       }
       if (decision === "network-stream") {
         openRemoteStream();

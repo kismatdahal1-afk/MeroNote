@@ -86,6 +86,7 @@ export async function ensureB2Cors(): Promise<void> {
   const client = getB2Client();
   const bucket = b2Bucket();
   const appOrigin = env.clientUrl.replace(/\/$/, "");
+  console.log(`[TIMING] ensureB2Cors START appOrigin=${appOrigin}`);
   try {
     await client.send(
       new PutBucketCorsCommand({
@@ -103,9 +104,9 @@ export async function ensureB2Cors(): Promise<void> {
         },
       }),
     );
+    console.log(`[TIMING] ensureB2Cors DONE appOrigin=${appOrigin}`);
   } catch (err) {
-    // Non-fatal: presigned URLs still work within the same origin;
-    // this only affects cross-origin browser fetches.
+    console.error(`[TIMING] ensureB2Cors FAILED after ${Date.now()} appOrigin=${appOrigin}:`, err instanceof Error ? err.message : err);
     console.warn("B2 CORS configuration failed (non-fatal):", err instanceof Error ? err.message : err);
   }
 }
