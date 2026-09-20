@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
 import { describePdfError } from "../../lib/pdfErrors";
 
@@ -23,36 +23,54 @@ interface PdfCanvasProps {
   onPageChange?: (page: number, totalPages: number) => void;
 }
 
-function PageRenderer({
+const PageRenderer = memo(function PageRenderer({
   pdf,
   pageNum,
   scale,
-  render,
 }: {
   pdf: PDFDocumentProxy;
   pageNum: number;
   scale: number;
-  render: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderedRef = useRef(false);
+  const renderVersionRef = useRef(0);
 
   useEffect(() => {
-    if (!render) return;
+    let cancelled = false;
+    const version = ++renderVersionRef.current;
+
     (async () => {
       const p = await pdf.getPage(pageNum);
       const vp = p.getViewport({ scale });
       const c = canvasRef.current;
       if (!c) return;
-      c.width = vp.width;
-      c.height = vp.height;
+      if (cancelled) return;
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const cssWidth = vp.width;
+      const cssHeight = vp.height;
+
+      c.width = Math.round(cssWidth * dpr);
+      c.height = Math.round(cssHeight * dpr);
+      c.style.width = `${cssWidth}px`;
+      c.style.height = `${cssHeight}px`;
+
       const ctx = c.getContext("2d");
       if (!ctx) return;
+      ctx.scale(dpr, dpr);
+
       const rt = p.render({ canvasContext: ctx, viewport: vp });
       await rt.promise;
+      if (!cancelled && version === renderVersionRef.current) {
+        renderedRef.current = true;
+      }
     })();
-  }, [pdf, pageNum, scale, render]);
 
-  if (!render) return null;
+    return () => {
+      cancelled = true;
+    };
+  }, [pdf, pageNum, scale]);
 
   return (
     <canvas
@@ -61,7 +79,8 @@ function PageRenderer({
       style={{ imageRendering: "auto" }}
     />
   );
-}
+},
+);
 
 export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,7 +89,6 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
   const observerRef = useRef<IntersectionObserver | null>(null);
   const pageRef = useRef(page);
   const isInitialMount = useRef(true);
-  const scrollTimerRef = useRef<number | null>(null);
   const onStateChangeRef = useRef(onStateChange);
   const onPageChangeRef = useRef(onPageChange);
 
@@ -128,7 +146,6 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
           addToRenderSet(toRender);
         }
 
-        // Suppress observer-driven page changes until initial layout settles
         if (isInitialMount.current) return;
 
         if (closestPage !== pageRef.current) {
@@ -149,7 +166,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
     });
   }, [doc, addToRenderSet]);
 
-  // Load PDF document — only when URL changes, NOT when scale changes
+  // Load PDF document — only when URL changes
   useEffect(() => {
     if (!url) {
       setDoc(null);
@@ -183,7 +200,6 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
         setLoadState({ status: "ready", totalPages: pdf.numPages });
         onStateChangeRef.current({ status: "ready", totalPages: pdf.numPages });
 
-        // Pre-compute aspect ratios (scale-independent)
         const ratios: Record<number, number> = {};
         Promise.all(
           Array.from({ length: pdf.numPages }, (_, i) =>
@@ -203,7 +219,6 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
           }
         });
 
-        // Render first batch only
         const initial: number[] = [];
         for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
           initial.push(i);
@@ -256,7 +271,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
     }
   }, [doc, setupObserver]);
 
-  // Re-render visible pages when scale changes (only pages already in renderSet)
+  // Re-render visible pages when scale changes
   useEffect(() => {
     if (doc) {
       const visiblePages = Array.from(renderSet).filter((p) => p <= doc.numPages);
@@ -270,7 +285,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
   useEffect(() => {
     return () => {
       observerRef.current?.disconnect();
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+      if (initTimerRef.current) clearTimeout(initTimerRef.current);
     };
   }, []);
 
@@ -297,29 +312,34 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
     );
   }
 
+  // Memoize the page list to avoid creating new array on every render
+  const pageElements = useMemo(() => {
+    return Array.from({ length: numPages }, (_, i) => {
+      const pageNum = i + 1;
+      const ratio = aspectRatios[pageNum] ?? 297 / 210;
+      const shouldRender = renderSet.has(pageNum);
+
+      return (
+        <div
+          key={pageNum}
+          data-page={pageNum}
+          className="relative w-full max-w-[56rem] shrink-0 overflow-hidden rounded-lg bg-surface border border-border"
+          style={{ aspectRatio: `${ratio} / 1` }}
+        >
+          {shouldRender && doc && (
+            <PageRenderer pdf={doc} pageNum={pageNum} scale={scale} />
+          )}
+        </div>
+      );
+    });
+  }, [numPages, aspectRatios, renderSet, doc, scale]);
+
   return (
     <div
       ref={containerRef}
       className="flex flex-col items-center gap-3 bg-background px-2 py-4"
     >
-      {Array.from({ length: numPages }, (_, i) => {
-        const pageNum = i + 1;
-        const ratio = aspectRatios[pageNum] ?? 297 / 210;
-        const shouldRender = renderSet.has(pageNum);
-
-        return (
-          <div
-            key={pageNum}
-            data-page={pageNum}
-            className="relative w-full max-w-[56rem] shrink-0 overflow-hidden rounded-lg bg-surface border border-border"
-            style={{ aspectRatio: `${ratio} / 1` }}
-          >
-            {shouldRender && doc && (
-              <PageRenderer pdf={doc} pageNum={pageNum} scale={scale} render={shouldRender} />
-            )}
-          </div>
-        );
-      })}
+      {pageElements}
     </div>
   );
 }
