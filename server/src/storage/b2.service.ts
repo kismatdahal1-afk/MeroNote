@@ -13,23 +13,6 @@ import { ALLOWED_PDF_MIME, validatePdfUpload } from "./fileRules";
 import { buildResourceKey } from "./objectKeys";
 import { env } from "../config/env";
 
-/**
- * Phase 5 storage service — the ONLY module that talks to B2.
- * Controllers/models never import the SDK directly.
- *
- * Consistency contract (no distributed transactions):
- * A. B2 upload fails → MongoDB is never touched (validate + put first).
- * B. B2 succeeds but the MongoDB write fails → the fresh object is deleted
- *    via `uploadResourceFile` compensating cleanup before rethrowing.
- * C. MongoDB points at a missing object → `objectExists`/`getDownloadUrl`
- *    surface a clear StorageMissingError.
- * D. Delete failures propagate — never reported as success.
- *
- * Logging contract: callers may log operation, resourceId, key, size and
- * outcome. Keys, secrets, bucket passwords and signed URLs with embedded
- * auth material are never logged here.
- */
-
 export { StorageNotConfiguredError };
 
 export class StorageMissingError extends Error {
@@ -39,6 +22,13 @@ export class StorageMissingError extends Error {
     super(`Stored object not found: ${key}`);
     this.name = "StorageMissingError";
     this.key = key;
+  }
+}
+
+export class StorageUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageUnavailableError";
   }
 }
 
@@ -55,15 +45,19 @@ export function sha256Hex(body: Uint8Array): string {
 }
 
 function toStorageError(err: unknown, key?: string): Error {
-  // Preserve typed errors (config state, missing objects) for callers that
-  // map them to status codes — never wrap them into generic messages.
   if (err instanceof StorageNotConfiguredError || err instanceof StorageMissingError) return err;
   const name = (err as { name?: string })?.name ?? "";
   const message = err instanceof Error ? err.message : String(err);
   if (name === "NotFound" || name === "NoSuchKey" || name === "NoSuchBucket") {
     return new StorageMissingError(key ?? "(unknown key)");
   }
-  return new Error(`Storage operation failed${key ? ` for ${key}` : ""}: ${message}`);
+  if (name === "AccessDenied" || name === "Forbidden") {
+    return new StorageUnavailableError(`Access denied for storage object${key ? `: ${key}` : ""}.`);
+  }
+  if (name === "RequestTimeout" || name === "NetworkingError" || name === "TimeoutError" || /timeout|network/i.test(message)) {
+    return new StorageUnavailableError(`Storage service temporarily unavailable${key ? ` for ${key}` : ""}.`);
+  }
+  return new StorageUnavailableError(`Storage operation failed${key ? ` for ${key}` : ""}: ${message}`);
 }
 
 /** Bucket reachability probe (used by verification, never exposes secrets). */
@@ -165,7 +159,6 @@ export async function uploadResourceFile<T>(input: {
   persist: (meta: StoredFileMeta) => Promise<T>;
 }): Promise<T> {
   const _t0 = Date.now();
-  console.log(`[TIMING] uploadResourceFile START resourceId=${input.resourceId}`);
   const t1 = Date.now();
   const meta = await uploadPdf(input);
   console.log(`[TIMING] uploadResourceFile uploadPdf done in ${Date.now() - t1}ms (total ${Date.now() - _t0}ms)`);
@@ -185,15 +178,25 @@ export async function uploadResourceFile<T>(input: {
 }
 
 /**
- * Time-limited retrieval for a stored key (default 15 min). Throws
- * StorageMissingError when the object is gone (failure case C).
+ * Time-limited retrieval for a stored key (default 15 min).
+ * Accepts skipExistsCheck to avoid a redundant B2 HEAD when the caller
+ * already verified existence (e.g., in the resource file endpoint).
  */
-export async function getDownloadUrl(key: string, expiresInSeconds = 900): Promise<string> {
-  if (!(await objectExists(key))) throw new StorageMissingError(key);
+export async function getDownloadUrl(
+  key: string,
+  expiresInSeconds = 900,
+  skipExistsCheck = false,
+): Promise<string> {
+  if (!skipExistsCheck && !(await objectExists(key))) {
+    throw new StorageMissingError(key);
+  }
+  const t0 = Date.now();
   try {
-    return await getSignedUrl(getB2Client(), new GetObjectCommand({ Bucket: b2Bucket(), Key: key }), {
+    const url = await getSignedUrl(getB2Client(), new GetObjectCommand({ Bucket: b2Bucket(), Key: key }), {
       expiresIn: expiresInSeconds,
     });
+    console.log(`[TIMING] getDownloadUrl done in ${Date.now() - t0}ms key=${key.substring(0, 40)}...`);
+    return url;
   } catch (err) {
     throw toStorageError(err, key);
   }

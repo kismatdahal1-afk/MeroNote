@@ -44,20 +44,25 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale }: P
     const dpr = getDpr();
 
     (async () => {
-      const p = await pdf.getPage(pageNum);
-      const vp = p.getViewport({ scale: renderScale });
-      const c = canvasRef.current;
-      if (!c || cancelledRef.current) return;
+      try {
+        const p = await pdf.getPage(pageNum);
+        if (cancelledRef.current) return;
+        const vp = p.getViewport({ scale: renderScale });
+        const c = canvasRef.current;
+        if (!c) return;
 
-      c.width = Math.round(vp.width * dpr);
-      c.height = Math.round(vp.height * dpr);
+        c.width = Math.round(vp.width * dpr);
+        c.height = Math.round(vp.height * dpr);
 
-      const ctx = c.getContext("2d");
-      if (!ctx) return;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const ctx = c.getContext("2d");
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const rt = p.render({ canvasContext: ctx, viewport: vp });
-      await rt.promise;
+        const rt = p.render({ canvasContext: ctx, viewport: vp });
+        await rt.promise;
+      } catch {
+        // Page render failed silently; page container still reserves space.
+      }
     })();
 
     return () => {
@@ -184,7 +189,12 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     setAspectRatios({});
     isInitialMount.current = true;
 
-    const task = getDocument({ url });
+    const task = getDocument({
+      url,
+      disableRange: false,
+      disableStream: false,
+      disableAutoFetch: false,
+    });
 
     task.promise.then(
       (pdfDoc: PDFDocumentProxy) => {
