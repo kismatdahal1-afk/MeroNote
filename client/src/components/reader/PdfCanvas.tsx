@@ -167,20 +167,6 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     });
   }, []);
 
-  const removeFromRenderSet = useCallback((pages: number[]) => {
-    setRenderSet((prev) => {
-      const next = new Set(prev);
-      let changed = false;
-      for (const p of pages) {
-        if (next.has(p)) {
-          next.delete(p);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, []);
-
   const setupObserver = useCallback(() => {
     const container = containerRef.current;
     if (!container || !doc) return;
@@ -192,10 +178,9 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
       (entries) => {
         if (rafId) cancelAnimationFrame(rafId);
         rafId = requestAnimationFrame(() => {
-          let closestPage = pageRef.current;
-          let closestDist = Infinity;
-          let anyIntersecting = false;
-          const toRender: number[] = [];
+           let closestPage = pageRef.current;
+           let closestDist = Infinity;
+           const toRender: number[] = [];
 
           const containerCenter = container.getBoundingClientRect().top + container.clientHeight / 2;
 
@@ -210,7 +195,6 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
               closestPage = num;
             }
             if (entry.isIntersecting) {
-              anyIntersecting = true;
               toRender.push(num);
             }
           }
