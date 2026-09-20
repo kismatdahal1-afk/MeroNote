@@ -28,7 +28,7 @@ export async function getResourceFile(req: Request, res: Response): Promise<void
   console.log(`[TIMING] FILE REQUEST START resourceId=${id} fileKey=${fileKey.substring(0, 40)}...`);
 
   try {
-    const url = await getDownloadUrl(fileKey, URL_TTL_SECONDS, true);
+     const url = await getDownloadUrl(fileKey, URL_TTL_SECONDS);
     console.log(`[TIMING] FILE REQUEST DONE ${Date.now() - t0}ms resourceId=${id}`);
     res.json({ status: "ok", data: { url, expiresIn: URL_TTL_SECONDS } });
   } catch (err) {
