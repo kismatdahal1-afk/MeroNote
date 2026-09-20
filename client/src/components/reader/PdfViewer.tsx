@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback, type ReactNode } from "react";
 import {
-  Bookmark, ChevronLeft, ChevronRight, Download, FileWarning, Loader2,
-  Maximize2, Minus, Plus, RectangleHorizontal, RectangleVertical, Search,
+  Bookmark, ChevronLeft, ChevronRight, Download, FileWarning, Loader2, Search,
+  RectangleHorizontal, RectangleVertical, Maximize2,
 } from "lucide-react";
 import { IconButton } from "../common/IconButton";
 import { useToast } from "../../state/ToastProvider";
-import { clamp, cx } from "../../lib/utils";
+import { cx, clamp } from "../../lib/utils";
 import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
 
-const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
+const RENDER_SCALE = 1.5;
 
 interface PdfViewerProps {
   resource: { id: string; title: string; pageCount: number };
@@ -23,15 +23,10 @@ interface PdfViewerProps {
   variant?: "page" | "embedded";
   breadcrumbs?: ReactNode;
   className?: string;
-  /** Secure short-lived PDF URL (Phase 6). Absent = URL still resolving. */
   fileUrl?: string | null;
-  /** True while the file URL is being requested from the API. */
   urlLoading?: boolean;
-  /** Friendly file-access error (unavailable, no file, offline…). */
   urlError?: string | null;
-  /** Retry the file-URL request after an error. */
   onRetryFile?: () => void;
-  /** Where the bytes came from ("Saved on device" / "Cached copy" / null). */
   sourceLabel?: string | null;
 }
 
@@ -55,19 +50,16 @@ export function PdfViewer({
   sourceLabel = null,
 }: PdfViewerProps) {
   const { toast } = useToast();
-  // PDF.js page count is authoritative while reading; metadata is the fallback.
   const [docPages, setDocPages] = useState<number | null>(null);
   const [docError, setDocError] = useState<string | null>(null);
   const totalPages = Math.max(1, docPages ?? resource.pageCount);
 
   const [page, setPage] = useState(() => clamp(initialPage, 1, totalPages));
-  const [zoom, setZoom] = useState(100);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<'portrait' | 'landscape'>('portrait');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Keep the page in range once the real document reports its length.
   useEffect(() => {
     if (docPages !== null) setPage((p) => clamp(p, 1, docPages));
   }, [docPages]);
@@ -92,9 +84,6 @@ export function PdfViewer({
     onPageChange?.(p, totalPages);
   }, [onPageChange, totalPages]);
 
-  // Fullscreen may be unavailable (standalone PWA, iOS, denied) — the
-  // promise rejection must never surface, and system-initiated exits
-  // (gesture, Esc) sync back via the fullscreenchange listener below.
   const handleFullscreen = () => {
     try {
       if (document.fullscreenElement) {
@@ -121,7 +110,6 @@ export function PdfViewer({
     setViewMode((v) => (v === 'portrait' ? 'landscape' : 'portrait'));
   };
 
-  const zoomIndex = ZOOM_LEVELS.indexOf(zoom);
   const isPage = variant === "page";
 
   return (
@@ -130,20 +118,17 @@ export function PdfViewer({
       className={cx(
         "reader-bar flex flex-col overflow-hidden",
         isPage
-          // dvh tracks the mobile browser chrome (URL bar show/hide) so the
-          // reader never jumps or hides content behind it.
           ? "h-screen supports-[height:100dvh]:h-dvh bg-background"
           : "card-glow overflow-hidden rounded-xl border border-border bg-surface shadow-card",
         className,
       )}
     >
-<main
+      <main
         className={cx(
-          "flex-1 min-h-0 overflow-y-auto overflow-x-auto",
+          "flex-1 min-h-0 overflow-y-auto overflow-x-hidden",
           isPage ? "pb-0" : "",
         )}
       >
-        {/* Unified fixed header */}
         <header
           className={cx(
             "sticky top-0 z-30 flex-shrink-0 flex flex-col",
@@ -152,14 +137,12 @@ export function PdfViewer({
               : "bg-surface-muted/50",
           )}
         >
-          {/* Compact breadcrumb row */}
           {breadcrumbs && isPage && (
             <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background/95 px-3 py-0.5 text-[10px] md:text-xs font-medium text-muted-foreground/80 backdrop-blur-sm whitespace-nowrap overflow-hidden">
               {breadcrumbs}
             </div>
           )}
 
-          {/* DESKTOP toolbar row */}
           <div
             className={cx(
               "hidden items-center gap-2 border-b border-border px-3 lg:px-4",
@@ -194,12 +177,6 @@ export function PdfViewer({
                 <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">/ {totalPages}</span>
               </div>
               <IconButton icon={ChevronRight} label="Next page" variant="bar" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
-            </div>
-
-            <div className="hidden items-center gap-0.5 lg:flex">
-              <IconButton icon={Minus} label="Zoom out" variant="bar" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex - 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex <= 0} />
-              <span className="w-11 text-center text-xs font-bold text-muted-foreground">{zoom}%</span>
-              <IconButton icon={Plus} label="Zoom in" variant="bar" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex + 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex >= ZOOM_LEVELS.length - 1} />
             </div>
 
             <IconButton
@@ -242,7 +219,6 @@ export function PdfViewer({
             />
           </div>
 
-          {/* MOBILE title row */}
           <div className="flex md:hidden items-center gap-2 border-b border-border px-3 py-1">
             {toolbarLeading}
             <div className="min-w-0 flex-1">
@@ -254,8 +230,6 @@ export function PdfViewer({
             </div>
           </div>
 
-          {/* MOBILE controls row — scrolls horizontally on narrow screens
-              instead of overflowing; children never shrink. */}
           <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
             <div className="flex items-center gap-1 rounded-md bg-surface-muted px-1.5">
               <IconButton icon={ChevronLeft} label="Previous page" variant="bar" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
@@ -264,11 +238,6 @@ export function PdfViewer({
                 <span className="text-[10px] font-medium text-muted-foreground">/ {totalPages}</span>
               </div>
               <IconButton icon={ChevronRight} label="Next page" variant="bar" size="sm" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
-            </div>
-            <div className="flex h-7 items-center gap-0.5 rounded-md bg-surface-muted px-1.5">
-              <IconButton icon={Minus} label="Zoom out" variant="bar" size="sm" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex - 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex <= 0} />
-              <span className="min-w-9 text-center text-xs font-bold text-foreground">{zoom}%</span>
-              <IconButton icon={Plus} label="Zoom in" variant="bar" size="sm" onClick={() => setZoom(ZOOM_LEVELS[clamp(zoomIndex + 1, 0, ZOOM_LEVELS.length - 1)])} disabled={zoomIndex >= ZOOM_LEVELS.length - 1} />
             </div>
             <IconButton
               icon={Search}
@@ -313,7 +282,6 @@ export function PdfViewer({
             />
           </div>
 
-          {/* In-document search bar */}
           {searchOpen && (
             <div
               className="border-b border-border bg-surface/95 px-3 py-2 backdrop-blur-sm"
@@ -348,8 +316,7 @@ export function PdfViewer({
           )}
         </header>
 
-        {/* Document area — continuous vertical scroll */}
-        <div className="flex-1 overflow-y-auto overflow-x-auto bg-background">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
           {urlError || docError ? (
             <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
               <FileWarning className="size-8 text-muted-foreground" aria-hidden="true" />
@@ -373,7 +340,9 @@ export function PdfViewer({
               </p>
             </div>
           ) : (
-            <PdfCanvas url={fileUrl} page={page} scale={zoom / 100} onStateChange={handlePdfState} onPageChange={handlePageChange} />
+            <div className="mx-auto w-full max-w-[850px] px-2">
+              <PdfCanvas url={fileUrl} page={page} renderScale={RENDER_SCALE} onStateChange={handlePdfState} onPageChange={handlePageChange} />
+            </div>
           )}
         </div>
       </main>

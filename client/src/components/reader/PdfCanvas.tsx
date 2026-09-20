@@ -18,38 +18,43 @@ export interface PdfLoadState {
 interface PdfCanvasProps {
   url: string | null;
   page: number;
-  scale: number;
+  renderScale: number;
   onStateChange: (state: PdfLoadState) => void;
   onPageChange?: (page: number, totalPages: number) => void;
+}
+
+const MAX_DPR = 2;
+const DESKTOP_MAX_WIDTH = 850;
+
+function getDpr(): number {
+  return Math.min(window.devicePixelRatio || 1, MAX_DPR);
 }
 
 const PageRenderer = memo(function PageRenderer({
   pdf,
   pageNum,
-  scale,
+  renderScale,
 }: {
   pdf: PDFDocumentProxy;
   pageNum: number;
-  scale: number;
+  renderScale: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  let cancelled = false;
 
   useEffect(() => {
-    let cancelled = false;
+    cancelled = false;
+    const dpr = getDpr();
 
     (async () => {
       const p = await pdf.getPage(pageNum);
-      const vp = p.getViewport({ scale });
+      const vp = p.getViewport({ scale: renderScale });
       const c = canvasRef.current;
       if (!c) return;
       if (cancelled) return;
 
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const cssWidth = vp.width;
-      const cssHeight = vp.height;
-
-      c.width = Math.round(cssWidth * dpr);
-      c.height = Math.round(cssHeight * dpr);
+      c.width = Math.round(vp.width * dpr);
+      c.height = Math.round(vp.height * dpr);
 
       const ctx = c.getContext("2d");
       if (!ctx) return;
@@ -62,19 +67,18 @@ const PageRenderer = memo(function PageRenderer({
     return () => {
       cancelled = true;
     };
-  }, [pdf, pageNum, scale]);
+  }, [pdf, pageNum, renderScale]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="w-full h-full block rounded-lg"
-      style={{ imageRendering: "auto" }}
+      className="w-full block rounded-lg"
+      style={{ height: "auto", imageRendering: "auto" }}
     />
   );
-},
-);
+});
 
-export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: PdfCanvasProps) {
+export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const docRef = useRef<PDFDocumentProxy | null>(null);
   const destroyedRef = useRef(false);
@@ -83,6 +87,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
   const isInitialMount = useRef(true);
   const onStateChangeRef = useRef(onStateChange);
   const onPageChangeRef = useRef(onPageChange);
+  const observerTimerRef = useRef<number | null>(null);
 
   onStateChangeRef.current = onStateChange;
   onPageChangeRef.current = onPageChange;
@@ -167,7 +172,6 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
     });
   }, [doc, addToRenderSet]);
 
-  // Load PDF document — only when URL changes
   useEffect(() => {
     if (!url) {
       setDoc(null);
@@ -207,7 +211,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
             pdf
               .getPage(i + 1)
               .then((p) => {
-                const vp = p.getViewport({ scale: 1 });
+                const vp = p.getViewport({ scale: renderScale });
                 ratios[i + 1] = vp.height / vp.width;
               })
               .catch(() => {
@@ -242,47 +246,41 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
       docRef.current = null;
       observerRef.current?.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  }, [url, renderScale, addToRenderSet]);
 
-  // Scroll to current page when page prop changes (user navigation only)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const el = container.querySelector(`[data-page="${page}"]`) as HTMLElement;
-    if (el) {
+    if (el && !isInitialMount.current) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [page]);
 
-  // Update observer when doc changes
-  const initTimerRef = useRef<number | null>(null);
   useEffect(() => {
     if (doc && containerRef.current) {
       const timer = setTimeout(() => {
         setupObserver();
-        initTimerRef.current = window.setTimeout(() => {
+        observerTimerRef.current = window.setTimeout(() => {
           isInitialMount.current = false;
         }, 500);
       }, 50);
       return () => {
         clearTimeout(timer);
-        if (initTimerRef.current) clearTimeout(initTimerRef.current);
+        if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
       };
     }
   }, [doc, setupObserver]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       observerRef.current?.disconnect();
-      if (initTimerRef.current) clearTimeout(initTimerRef.current);
+      if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
     };
   }, []);
 
   const numPages = doc?.numPages ?? 0;
 
-  // Memoize the page list to avoid creating new array on every render
   const pageElements = useMemo(() => {
     return Array.from({ length: numPages }, (_, i) => {
       const pageNum = i + 1;
@@ -297,12 +295,12 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
           style={{ aspectRatio: `${ratio} / 1` }}
         >
           {shouldRender && doc && (
-            <PageRenderer pdf={doc} pageNum={pageNum} scale={scale} />
+            <PageRenderer pdf={doc} pageNum={pageNum} renderScale={renderScale} />
           )}
         </div>
       );
     });
-  }, [numPages, aspectRatios, renderSet, doc, scale]);
+  }, [numPages, aspectRatios, renderSet, doc, renderScale]);
 
   if (loadState.status === "loading") {
     return (
