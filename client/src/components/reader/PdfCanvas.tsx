@@ -24,48 +24,44 @@ interface PdfCanvasProps {
 }
 
 const MAX_DPR = 2;
-const DESKTOP_MAX_WIDTH = 850;
 
 function getDpr(): number {
   return Math.min(window.devicePixelRatio || 1, MAX_DPR);
 }
 
-const PageRenderer = memo(function PageRenderer({
-  pdf,
-  pageNum,
-  renderScale,
-}: {
+interface PageRendererProps {
   pdf: PDFDocumentProxy;
   pageNum: number;
   renderScale: number;
-}) {
+}
+
+const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale }: PageRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  let cancelled = false;
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
-    cancelled = false;
+    cancelledRef.current = false;
     const dpr = getDpr();
 
     (async () => {
       const p = await pdf.getPage(pageNum);
       const vp = p.getViewport({ scale: renderScale });
       const c = canvasRef.current;
-      if (!c) return;
-      if (cancelled) return;
+      if (!c || cancelledRef.current) return;
 
       c.width = Math.round(vp.width * dpr);
       c.height = Math.round(vp.height * dpr);
 
       const ctx = c.getContext("2d");
       if (!ctx) return;
-      ctx.scale(dpr, dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       const rt = p.render({ canvasContext: ctx, viewport: vp });
       await rt.promise;
     })();
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
   }, [pdf, pageNum, renderScale]);
 
@@ -80,21 +76,17 @@ const PageRenderer = memo(function PageRenderer({
 
 export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const docRef = useRef<PDFDocumentProxy | null>(null);
   const destroyedRef = useRef(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
-  const pageRef = useRef(page);
   const isInitialMount = useRef(true);
   const onStateChangeRef = useRef(onStateChange);
   const onPageChangeRef = useRef(onPageChange);
   const observerTimerRef = useRef<number | null>(null);
+  const pageRef = useRef(page);
 
+  pageRef.current = page;
   onStateChangeRef.current = onStateChange;
   onPageChangeRef.current = onPageChange;
-
-  useEffect(() => {
-    pageRef.current = page;
-  }, [page]);
 
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [loadState, setLoadState] = useState<PdfLoadState>({ status: "loading" });
@@ -105,12 +97,12 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     setRenderSet((prev) => {
       const next = new Set(prev);
       let changed = false;
-      pages.forEach((p) => {
+      for (const p of pages) {
         if (!next.has(p)) {
           next.add(p);
           changed = true;
         }
-      });
+      }
       return changed ? next : prev;
     });
   }, []);
@@ -132,12 +124,14 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
           let closestDist = Infinity;
           const center = container.clientHeight / 2;
 
-          entries.forEach((entry) => {
+          for (const entry of entries) {
             const num = Number(entry.target.getAttribute("data-page"));
-            if (!num) return;
+            if (!num) continue;
             const rect = entry.boundingClientRect;
             const entryCenter = rect.top + rect.height / 2;
-            const dist = Math.abs(entryCenter - (container.getBoundingClientRect().top + center));
+            const dist = Math.abs(
+              entryCenter - (container.getBoundingClientRect().top + center)
+            );
             if (dist < closestDist) {
               closestDist = dist;
               closestPage = num;
@@ -145,7 +139,7 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
             if (entry.isIntersecting) {
               toRender.push(num);
             }
-          });
+          }
 
           if (toRender.length > 0) {
             addToRenderSet(toRender);
@@ -154,7 +148,6 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
           if (isInitialMount.current) return;
 
           if (closestPage !== pageRef.current) {
-            pageRef.current = closestPage;
             onStateChangeRef.current({ status: "ready", totalPages: doc.numPages });
             onPageChangeRef.current?.(closestPage, doc.numPages);
           }
@@ -194,21 +187,20 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     const task = getDocument({ url });
 
     task.promise.then(
-      (pdf: PDFDocumentProxy) => {
+      (pdfDoc: PDFDocumentProxy) => {
         if (cancelled || destroyedRef.current) {
-          pdf.destroy();
+          pdfDoc.destroy();
           return;
         }
 
-        docRef.current = pdf;
-        setDoc(pdf);
-        setLoadState({ status: "ready", totalPages: pdf.numPages });
-        onStateChangeRef.current({ status: "ready", totalPages: pdf.numPages });
+        setDoc(pdfDoc);
+        setLoadState({ status: "ready", totalPages: pdfDoc.numPages });
+        onStateChangeRef.current({ status: "ready", totalPages: pdfDoc.numPages });
 
         const ratios: Record<number, number> = {};
         Promise.all(
-          Array.from({ length: pdf.numPages }, (_, i) =>
-            pdf
+          Array.from({ length: pdfDoc.numPages }, (_, i) =>
+            pdfDoc
               .getPage(i + 1)
               .then((p) => {
                 const vp = p.getViewport({ scale: renderScale });
@@ -225,7 +217,7 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
         });
 
         const initial: number[] = [];
-        for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
+        for (let i = 1; i <= Math.min(pdfDoc.numPages, 10); i++) {
           initial.push(i);
         }
         addToRenderSet(initial);
@@ -242,17 +234,15 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
       cancelled = true;
       destroyedRef.current = true;
       task.destroy?.();
-      docRef.current?.destroy();
-      docRef.current = null;
       observerRef.current?.disconnect();
     };
   }, [url, renderScale, addToRenderSet]);
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || isInitialMount.current) return;
     const el = container.querySelector(`[data-page="${page}"]`) as HTMLElement;
-    if (el && !isInitialMount.current) {
+    if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [page]);
@@ -282,24 +272,24 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
   const numPages = doc?.numPages ?? 0;
 
   const pageElements = useMemo(() => {
-    return Array.from({ length: numPages }, (_, i) => {
-      const pageNum = i + 1;
-      const ratio = aspectRatios[pageNum] ?? 297 / 210;
-      const shouldRender = renderSet.has(pageNum);
-
-      return (
+    const elements: React.ReactNode[] = [];
+    for (let i = 1; i <= numPages; i++) {
+      const ratio = aspectRatios[i] ?? 297 / 210;
+      const shouldRender = renderSet.has(i);
+      elements.push(
         <div
-          key={pageNum}
-          data-page={pageNum}
+          key={i}
+          data-page={i}
           className="relative w-full shrink-0 rounded-lg bg-surface border border-border"
           style={{ aspectRatio: `${ratio} / 1` }}
         >
-          {shouldRender && doc && (
-            <PageRenderer pdf={doc} pageNum={pageNum} renderScale={renderScale} />
-          )}
+          {shouldRender && doc ? (
+            <PageRenderer pdf={doc} pageNum={i} renderScale={renderScale} />
+          ) : null}
         </div>
       );
-    });
+    }
+    return elements;
   }, [numPages, aspectRatios, renderSet, doc, renderScale]);
 
   if (loadState.status === "loading") {
