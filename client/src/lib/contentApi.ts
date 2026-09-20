@@ -65,6 +65,8 @@ function refId(value: unknown): string | undefined {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<{ data: T; pagination: Pagination | null }> {
+  const _t0 = Date.now();
+  console.log(`[TIMING] contentApi request START ${init?.method ?? "GET"} ${path} at ${_t0}`);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
@@ -75,9 +77,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<{ data: T; 
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
+    console.error(`[TIMING] contentApi request FETCH ERROR after ${Date.now() - _t0}ms:`, err instanceof Error ? err.message : err);
     throw new ApiError(0, "Cannot reach the server. Check your connection and try again.");
   }
+  console.log(`[TIMING] contentApi request FETCH DONE status=${res.status} in ${Date.now() - _t0}ms ${path}`);
+  const t1 = Date.now();
   const json = (await res.json().catch(() => ({}))) as Envelope<T>;
+  console.log(`[TIMING] contentApi request JSON parse done in ${Date.now() - t1}ms (total ${Date.now() - _t0}ms) ${path}`);
   if (!res.ok) {
     throw new ApiError(res.status, typeof json.message === "string" && json.message ? json.message : "Something went wrong.");
   }

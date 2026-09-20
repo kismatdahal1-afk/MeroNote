@@ -17,7 +17,7 @@ export const env = {
   // Backblaze B2 object storage (S3-compatible). Credentials are
   // environment-only and validated lazily by the storage layer, so MongoDB
   // boot never depends on B2 being configured (see .env.example).
-  b2Region: process.env.B2_REGION || "us-west-004",
+  b2Region: process.env.B2_REGION || "us-east-005",
   b2Endpoint: process.env.B2_ENDPOINT || "",
   b2KeyId: process.env.B2_KEY_ID || "",
   b2ApplicationKey: process.env.B2_APPLICATION_KEY || "",

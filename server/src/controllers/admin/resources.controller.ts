@@ -115,6 +115,8 @@ export async function getResource(req: Request, res: Response): Promise<void> {
 }
 
 export async function createResource(req: Request, res: Response): Promise<void> {
+  const _t0 = Date.now();
+  console.log(`[TIMING] createResource START at ${_t0}`);
   try {
     const body = bodyOf(req);
     rejectServerManagedFileFields(body);
@@ -122,11 +124,14 @@ export async function createResource(req: Request, res: Response): Promise<void>
     const subjectId = reqId(body, "subjectId");
     const topicId = optId(body, "topicId");
     const bookId = optId(body, "bookId");
+    const t1 = Date.now();
     await assertResourceParents({ semesterId, subjectId, topicId, bookId });
+    console.log(`[TIMING] createResource assertResourceParents done in ${Date.now() - t1}ms (total ${Date.now() - _t0}ms)`);
     const type = reqEnum(body, "type", RESOURCE_TYPES);
     if (type !== "custom" && body.customType !== undefined) {
       throw new AdminError(400, "Field 'customType' is only allowed when type is 'custom'.");
     }
+    const t2 = Date.now();
     const created = await Resource.create({
       semesterId,
       subjectId,
@@ -147,8 +152,21 @@ export async function createResource(req: Request, res: Response): Promise<void>
       status: optEnum(body, "status", PUBLISH_STATUSES) ?? "draft",
       uploadedBy: req.user!.id,
     });
+    console.log(`[TIMING] createResource Resource.create done in ${Date.now() - t2}ms (total ${Date.now() - _t0}ms) id=${created.id}`);
     res.status(201).json(detailEnvelope(created.toObject()));
+    console.log(`[TIMING] createResource END, total=${Date.now() - _t0}ms`);
   } catch (err) {
+    if (err instanceof FileRejectedError || (err as { name?: string })?.name === "StorageNotConfiguredError") {
+      res.status(err instanceof FileRejectedError ? 400 : 503).json({
+        status: "error",
+        message:
+          err instanceof FileRejectedError
+            ? err.message
+            : "File storage is not configured. Set B2 credentials to enable uploads.",
+      });
+      return;
+    }
+    console.error(`[TIMING] createResource ERROR after ${Date.now() - _t0}ms:`, err instanceof Error ? err.message : err);
     if (!sendAdminError(res, err)) throw err;
   }
 }
@@ -275,8 +293,11 @@ export async function uploadResourcePdf(req: Request, res: Response): Promise<vo
   // NOTE: multer (uploadSinglePdf) runs as route middleware before this
   // handler. Never invoke it from inside here: it answers MulterErrors
   // itself without calling next(), which would hang this handler.
+  const _t0 = Date.now();
+  console.log(`[TIMING] uploadResourcePdf START at ${_t0}`);
   try {
     const id = parseObjectId(req.params.id);
+    console.log(`[TIMING] uploadResourcePdf parseObjectId done in ${Date.now() - _t0}ms`);
     if (!id) throw new AdminError(400, "Invalid resource id.");
     const file = req.file;
     if (!file) {
@@ -284,21 +305,28 @@ export async function uploadResourcePdf(req: Request, res: Response): Promise<vo
     }
     // Existence (and liveness) is checked before touching storage so a
     // missing resource is 404 even when B2 is unconfigured.
+    const t1 = Date.now();
     const target = await Resource.findById(id).select("deletedAt").lean().exec();
+    console.log(`[TIMING] uploadResourcePdf Resource.findById done in ${Date.now() - t1}ms (total ${Date.now() - _t0}ms)`);
     if (!target) throw new AdminError(404, "Resource not found.");
     if (target.deletedAt) throw new AdminError(400, "Resource is deleted. Restore it before uploading.");
     // Multipart fields arrive as strings; pageCount stays admin-supplied.
     const pageCount = readPageCount({ pageCount: (req.body as Record<string, unknown> | undefined)?.pageCount });
     const fileName = file.originalname.trim();
+    console.log(`[TIMING] uploadResourcePdf multer parsed: fileName=${fileName}, mime=${file.mimetype}, size=${file.buffer.length} bytes, pageCount=${pageCount}, total_so_far=${Date.now() - _t0}ms`);
+    const t2 = Date.now();
     const oldKey = await uploadResourceFile({
       resourceId: id,
       fileName,
       mime: file.mimetype,
       body: file.buffer,
       persist: async (meta) => {
+        const t25 = Date.now();
         const before = await Resource.findById(id).select("file").lean().exec();
+        console.log(`[TIMING] uploadResourceFile persist Resource.findById done in ${Date.now() - t25}ms`);
         if (!before) throw new AdminError(404, "Resource not found.");
         if (before.deletedAt) throw new AdminError(400, "Resource is deleted. Restore it before uploading.");
+        const t26 = Date.now();
         await Resource.findByIdAndUpdate(
           id,
           {
@@ -311,15 +339,20 @@ export async function uploadResourcePdf(req: Request, res: Response): Promise<vo
           },
           { runValidators: true },
         ).exec();
+        console.log(`[TIMING] uploadResourceFile persist Resource.findByIdAndUpdate done in ${Date.now() - t26}ms`);
         return before.file?.key;
       },
     });
+    console.log(`[TIMING] uploadResourceFile done in ${Date.now() - t2}ms (total ${Date.now() - _t0}ms), oldKey=${oldKey}`);
     // Replacement rule: the old object goes only after the new metadata won.
     if (oldKey) {
       await deleteObject(oldKey).catch(() => {});
     }
+    const t3 = Date.now();
     const updated = await Resource.findById(id).lean().exec();
+    console.log(`[TIMING] uploadResourcePdf final Resource.findById done in ${Date.now() - t3}ms (total ${Date.now() - _t0}ms)`);
     res.json(detailEnvelope({ fileName: updated?.fileName, fileSize: updated?.fileSize, mime: updated?.file?.mime, checksum: updated?.file?.checksum, pageCount: updated?.pageCount }));
+    console.log(`[TIMING] uploadResourcePdf END, total=${Date.now() - _t0}ms`);
   } catch (err) {
     if (err instanceof FileRejectedError || (err as { name?: string })?.name === "StorageNotConfiguredError") {
       res.status(err instanceof FileRejectedError ? 400 : 503).json({
@@ -331,6 +364,7 @@ export async function uploadResourcePdf(req: Request, res: Response): Promise<vo
       });
       return;
     }
+    console.error(`[TIMING] uploadResourcePdf ERROR after ${Date.now() - _t0}ms:`, err instanceof Error ? err.message : err);
     if (!sendAdminError(res, err)) throw err;
   }
 }

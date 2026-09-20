@@ -18,6 +18,15 @@ export function createApp(): express.Express {
   app.use(cookieParser());
   app.use(express.json());
 
+  // Temporary request timing middleware — remove after debugging
+  app.use((req, res, next) => {
+    const _t0 = Date.now();
+    res.on("finish", () => {
+      console.log(`[TIMING] ${req.method} ${req.originalUrl} → ${res.statusCode} in ${Date.now() - _t0}ms`);
+    });
+    next();
+  });
+
   app.use("/api", apiRouter);
 
   app.use(notFoundHandler);

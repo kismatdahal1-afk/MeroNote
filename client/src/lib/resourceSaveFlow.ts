@@ -87,6 +87,8 @@ export type SaveFlowResult =
  * Upload failure never publishes; publish failure keeps a valid draft+file.
  */
 export async function executeResourceSave(deps: SaveFlowDeps, args: SaveFlowArgs): Promise<SaveFlowResult> {
+  const _t0 = Date.now();
+  console.log(`[TIMING] executeResourceSave START isNew=${args.isNew} hasFile=${args.file !== null} status=${args.status}`);
   const plan = planResourceSave({
     status: args.status,
     hasPendingFile: args.file !== null,
@@ -99,15 +101,22 @@ export async function executeResourceSave(deps: SaveFlowDeps, args: SaveFlowArgs
   const staged = { ...args.payload, status: plan.stagedStatus };
   let resourceId: string;
   if (args.isNew || args.saveAsNewDraft === true) {
+    const t1 = Date.now();
     const created = await deps.create(staged);
+    console.log(`[TIMING] executeResourceSave deps.create done in ${Date.now() - t1}ms (total ${Date.now() - _t0}ms) id=${created.id}`);
     resourceId = created.id;
   } else {
     resourceId = String(args.editingId ?? "");
+    const t1 = Date.now();
     await deps.update(resourceId, staged);
+    console.log(`[TIMING] executeResourceSave deps.update done in ${Date.now() - t1}ms (total ${Date.now() - _t0}ms)`);
   }
   if (args.file) {
     try {
+      const t2 = Date.now();
+      console.log(`[TIMING] executeResourceSave upload START at ${t2} (total ${Date.now() - _t0}ms) fileSize=${args.file.size}`);
       await deps.upload(resourceId, args.file, args.pageCount);
+      console.log(`[TIMING] executeResourceSave upload done in ${Date.now() - t2}ms (total ${Date.now() - _t0}ms)`);
     } catch (err) {
       return {
         ok: false,
@@ -119,7 +128,9 @@ export async function executeResourceSave(deps: SaveFlowDeps, args: SaveFlowArgs
   }
   if (plan.publishAfterUpload) {
     try {
+      const t3 = Date.now();
       await deps.update(resourceId, { status: "published" satisfies SaveStatus });
+      console.log(`[TIMING] executeResourceSave publish done in ${Date.now() - t3}ms (total ${Date.now() - _t0}ms)`);
     } catch (err) {
       return {
         ok: false,

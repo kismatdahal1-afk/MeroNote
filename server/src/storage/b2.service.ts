@@ -133,14 +133,18 @@ export async function uploadPdf(input: {
   mime: string;
   body: Uint8Array;
 }): Promise<StoredFileMeta> {
+  const _t0 = Date.now();
+  console.log(`[TIMING] uploadPdf START resourceId=${input.resourceId} fileName=${input.fileName} bodySize=${input.body.length}`);
   const valid = validatePdfUpload(input);
   const key = buildResourceKey(input.resourceId, valid.fileName);
   const bucket = b2Bucket();
   const body = Buffer.from(input.body);
   try {
+    const t1 = Date.now();
     await getB2Client().send(
       new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: valid.mime }),
     );
+    console.log(`[TIMING] uploadPdf B2 PutObjectCommand done in ${Date.now() - t1}ms (total ${Date.now() - _t0}ms) key=${key}`);
   } catch (err) {
     throw toStorageError(err, key);
   }
@@ -159,9 +163,16 @@ export async function uploadResourceFile<T>(input: {
   body: Uint8Array;
   persist: (meta: StoredFileMeta) => Promise<T>;
 }): Promise<T> {
+  const _t0 = Date.now();
+  console.log(`[TIMING] uploadResourceFile START resourceId=${input.resourceId}`);
+  const t1 = Date.now();
   const meta = await uploadPdf(input);
+  console.log(`[TIMING] uploadResourceFile uploadPdf done in ${Date.now() - t1}ms (total ${Date.now() - _t0}ms)`);
   try {
-    return await input.persist(meta);
+    const t2 = Date.now();
+    const result = await input.persist(meta);
+    console.log(`[TIMING] uploadResourceFile persist done in ${Date.now() - t2}ms (total ${Date.now() - _t0}ms)`);
+    return result;
   } catch (persistErr) {
     try {
       await deleteObject(meta.key);

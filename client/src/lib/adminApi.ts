@@ -33,6 +33,8 @@ export interface AdminFileMeta {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const _t0 = Date.now();
+  console.log(`[TIMING] adminApi request START ${init?.method ?? "GET"} ${path} at ${_t0}`);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
@@ -43,9 +45,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") throw err;
+    console.error(`[TIMING] adminApi request FETCH ERROR after ${Date.now() - _t0}ms:`, err instanceof Error ? err.message : err);
     throw new ApiError(0, "Cannot reach the server. Check your connection and try again.");
   }
+  console.log(`[TIMING] adminApi request FETCH DONE status=${res.status} in ${Date.now() - _t0}ms ${path}`);
+  const t1 = Date.now();
   const json = (await res.json().catch(() => ({}))) as { data?: T; pagination?: Pagination; message?: string };
+  console.log(`[TIMING] adminApi request JSON parse done in ${Date.now() - t1}ms (total ${Date.now() - _t0}ms) ${path}`);
   if (!res.ok) {
     throw new ApiError(res.status, typeof json.message === "string" && json.message ? json.message : "Something went wrong.");
   }
@@ -157,13 +163,22 @@ export function adminRestore<T>(entity: AdminEntity, id: string): Promise<T> {
 }
 
 export function adminUploadFile(resourceId: string, file: File, pageCount?: number): Promise<AdminFileMeta> {
+  const _t0 = Date.now();
+  console.log(`[TIMING] adminUploadFile START resourceId=${resourceId} fileSize=${file.size} pageCount=${pageCount} at ${_t0}`);
   const form = new FormData();
   form.append("file", file, file.name);
   if (pageCount !== undefined) form.append("pageCount", String(pageCount));
-  return request<AdminFileMeta>(`/api/admin/resources/${encodeURIComponent(resourceId)}/file`, {
+  const result = request<AdminFileMeta>(`/api/admin/resources/${encodeURIComponent(resourceId)}/file`, {
     method: "POST",
     body: form,
+  }).then((r) => {
+    console.log(`[TIMING] adminUploadFile DONE after ${Date.now() - _t0}ms`, r);
+    return r;
+  }).catch((err) => {
+    console.error(`[TIMING] adminUploadFile ERROR after ${Date.now() - _t0}ms:`, err instanceof Error ? err.message : err);
+    throw err;
   });
+  return result;
 }
 
 export function adminDeleteFile(resourceId: string): Promise<{ id: string; removed: boolean }> {
