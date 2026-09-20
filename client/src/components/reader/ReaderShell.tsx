@@ -346,7 +346,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       urlError={urlError}
       sourceLabel={source ? readingSourceLabel(source) : null}
        onRetryFile={() => setRetryNonce((n) => n + 1)}
-       breadcrumbs={
+      breadcrumbs={
         admin ? (
           <>
             <Link to="/admin" className="rounded px-1 py-0.5 hover:text-primary">Admin</Link>
@@ -450,10 +450,10 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           className="text-foreground/75 hover:bg-surface-hover hover:text-foreground"
         />
       }
-       onBookmark={handleBookmark}
-       bookmarked={bookmarked}
-       onDownload={handleDownload}
-       downloadActive={download?.status === "completed"}
+      onBookmark={handleBookmark}
+      bookmarked={bookmarked}
+      onDownload={handleDownload}
+      downloadActive={download?.status === "completed"}
       />
   );
 }

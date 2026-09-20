@@ -137,9 +137,9 @@ export function PdfViewer({
         className,
       )}
     >
-      <main
+<main
         className={cx(
-          "flex-1 min-h-0 overflow-y-auto overflow-x-hidden",
+          "flex-1 min-h-0 overflow-y-auto overflow-x-auto",
           isPage ? "pb-0" : "",
         )}
       >
@@ -349,7 +349,7 @@ export function PdfViewer({
         </header>
 
         {/* Document area — continuous vertical scroll */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
+        <div className="flex-1 overflow-y-auto overflow-x-auto bg-background">
           {urlError || docError ? (
             <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
               <FileWarning className="size-8 text-muted-foreground" aria-hidden="true" />

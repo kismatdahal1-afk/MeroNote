@@ -33,11 +33,9 @@ const PageRenderer = memo(function PageRenderer({
   scale: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderVersionRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
-    const version = ++renderVersionRef.current;
 
     (async () => {
       const p = await pdf.getPage(pageNum);
@@ -52,8 +50,6 @@ const PageRenderer = memo(function PageRenderer({
 
       c.width = Math.round(cssWidth * dpr);
       c.height = Math.round(cssHeight * dpr);
-      c.style.width = `${cssWidth}px`;
-      c.style.height = `${cssHeight}px`;
 
       const ctx = c.getContext("2d");
       if (!ctx) return;
@@ -61,8 +57,6 @@ const PageRenderer = memo(function PageRenderer({
 
       const rt = p.render({ canvasContext: ctx, viewport: vp });
       await rt.promise;
-      if (!cancelled && version === renderVersionRef.current) {
-      }
     })();
 
     return () => {
@@ -73,7 +67,7 @@ const PageRenderer = memo(function PageRenderer({
   return (
     <canvas
       ref={canvasRef}
-      className="w-full block rounded-lg"
+      className="w-full h-full block rounded-lg"
       style={{ imageRendering: "auto" }}
     />
   );
@@ -122,39 +116,44 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
 
     observerRef.current?.disconnect();
 
+    let rafId = 0;
+
     observerRef.current = new IntersectionObserver(
       (entries) => {
-        const toRender: number[] = [];
-        let closestPage = pageRef.current;
-        let closestDist = Infinity;
-        const center = container.clientHeight / 2;
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          const toRender: number[] = [];
+          let closestPage = pageRef.current;
+          let closestDist = Infinity;
+          const center = container.clientHeight / 2;
 
-        entries.forEach((entry) => {
-          const num = Number(entry.target.getAttribute("data-page"));
-          if (!num) return;
-          const rect = entry.boundingClientRect;
-          const entryCenter = rect.top + rect.height / 2;
-          const dist = Math.abs(entryCenter - (container.getBoundingClientRect().top + center));
-          if (dist < closestDist) {
-            closestDist = dist;
-            closestPage = num;
+          entries.forEach((entry) => {
+            const num = Number(entry.target.getAttribute("data-page"));
+            if (!num) return;
+            const rect = entry.boundingClientRect;
+            const entryCenter = rect.top + rect.height / 2;
+            const dist = Math.abs(entryCenter - (container.getBoundingClientRect().top + center));
+            if (dist < closestDist) {
+              closestDist = dist;
+              closestPage = num;
+            }
+            if (entry.isIntersecting) {
+              toRender.push(num);
+            }
+          });
+
+          if (toRender.length > 0) {
+            addToRenderSet(toRender);
           }
-          if (entry.isIntersecting) {
-            toRender.push(num);
+
+          if (isInitialMount.current) return;
+
+          if (closestPage !== pageRef.current) {
+            pageRef.current = closestPage;
+            onStateChangeRef.current({ status: "ready", totalPages: doc.numPages });
+            onPageChangeRef.current?.(closestPage, doc.numPages);
           }
         });
-
-        if (toRender.length > 0) {
-          addToRenderSet(toRender);
-        }
-
-        if (isInitialMount.current) return;
-
-        if (closestPage !== pageRef.current) {
-          pageRef.current = closestPage;
-          onStateChangeRef.current({ status: "ready", totalPages: doc.numPages });
-          onPageChangeRef.current?.(closestPage, doc.numPages);
-        }
       },
       {
         root: container,
@@ -294,7 +293,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
         <div
           key={pageNum}
           data-page={pageNum}
-          className="relative w-full max-w-[56rem] shrink-0 overflow-hidden rounded-lg bg-surface border border-border"
+          className="relative w-full shrink-0 rounded-lg bg-surface border border-border"
           style={{ aspectRatio: `${ratio} / 1` }}
         >
           {shouldRender && doc && (
