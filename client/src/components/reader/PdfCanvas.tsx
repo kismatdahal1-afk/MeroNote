@@ -283,27 +283,6 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
 
   const numPages = doc?.numPages ?? 0;
 
-  if (loadState.status === "loading") {
-    return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8" role="status" aria-label="Loading PDF">
-        <svg className="size-7 animate-spin text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-        <p className="text-xs font-semibold text-muted-foreground">Loading PDF…</p>
-      </div>
-    );
-  }
-
-  if (loadState.status === "error") {
-    return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
-        <p className="text-sm font-bold text-foreground">Couldn't open this PDF</p>
-        <p className="max-w-sm text-xs font-medium text-muted-foreground">{loadState.message}</p>
-      </div>
-    );
-  }
-
   // Memoize the page list to avoid creating new array on every render
   const pageElements = useMemo(() => {
     return Array.from({ length: numPages }, (_, i) => {
@@ -325,6 +304,27 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
       );
     });
   }, [numPages, aspectRatios, renderSet, doc, scale]);
+
+  if (loadState.status === "loading") {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8" role="status" aria-label="Loading PDF">
+        <svg className="size-7 animate-spin text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <p className="text-xs font-semibold text-muted-foreground">Loading PDF…</p>
+      </div>
+    );
+  }
+
+  if (loadState.status === "error") {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
+        <p className="text-sm font-bold text-foreground">Couldn't open this PDF</p>
+        <p className="max-w-sm text-xs font-medium text-muted-foreground">{loadState.message}</p>
+      </div>
+    );
+  }
 
   return (
     <div
