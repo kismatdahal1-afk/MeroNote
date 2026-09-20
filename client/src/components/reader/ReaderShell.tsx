@@ -1,5 +1,5 @@
 import { useParams, useLocation } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { fetchResource, fetchSemester, fetchSubject } from "../../lib/contentApi";
@@ -307,11 +307,11 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const totalPages = resource.pageCount;
   const progress = getProgress(resource.id);
 
-  const handlePageChange = (page: number) => {
+  const handlePageChange = useCallback((page: number) => {
     setReadingProgress(resource.id, page, totalPages);
     markOpened(resource.id);
     persistProgress(page);
-  };
+  }, [resource.id, totalPages, setReadingProgress, markOpened, persistProgress]);
 
   const handleBookmark = (page: number) => {
     if (bookmarked) {
@@ -343,7 +343,8 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       urlLoading={urlLoading}
       urlError={urlError}
       sourceLabel={source ? readingSourceLabel(source) : null}
-      onRetryFile={() => setRetryNonce((n) => n + 1)}      breadcrumbs={
+       onRetryFile={() => setRetryNonce((n) => n + 1)}
+       breadcrumbs={
         admin ? (
           <>
             <Link to="/admin" className="rounded px-1 py-0.5 hover:text-primary">Admin</Link>
@@ -451,6 +452,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
        bookmarked={bookmarked}
        onDownload={handleDownload}
        downloadActive={download?.status === "completed"}
-     />
+      />
   );
 }

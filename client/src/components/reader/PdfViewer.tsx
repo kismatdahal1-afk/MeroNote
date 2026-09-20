@@ -82,10 +82,7 @@ export function PdfViewer({
   }, []);
 
   const handlePageChange = useCallback((p: number, total: number) => {
-    setPage((prev) => {
-      if (prev !== p) return p;
-      return prev;
-    });
+    setPage(p);
     onPageChange?.(p, total);
   }, [onPageChange]);
 

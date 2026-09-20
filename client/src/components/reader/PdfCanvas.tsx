@@ -33,7 +33,6 @@ const PageRenderer = memo(function PageRenderer({
   scale: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderedRef = useRef(false);
   const renderVersionRef = useRef(0);
 
   useEffect(() => {
@@ -63,7 +62,6 @@ const PageRenderer = memo(function PageRenderer({
       const rt = p.render({ canvasContext: ctx, viewport: vp });
       await rt.promise;
       if (!cancelled && version === renderVersionRef.current) {
-        renderedRef.current = true;
       }
     })();
 
@@ -94,6 +92,10 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
 
   onStateChangeRef.current = onStateChange;
   onPageChangeRef.current = onPageChange;
+
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
 
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [loadState, setLoadState] = useState<PdfLoadState>({ status: "loading" });
@@ -270,16 +272,6 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
       };
     }
   }, [doc, setupObserver]);
-
-  // Re-render visible pages when scale changes
-  useEffect(() => {
-    if (doc) {
-      const visiblePages = Array.from(renderSet).filter((p) => p <= doc.numPages);
-      if (visiblePages.length > 0) {
-        addToRenderSet(visiblePages);
-      }
-    }
-  }, [scale, doc, addToRenderSet, renderSet]);
 
   // Cleanup on unmount
   useEffect(() => {
