@@ -4,12 +4,14 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
+  PutBucketCorsCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { b2Bucket, getB2Client, StorageNotConfiguredError } from "./b2.client";
 import { ALLOWED_PDF_MIME, validatePdfUpload } from "./fileRules";
 import { buildResourceKey } from "./objectKeys";
+import { env } from "../config/env";
 
 /**
  * Phase 5 storage service — the ONLY module that talks to B2.
@@ -72,6 +74,39 @@ export async function checkBucketAccess(): Promise<{ bucket: string; reachable: 
     return { bucket, reachable: true };
   } catch (err) {
     throw toStorageError(err);
+  }
+}
+
+/**
+ * Ensure the B2 bucket has CORS rules allowing the app origin
+ * for GET/HEAD/OPTIONS so browser PDF.js fetches of presigned URLs work.
+ * This is a fire-and-forget startup operation; failures are non-fatal.
+ */
+export async function ensureB2Cors(): Promise<void> {
+  const client = getB2Client();
+  const bucket = b2Bucket();
+  const appOrigin = env.clientUrl.replace(/\/$/, "");
+  try {
+    await client.send(
+      new PutBucketCorsCommand({
+        Bucket: bucket,
+        CORSConfiguration: {
+          CORSRules: [
+            {
+              AllowedHeaders: ["*"],
+              AllowedMethods: ["GET", "HEAD"],
+              AllowedOrigins: [appOrigin],
+              ExposeHeaders: ["ETag", "Content-Length", "Content-Type"],
+              MaxAgeSeconds: 3600,
+            },
+          ],
+        },
+      }),
+    );
+  } catch (err) {
+    // Non-fatal: presigned URLs still work within the same origin;
+    // this only affects cross-origin browser fetches.
+    console.warn("B2 CORS configuration failed (non-fatal):", err instanceof Error ? err.message : err);
   }
 }
 

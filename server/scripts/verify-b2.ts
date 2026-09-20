@@ -34,6 +34,7 @@ import { buildResourceKey, sanitizeFileName, UnsafeKeyError } from "../src/stora
 import {
   checkBucketAccess,
   deleteObject,
+  ensureB2Cors,
   getDownloadUrl,
   objectExists,
   sha256Hex,
@@ -162,6 +163,9 @@ async function main(): Promise<void> {
       const url = await getDownloadUrl(meta.key, 300);
       const fetched = Buffer.from(await (await fetch(url)).arrayBuffer());
       check("presigned-URL byte round-trip", fetched.equals(MINIMAL_PDF));
+
+      // Ensure B2 CORS is configured so browser PDF.js fetches work.
+      await ensureB2Cors();
 
       // Browser-consumability (PDF Reader regression): the reader fetches the
       // presigned URL cross-origin from the app origin (plain GET + PDF.js),
