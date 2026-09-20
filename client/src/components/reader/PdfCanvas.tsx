@@ -24,22 +24,26 @@ interface PdfCanvasProps {
 }
 
 const MAX_DPR = 2;
-const RENDER_WINDOW_ABOVE = 5;
-const RENDER_WINDOW_BELOW = 5;
-const LEAVE_WINDOW_ABOVE = 8;
-const LEAVE_WINDOW_BELOW = 8;
+const OVERSCAN_ABOVE = 5;
+const OVERSCAN_BELOW = 5;
+const PAGE_GAP_PX = 12;
 
 function getDpr(): number {
   return Math.min(window.devicePixelRatio || 1, MAX_DPR);
+}
+
+interface PageInfo {
+  aspectRatio: number;
 }
 
 interface PageRendererProps {
   pdf: PDFDocumentProxy;
   pageNum: number;
   renderScale: number;
+  containerWidth: number;
 }
 
-const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale }: PageRendererProps) {
+const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale, containerWidth }: PageRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cancelledRef = useRef(false);
   const renderTaskRef = useRef<Promise<void> | null>(null);
@@ -57,12 +61,15 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale }: P
         const c = canvasRef.current;
         if (!c) return;
 
-        c.width = Math.round(vp.width * dpr);
-        c.height = Math.round(vp.height * dpr);
+        const backingW = Math.round(containerWidth * dpr * renderScale);
+        const backingH = Math.round(containerWidth * (vp.height / vp.width) * dpr * renderScale);
+
+        c.width = backingW;
+        c.height = backingH;
 
         const ctx = c.getContext("2d");
         if (!ctx) return;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.setTransform(dpr * renderScale, 0, 0, dpr * renderScale, 0, 0);
 
         const rt = p.render({ canvasContext: ctx, viewport: vp });
         currentRenderPromise = rt.promise;
@@ -83,7 +90,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale }: P
       cancelledRef.current = true;
       renderTaskRef.current = null;
     };
-  }, [pdf, pageNum, renderScale]);
+  }, [pdf, pageNum, renderScale, containerWidth]);
 
   return (
     <canvas
@@ -94,43 +101,16 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale }: P
   );
 });
 
-interface PageContainerProps {
-  pageNum: number;
-  ratio: number;
-  shouldRender: boolean;
-  doc: PDFDocumentProxy | null;
-  renderScale: number;
-}
-
-const PageContainer = memo(function PageContainer({
-  pageNum,
-  ratio,
-  shouldRender,
-  doc,
-  renderScale,
-}: PageContainerProps) {
-  return (
-    <div
-      data-page={pageNum}
-      className="relative w-full shrink-0 rounded-lg bg-surface border border-border"
-      style={{ aspectRatio: `${ratio} / 1` }}
-    >
-      {shouldRender && doc ? (
-        <PageRenderer pdf={doc} pageNum={pageNum} renderScale={renderScale} />
-      ) : null}
-    </div>
-  );
-});
-
 export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const destroyedRef = useRef(false);
-  const observerRef = useRef<IntersectionObserver | null>(null);
   const isInitialMount = useRef(true);
   const onStateChangeRef = useRef(onStateChange);
   const onPageChangeRef = useRef(onPageChange);
-  const observerTimerRef = useRef<number | null>(null);
   const pageRef = useRef(page);
+  const scrollRafRef = useRef<number | null>(null);
+  const resizeTimerRef = useRef<number | null>(null);
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
@@ -138,98 +118,160 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
 
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [loadState, setLoadState] = useState<PdfLoadState>({ status: "loading" });
-  const [renderSet, setRenderSet] = useState<Set<number>>(new Set());
-  const [aspectRatios, setAspectRatios] = useState<Record<number, number>>({});
+  const [pageInfos, setPageInfos] = useState<PageInfo[]>([]);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
 
-  const updateRenderWindow = useCallback((closestPage: number, totalPages: number) => {
-    const enterStart = Math.max(1, closestPage - RENDER_WINDOW_ABOVE);
-    const enterEnd = Math.min(totalPages, closestPage + RENDER_WINDOW_BELOW);
-    const leaveStart = Math.max(1, closestPage - LEAVE_WINDOW_ABOVE);
-    const leaveEnd = Math.min(totalPages, closestPage + LEAVE_WINDOW_BELOW);
+  const virtualData = useMemo(() => {
+    if (pageInfos.length === 0 || containerWidth <= 0) {
+      return { offsets: [0] as number[], totalHeight: 0, numPages: 0 };
+    }
+    const offsets: number[] = [0];
+    let total = 0;
+    for (let i = 0; i < pageInfos.length; i++) {
+      const h = containerWidth * pageInfos[i].aspectRatio;
+      total += h + PAGE_GAP_PX;
+      offsets.push(total);
+    }
+    return { offsets, totalHeight: total, numPages: pageInfos.length };
+  }, [pageInfos, containerWidth]);
 
-    setRenderSet((prev) => {
-      const next = new Set<number>();
-      for (let i = enterStart; i <= enterEnd; i++) {
-        next.add(i);
-      }
-      // Keep pages already rendered that are within the leave window but outside enter window
-      // This prevents oscillation: pages that just left the enter window but are still
-      // in the leave window retain their canvas
-      let changed = false;
-      if (next.size !== prev.size) changed = true;
-      for (const p of prev) {
-        if (p >= leaveStart && p <= leaveEnd && !next.has(p)) {
-          next.add(p);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
+  // Binary search: find first page whose bottom > scrollTop
+  const findFirstVisible = useCallback((scrollTop: number): number => {
+    const num = virtualData.numPages;
+    if (num === 0) return 1;
+    let lo = 0;
+    let hi = num;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const pageBottom = virtualData.offsets[mid + 1] - PAGE_GAP_PX;
+      if (pageBottom <= scrollTop) lo = mid + 1;
+      else hi = mid;
+    }
+    return Math.max(1, lo);
+  }, [virtualData]);
+
+  // Binary search: find last page whose top < scrollBottom
+  const findLastVisible = useCallback((scrollBottom: number): number => {
+    const num = virtualData.numPages;
+    if (num === 0) return 0;
+    let lo = 1;
+    let hi = num;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      const pageTop = virtualData.offsets[mid - 1];
+      if (pageTop >= scrollBottom) hi = mid - 1;
+      else lo = mid;
+    }
+    return Math.min(num, lo + OVERSCAN_BELOW);
+  }, [virtualData]);
+
+  // Find closest page to viewport center
+  const findClosestPage = useCallback((scrollTop: number, viewportHeight: number): number => {
+    const num = virtualData.numPages;
+    if (num === 0) return 1;
+    const center = scrollTop + viewportHeight / 2;
+    let closest = 1;
+    let closestDist = Infinity;
+    for (let i = 1; i <= num; i++) {
+      const pageTop = virtualData.offsets[i - 1];
+      const pageHeight = (virtualData.offsets[i] - virtualData.offsets[i - 1]) - PAGE_GAP_PX;
+      const pageCenter = pageTop + pageHeight / 2;
+      const dist = Math.abs(pageCenter - center);
+      if (dist < closestDist) { closestDist = dist; closest = i; }
+    }
+    return closest;
+  }, [virtualData]);
+
+  // Determine mounted range from scroll position
+  const mountedRange = useMemo(() => {
+    if (virtualData.numPages === 0) {
+      return { start: 1, end: 0 };
+    }
+    const start = findFirstVisible(scrollTop);
+    const end = findLastVisible(scrollTop + (scrollContainerRef.current?.clientHeight ?? 0));
+    return { start: Math.max(1, start - OVERSCAN_ABOVE), end };
+  }, [virtualData, findFirstVisible, findLastVisible, scrollTop]);
+
+  // Build page elements for visible range
+  const pageElements = useMemo(() => {
+    const elements: React.ReactNode[] = [];
+    if (virtualData.numPages === 0 || !doc) return elements;
+    const { start, end } = mountedRange;
+
+    for (let i = start; i <= end; i++) {
+      const dim = pageInfos[i - 1];
+      const aspectRatio = dim ? dim.aspectRatio : 297 / 210;
+      const top = virtualData.offsets[i - 1];
+
+      elements.push(
+        <div
+          key={i}
+          data-page={i}
+          className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
+          style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
+        >
+          <PageRenderer pdf={doc} pageNum={i} renderScale={renderScale} containerWidth={containerWidth} />
+        </div>
+      );
+    }
+
+    return elements;
+  }, [virtualData, mountedRange, pageInfos, doc, renderScale, containerWidth]);
+
+  // Update page indicator from scroll position
+  const updatePageIndicator = useCallback((currentScrollTop: number, viewportHeight: number) => {
+    if (isInitialMount.current || virtualData.numPages === 0) return;
+    const closestPage = findClosestPage(currentScrollTop, viewportHeight);
+    if (closestPage !== pageRef.current) {
+      onStateChangeRef.current({ status: "ready", totalPages: virtualData.numPages });
+      onPageChangeRef.current?.(closestPage, virtualData.numPages);
+    }
+  }, [virtualData, findClosestPage]);
+
+  // Scroll handler with RAF throttling
+  const handleScroll = useCallback(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+    if (scrollRafRef.current) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const sc = scrollContainerRef.current;
+      if (!sc || virtualData.numPages === 0) return;
+      setScrollTop(sc.scrollTop);
+      updatePageIndicator(sc.scrollTop, sc.clientHeight);
     });
-  }, []);
+  }, [virtualData, updatePageIndicator]);
 
-  const setupObserver = useCallback(() => {
-    const container = containerRef.current;
-    if (!container || !doc) return;
+  // Scroll listener
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+    scrollContainer.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      scrollContainer.removeEventListener("scroll", handleScroll);
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+    };
+  }, [handleScroll]);
 
-    observerRef.current?.disconnect();
-    let rafId = 0;
+  // Scroll-to-page effect
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer || virtualData.numPages === 0) return;
+    const targetTop = virtualData.offsets[Math.max(0, page - 1)] ?? 0;
+    scrollContainer.scrollTop = targetTop;
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+    }
+  }, [page, virtualData]);
 
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (rafId) cancelAnimationFrame(rafId);
-        rafId = requestAnimationFrame(() => {
-           let closestPage = pageRef.current;
-           let closestDist = Infinity;
-           const toRender: number[] = [];
-
-          const containerCenter = container.getBoundingClientRect().top + container.clientHeight / 2;
-
-          for (const entry of entries) {
-            const num = Number(entry.target.getAttribute("data-page"));
-            if (!num) continue;
-            const rect = entry.boundingClientRect;
-            const entryCenter = rect.top + rect.height / 2;
-            const dist = Math.abs(entryCenter - containerCenter);
-            if (dist < closestDist) {
-              closestDist = dist;
-              closestPage = num;
-            }
-            if (entry.isIntersecting) {
-              toRender.push(num);
-            }
-          }
-
-          if (toRender.length > 0) {
-            updateRenderWindow(closestPage, doc.numPages);
-          }
-
-          if (isInitialMount.current) return;
-
-          if (closestPage !== pageRef.current) {
-            onStateChangeRef.current({ status: "ready", totalPages: doc.numPages });
-            onPageChangeRef.current?.(closestPage, doc.numPages);
-          }
-        });
-      },
-      {
-        root: container,
-        rootMargin: "-10% 0px -10% 0px",
-        threshold: 0,
-      }
-    );
-
-    container.querySelectorAll("[data-page]").forEach((el) => {
-      observerRef.current?.observe(el);
-    });
-  }, [doc, updateRenderWindow]);
-
+  // Load PDF document
   useEffect(() => {
     if (!url) {
       setDoc(null);
       setLoadState({ status: "loading" });
-      setRenderSet(new Set());
-      setAspectRatios({});
-      isInitialMount.current = true;
+      setPageInfos([]);
+      setContainerWidth(0);
       return;
     }
 
@@ -237,10 +279,8 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     let cancelled = false;
 
     setLoadState({ status: "loading" });
-    setDoc(null);
-    setRenderSet(new Set());
-    setAspectRatios({});
-    isInitialMount.current = true;
+    setPageInfos([]);
+    setContainerWidth(0);
 
     const task = getDocument({
       url,
@@ -251,39 +291,33 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
 
     task.promise.then(
       (pdfDoc: PDFDocumentProxy) => {
-        if (cancelled || destroyedRef.current) {
-          pdfDoc.destroy();
-          return;
-        }
-
+        if (cancelled || destroyedRef.current) { pdfDoc.destroy(); return; }
         setDoc(pdfDoc);
         setLoadState({ status: "ready", totalPages: pdfDoc.numPages });
         onStateChangeRef.current({ status: "ready", totalPages: pdfDoc.numPages });
 
-        const ratios: Record<number, number> = {};
-        Promise.all(
-          Array.from({ length: pdfDoc.numPages }, (_, i) =>
-            pdfDoc
-              .getPage(i + 1)
-              .then((p) => {
-                const vp = p.getViewport({ scale: renderScale });
-                ratios[i + 1] = vp.height / vp.width;
-              })
-              .catch(() => {
-                ratios[i + 1] = 297 / 210;
-              })
-          )
-        ).then(() => {
-          if (!cancelled && !destroyedRef.current) {
-            setAspectRatios(ratios);
-          }
-        });
+        const infos: PageInfo[] = new Array(pdfDoc.numPages);
+        const defaults = new Array(pdfDoc.numPages).fill({ aspectRatio: 297 / 210 });
+        setPageInfos(defaults);
 
-        const initial: number[] = [];
-        for (let i = 1; i <= Math.min(pdfDoc.numPages, 10); i++) {
-          initial.push(i);
+        let remaining = pdfDoc.numPages;
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+          pdfDoc.getPage(i).then((p) => {
+            if (cancelled) return;
+            const vp = p.getViewport({ scale: 1 });
+            infos[i - 1] = { aspectRatio: vp.height / vp.width };
+            remaining--;
+            if (remaining === 0 && !cancelled) {
+              setPageInfos(infos);
+            }
+          }).catch(() => {
+            if (cancelled) return;
+            remaining--;
+            if (remaining === 0 && !cancelled) {
+              setPageInfos(infos);
+            }
+          });
         }
-        setRenderSet(new Set(initial));
       },
       (err: unknown) => {
         if (cancelled || destroyedRef.current) return;
@@ -297,61 +331,33 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
       cancelled = true;
       destroyedRef.current = true;
       task.destroy?.();
-      observerRef.current?.disconnect();
     };
-  }, [url, renderScale]);
+  }, [url]);
 
+  // ResizeObserver for container width
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || isInitialMount.current) return;
-    const el = container.querySelector(`[data-page="${page}"]`) as HTMLElement;
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, [page]);
+    if (!container) return;
 
-  useEffect(() => {
-    if (doc && containerRef.current) {
-      const timer = setTimeout(() => {
-        setupObserver();
-        observerTimerRef.current = window.setTimeout(() => {
-          isInitialMount.current = false;
-        }, 500);
-      }, 50);
-      return () => {
-        clearTimeout(timer);
-        if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
-      };
-    }
-  }, [doc, setupObserver]);
+    const observer = new ResizeObserver((entries) => {
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+      resizeTimerRef.current = window.setTimeout(() => {
+        const entry = entries[0];
+        if (entry) {
+          const newWidth = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+          if (newWidth > 0 && Math.abs(newWidth - containerWidth) > 1) {
+            setContainerWidth(newWidth);
+          }
+        }
+      }, 150);
+    });
 
-  useEffect(() => {
+    observer.observe(container);
     return () => {
-      observerRef.current?.disconnect();
-      if (observerTimerRef.current) clearTimeout(observerTimerRef.current);
+      observer.disconnect();
+      if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     };
-  }, []);
-
-  const numPages = doc?.numPages ?? 0;
-
-  const pageElements = useMemo(() => {
-    const elements: React.ReactNode[] = [];
-    for (let i = 1; i <= numPages; i++) {
-      const ratio = aspectRatios[i] ?? 297 / 210;
-      const shouldRender = renderSet.has(i);
-      elements.push(
-        <PageContainer
-          key={i}
-          pageNum={i}
-          ratio={ratio}
-          shouldRender={shouldRender}
-          doc={doc}
-          renderScale={renderScale}
-        />
-      );
-    }
-    return elements;
-  }, [numPages, aspectRatios, renderSet, doc, renderScale]);
+  }, [containerWidth]);
 
   if (loadState.status === "loading") {
     return (
@@ -375,11 +381,21 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="flex flex-col items-center gap-3 bg-background px-2 py-4"
-    >
-      {pageElements}
+    <div ref={containerRef} className="w-full h-full">
+      <div
+        ref={scrollContainerRef}
+        className="overflow-y-auto overflow-x-hidden bg-background h-full"
+      >
+        <div
+          className="relative mx-auto"
+          style={{
+            height: virtualData.totalHeight || undefined,
+            maxWidth: "100%",
+          }}
+        >
+          {pageElements}
+        </div>
+      </div>
     </div>
   );
 }
