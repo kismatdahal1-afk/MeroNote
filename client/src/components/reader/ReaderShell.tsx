@@ -260,6 +260,16 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openResourceId, authStatus, metaResource]);
 
+  const totalPages = resource?.pageCount ?? 0;
+  const progress = resource ? getProgress(resource.id) : null;
+
+  const handlePageChange = useCallback((page: number) => {
+    if (!resource) return;
+    setReadingProgress(resource.id, page, totalPages);
+    markOpened(resource.id);
+    persistProgress(page);
+  }, [resource?.id ?? "", totalPages, setReadingProgress, markOpened, persistProgress]);
+
   if (!resource) {
     return (
       <div className="reader-bar flex min-h-screen items-center justify-center bg-background p-6">
@@ -304,14 +314,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const semester = meta?.semester ?? null;
   const bookmarked = Boolean(getBookmark(resource.id));
   const download = getDownload(resource.id);
-  const totalPages = resource.pageCount;
-  const progress = getProgress(resource.id);
-
-  const handlePageChange = useCallback((page: number) => {
-    setReadingProgress(resource.id, page, totalPages);
-    markOpened(resource.id);
-    persistProgress(page);
-  }, [resource.id, totalPages, setReadingProgress, markOpened, persistProgress]);
 
   const handleBookmark = (page: number) => {
     if (bookmarked) {
