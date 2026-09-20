@@ -1,8 +1,8 @@
 /* Mero Note Service Worker (Phase 9) — vanilla, no build step.
  *
  * Caches (versioned; old versions purged on activate):
- *   meronote-static-v1 — same-origin static assets (cache-first)
- *   meronote-api-v1     — public academic GETs (network-first, cache fallback)
+ *   meronote-static-v2 — same-origin static assets (cache-first)
+ *   meronote-api-v2     — public academic GETs (network-first, cache fallback)
  *
  * Policy mirrors client/src/lib/cachePolicy.ts (version strings, allowlist
  * prefixes, /file denylist, GET+200+basic-only). `verify:cache` asserts the
@@ -14,8 +14,8 @@
  * from cache cleanup by design).
  */
 
-const STATIC_CACHE = "meronote-static-v1";
-const API_CACHE = "meronote-api-v1";
+const STATIC_CACHE = "meronote-static-v2";
+const API_CACHE = "meronote-api-v2";
 
 const API_ALLOWLIST_PREFIXES = [
   "/api/semesters",
