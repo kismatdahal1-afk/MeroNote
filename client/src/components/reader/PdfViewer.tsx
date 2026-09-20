@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import {
   Bookmark, ChevronLeft, ChevronRight, Download, FileWarning, Loader2,
   Maximize2, Minus, Plus, RectangleHorizontal, RectangleVertical, Search,
@@ -9,7 +9,6 @@ import { clamp, cx } from "../../lib/utils";
 import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
 
 const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
-const A4_RATIO = 297 / 210;
 
 interface PdfViewerProps {
   resource: { id: string; title: string; pageCount: number };
@@ -73,20 +72,28 @@ export function PdfViewer({
     if (docPages !== null) setPage((p) => clamp(p, 1, docPages));
   }, [docPages]);
 
-  const handlePdfState = (s: PdfLoadState) => {
+  const handlePdfState = useCallback((s: PdfLoadState) => {
     if (s.status === "ready") {
-      setDocPages(s.totalPages);
+      setDocPages(s.totalPages ?? null);
       setDocError(null);
     } else if (s.status === "error") {
-      setDocError(s.message);
+      setDocError(s.message ?? null);
     }
-  };
+  }, []);
 
-  const goToPage = (next: number) => {
+  const handlePageChange = useCallback((p: number, total: number) => {
+    setPage((prev) => {
+      if (prev !== p) return p;
+      return prev;
+    });
+    onPageChange?.(p, total);
+  }, [onPageChange]);
+
+  const goToPage = useCallback((next: number) => {
     const p = clamp(next, 1, totalPages);
     setPage(p);
     onPageChange?.(p, totalPages);
-  };
+  }, [onPageChange, totalPages]);
 
   // Fullscreen may be unavailable (standalone PWA, iOS, denied) — the
   // promise rejection must never surface, and system-initiated exits
@@ -119,11 +126,6 @@ export function PdfViewer({
 
   const zoomIndex = ZOOM_LEVELS.indexOf(zoom);
   const isPage = variant === "page";
-  const pageWidth = clamp(zoom, 40, 200);
-  const pageMaxWidth = viewMode === 'landscape' ? '72rem' : '56rem';
-  const pageAspectRatio = viewMode === 'landscape'
-    ? `${A4_RATIO} / 1`
-    : `1 / ${A4_RATIO}`;
 
   return (
     <div
@@ -349,47 +351,33 @@ export function PdfViewer({
           )}
         </header>
 
-        {/* Document area */}
-        <div className="flex justify-center bg-background px-4 py-6 lg:py-10">
-          <div
-            aria-label="PDF document area"
-            style={
-              fileUrl && !urlError && !docError
-                ? { width: `${pageWidth}%`, maxWidth: pageMaxWidth }
-                : {
-                    width: `${pageWidth}%`,
-                    maxWidth: pageMaxWidth,
-                    aspectRatio: pageAspectRatio,
-                  }
-            }
-            className="card-glow rounded-xl border border-border bg-surface shadow-card transition-[width,aspect-ratio]"
-          >
-            {urlError || docError ? (
-              <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
-                <FileWarning className="size-8 text-muted-foreground" aria-hidden="true" />
-                <p className="text-sm font-bold text-foreground">Couldn't open this PDF</p>
-                <p className="max-w-sm text-xs font-medium text-muted-foreground">{urlError ?? docError}</p>
-                {onRetryFile && (
-                  <button
-                    type="button"
-                    onClick={onRetryFile}
-                    className="mt-1 rounded-lg bg-primary-muted px-3.5 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  >
-                    Try again
-                  </button>
-                )}
-              </div>
-            ) : urlLoading || !fileUrl ? (
-              <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8" role="status" aria-label="Loading PDF">
-                <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
-                <p className="text-xs font-semibold text-muted-foreground">
-                  {urlLoading ? "Requesting secure access…" : "Loading PDF…"}
-                </p>
-              </div>
-            ) : (
-              <PdfCanvas url={fileUrl} page={page} scale={zoom / 100} onStateChange={handlePdfState} />
-            )}
-          </div>
+        {/* Document area — continuous vertical scroll */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
+          {urlError || docError ? (
+            <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
+              <FileWarning className="size-8 text-muted-foreground" aria-hidden="true" />
+              <p className="text-sm font-bold text-foreground">Couldn't open this PDF</p>
+              <p className="max-w-sm text-xs font-medium text-muted-foreground">{urlError ?? docError}</p>
+              {onRetryFile && (
+                <button
+                  type="button"
+                  onClick={onRetryFile}
+                  className="mt-1 rounded-lg bg-primary-muted px-3.5 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  Try again
+                </button>
+              )}
+            </div>
+          ) : urlLoading || !fileUrl ? (
+            <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8" role="status" aria-label="Loading PDF">
+              <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
+              <p className="text-xs font-semibold text-muted-foreground">
+                {urlLoading ? "Requesting secure access…" : "Loading PDF…"}
+              </p>
+            </div>
+          ) : (
+            <PdfCanvas url={fileUrl} page={page} scale={zoom / 100} onStateChange={handlePdfState} onPageChange={handlePageChange} />
+          )}
         </div>
       </main>
     </div>
