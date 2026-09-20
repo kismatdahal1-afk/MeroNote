@@ -57,7 +57,7 @@ function PageRenderer({
   return (
     <canvas
       ref={canvasRef}
-      className="w-full h-full block rounded-lg"
+      className="w-full block rounded-lg"
       style={{ imageRendering: "auto" }}
     />
   );
@@ -69,7 +69,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
   const destroyedRef = useRef(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const pageRef = useRef(page);
-  const isProgrammaticScroll = useRef(false);
+  const isInitialMount = useRef(true);
   const scrollTimerRef = useRef<number | null>(null);
   const onStateChangeRef = useRef(onStateChange);
   const onPageChangeRef = useRef(onPageChange);
@@ -128,6 +128,9 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
           addToRenderSet(toRender);
         }
 
+        // Suppress observer-driven page changes until initial layout settles
+        if (isInitialMount.current) return;
+
         if (closestPage !== pageRef.current) {
           pageRef.current = closestPage;
           onStateChangeRef.current({ status: "ready", totalPages: doc.numPages });
@@ -153,6 +156,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
       setLoadState({ status: "loading" });
       setRenderSet(new Set());
       setAspectRatios({});
+      isInitialMount.current = true;
       return;
     }
 
@@ -163,6 +167,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
     setDoc(null);
     setRenderSet(new Set());
     setAspectRatios({});
+    isInitialMount.current = true;
 
     const task = getDocument({ url });
 
@@ -198,7 +203,7 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
           }
         });
 
-        // Render first batch
+        // Render first batch only
         const initial: number[] = [];
         for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
           initial.push(i);
@@ -221,38 +226,45 @@ export function PdfCanvas({ url, page, scale, onStateChange, onPageChange }: Pdf
       docRef.current = null;
       observerRef.current?.disconnect();
     };
-    }, [url]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
 
-  // Scroll to current page when page prop changes
+  // Scroll to current page when page prop changes (user navigation only)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const el = container.querySelector(`[data-page="${page}"]`) as HTMLElement;
     if (el) {
-      isProgrammaticScroll.current = true;
       el.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
-      scrollTimerRef.current = window.setTimeout(() => {
-        isProgrammaticScroll.current = false;
-      }, 1000);
     }
   }, [page]);
 
   // Update observer when doc changes
+  const initTimerRef = useRef<number | null>(null);
   useEffect(() => {
     if (doc && containerRef.current) {
-      const timer = setTimeout(() => setupObserver(), 50);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => {
+        setupObserver();
+        initTimerRef.current = window.setTimeout(() => {
+          isInitialMount.current = false;
+        }, 500);
+      }, 50);
+      return () => {
+        clearTimeout(timer);
+        if (initTimerRef.current) clearTimeout(initTimerRef.current);
+      };
     }
   }, [doc, setupObserver]);
 
-  // Re-render all pages when scale changes
+  // Re-render visible pages when scale changes (only pages already in renderSet)
   useEffect(() => {
     if (doc) {
-      const allPages = Array.from({ length: doc.numPages }, (_, i) => i + 1);
-      addToRenderSet(allPages);
+      const visiblePages = Array.from(renderSet).filter((p) => p <= doc.numPages);
+      if (visiblePages.length > 0) {
+        addToRenderSet(visiblePages);
+      }
     }
-  }, [scale, doc, addToRenderSet]);
+  }, [scale, doc, addToRenderSet, renderSet]);
 
   // Cleanup on unmount
   useEffect(() => {
