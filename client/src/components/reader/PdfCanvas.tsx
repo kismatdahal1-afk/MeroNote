@@ -23,7 +23,6 @@ interface PdfCanvasProps {
 }
 
 const MAX_DPR = 2;
-const OVERSCAN_ABOVE = 5;
 const OVERSCAN_BELOW = 5;
 const PAGE_GAP_PX = 12;
 const MAX_CONTAINER_WIDTH = 850;
@@ -40,9 +39,10 @@ interface PageRendererProps {
   pdf: PDFDocumentProxy;
   pageNum: number;
   containerWidth: number;
+  onRendered?: (pageNum: number) => void;
 }
 
-const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth }: PageRendererProps) {
+const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth, onRendered }: PageRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cancelledRef = useRef(false);
   const renderTaskRef = useRef<Promise<void> | null>(null);
@@ -78,6 +78,9 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth }
         currentRenderPromise = rt.promise;
         renderTaskRef.current = rt.promise;
         await rt.promise;
+        if (!cancelledRef.current) {
+          onRendered?.(pageNum);
+        }
       } catch {
         // Page render failed silently; container still reserves space.
       } finally {
@@ -93,7 +96,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth }
       cancelledRef.current = true;
       renderTaskRef.current = null;
     };
-  }, [pdf, pageNum, containerWidth]);
+  }, [pdf, pageNum, containerWidth, onRendered]);
 
   return (
     <canvas
@@ -125,6 +128,16 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
   const [pageInfos, setPageInfos] = useState<PageInfo[]>([]);
   const [containerWidth, setContainerWidth] = useState(850);
   const [scrollTop, setScrollTop] = useState(0);
+  const [renderedPages, setRenderedPages] = useState<Set<number>>(new Set());
+
+  const handlePageRendered = useCallback((pageNum: number) => {
+    setRenderedPages(prev => {
+      if (prev.has(pageNum)) return prev;
+      const next = new Set(prev);
+      next.add(pageNum);
+      return next;
+    });
+  }, []);
 
   const virtualData = useMemo(() => {
     if (pageInfos.length === 0 || containerWidth <= 0) {
@@ -184,7 +197,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
     return closest;
   }, [virtualData]);
 
-  const mountedRange = useMemo(() => {
+  const loadWindow = useMemo(() => {
     if (virtualData.numPages === 0) {
       return { start: 1, end: 0 };
     }
@@ -192,33 +205,50 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
     const scrollBottom = scrollTop + viewportHeight;
     const start = findFirstVisible(scrollTop);
     const end = findLastVisible(scrollBottom);
-    return { start: Math.max(1, start - OVERSCAN_ABOVE), end };
+    return {
+      start: Math.max(1, start - 1),
+      end: Math.min(virtualData.numPages, end + 1),
+    };
   }, [virtualData, findFirstVisible, findLastVisible, scrollTop]);
 
   const pageElements = useMemo(() => {
     const elements: React.ReactNode[] = [];
     if (virtualData.numPages === 0 || !doc) return elements;
-    const { start, end } = mountedRange;
 
-    for (let i = start; i <= end; i++) {
+    for (let i = 1; i <= virtualData.numPages; i++) {
       const dim = pageInfos[i - 1];
       const aspectRatio = dim ? dim.aspectRatio : 297 / 210;
       const top = virtualData.offsets[i - 1];
+      const isRendered = renderedPages.has(i);
+      const isInLoadWindow = i >= loadWindow.start && i <= loadWindow.end;
 
-      elements.push(
-        <div
-          key={i}
-          data-page={i}
-          className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
-          style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
-        >
-          <PageRenderer pdf={doc} pageNum={i} containerWidth={containerWidth} />
-        </div>
-      );
+      if (isRendered || isInLoadWindow) {
+        elements.push(
+          <div
+            key={i}
+            data-page={i}
+            className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
+            style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
+          >
+            <PageRenderer pdf={doc} pageNum={i} containerWidth={containerWidth} onRendered={handlePageRendered} />
+          </div>
+        );
+      } else {
+        elements.push(
+          <div
+            key={i}
+            data-page={i}
+            className="absolute left-0 right-0 rounded-lg bg-surface border border-border flex items-center justify-center"
+            style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
+          >
+            <span className="text-xs text-muted-foreground">Loading page…</span>
+          </div>
+        );
+      }
     }
 
     return elements;
-  }, [virtualData, mountedRange, pageInfos, doc, containerWidth]);
+  }, [virtualData, loadWindow, pageInfos, doc, containerWidth, renderedPages, handlePageRendered]);
 
   const updatePageIndicator = useCallback(() => {
     if (isInitialMount.current || virtualData.numPages === 0) return;
@@ -272,6 +302,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
       setDoc(null);
       setLoadState({ status: "loading" });
       setPageInfos([]);
+      setRenderedPages(new Set());
       return;
     }
 
@@ -280,6 +311,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
 
     setLoadState({ status: "loading" });
     setPageInfos([]);
+    setRenderedPages(new Set());
 
     const task = getDocument({
       url,
@@ -296,7 +328,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
         onStateChangeRef.current({ status: "ready", totalPages: pdfDoc.numPages });
 
         const infos: PageInfo[] = new Array(pdfDoc.numPages);
-        const defaults = new Array(pdfDoc.numPages).fill({ aspectRatio: 297 / 210 });
+        const defaults = Array.from({ length: pdfDoc.numPages }, () => ({ aspectRatio: 297 / 210 }));
         setPageInfos(defaults);
 
         let remaining = pdfDoc.numPages;
