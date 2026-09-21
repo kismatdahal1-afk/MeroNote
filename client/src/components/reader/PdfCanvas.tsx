@@ -25,6 +25,12 @@ interface PdfCanvasProps {
   /** PDF-only zoom multiplier (1 = fit width). Affects page render width
       and reserved geometry only — never the header, counter, or shell. */
   zoom?: number;
+  /** Shared-zoom writer used by the PDF-local pinch gesture. Same state
+      as the header [-] % [+] buttons: exactly one source of truth. */
+  onZoomChange?: (zoom: number) => void;
+  /** Clamp bounds for pinch zoom (defaults cover the supported range). */
+  minZoom?: number;
+  maxZoom?: number;
 }
 
 const MAX_DPR = 2;
@@ -121,7 +127,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth, 
   );
 });
 
-export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1 }: PdfCanvasProps) {
+export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1, onZoomChange, minZoom = 0.5, maxZoom = 1.25 }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const destroyedRef = useRef(false);
@@ -133,10 +139,22 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   const resizeTimerRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);
   const prevZoomRef = useRef(zoom);
+  const zoomRef = useRef(zoom);
+  const onZoomChangeRef = useRef(onZoomChange);
+  const pinchRef = useRef<{
+    active: boolean;
+    startDist: number;
+    startZoom: number;
+    raf: number | null;
+    pending: number | null;
+    lastSent: number;
+  }>({ active: false, startDist: 0, startZoom: 1, raf: null, pending: null, lastSent: zoom });
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
   onPageChangeRef.current = onPageChange;
+  zoomRef.current = zoom;
+  onZoomChangeRef.current = onZoomChange;
 
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [loadState, setLoadState] = useState<PdfLoadState>({ status: "loading" });
@@ -348,6 +366,113 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     };
   }, [handleScroll]);
 
+  // PDF-local two-finger pinch zoom. Listeners live on the PDF scroll
+  // container only, so a pinch starting on the header, counter, or any
+  // control never reaches this handler and never changes PDF zoom.
+  // One-finger touches are never preventDefaulted: native vertical scroll
+  // is fully preserved. Only while exactly two fingers are down do we
+  // preventDefault (scoped, via { passive: false }) so the browser does
+  // not zoom or scroll the page, and feed the finger-distance ratio into
+  // the shared pdfZoom state. Updates are rAF-throttled and rounded to
+  // avoid excessive re-renders during the gesture.
+  useEffect(() => {
+    const sc = scrollContainerRef.current;
+    if (!sc || !doc) return;
+
+    const fingerDist = (a: Touch, b: Touch) =>
+      Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+    const emitZoom = (value: number) => {
+      const rounded = Math.round(value * 1000) / 1000;
+      const p = pinchRef.current;
+      if (rounded !== p.lastSent) {
+        p.lastSent = rounded;
+        onZoomChangeRef.current?.(rounded);
+      }
+    };
+
+    const flushPending = () => {
+      const p = pinchRef.current;
+      p.raf = null;
+      if (p.pending === null) return;
+      const value = p.pending;
+      p.pending = null;
+      emitZoom(value);
+    };
+
+    const scheduleZoom = (value: number) => {
+      const p = pinchRef.current;
+      p.pending = value;
+      if (p.raf === null) {
+        p.raf = requestAnimationFrame(flushPending);
+      }
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const p = pinchRef.current;
+        p.active = true;
+        p.startDist = Math.max(1, fingerDist(e.touches[0], e.touches[1]));
+        p.startZoom = zoomRef.current;
+        p.lastSent = zoomRef.current;
+        p.pending = null;
+        // Take over this two-finger gesture only. Single-finger taps
+        // (including Retry buttons) never enter this branch.
+        if (e.cancelable) e.preventDefault();
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      const p = pinchRef.current;
+      if (!p.active || e.touches.length < 2) return;
+      if (e.cancelable) e.preventDefault();
+      const d = Math.max(1, fingerDist(e.touches[0], e.touches[1]));
+      const target = (p.startZoom * d) / p.startDist;
+      scheduleZoom(Math.min(maxZoom, Math.max(minZoom, target)));
+    };
+
+    const endPinch = () => {
+      const p = pinchRef.current;
+      if (!p.active) return;
+      p.active = false;
+      if (p.raf !== null) {
+        cancelAnimationFrame(p.raf);
+        p.raf = null;
+      }
+      // Settle the exact final value synchronously on release.
+      if (p.pending !== null) {
+        const value = p.pending;
+        p.pending = null;
+        emitZoom(value);
+      }
+    };
+
+    // iOS Safari proprietary gesture event: blocking it scoped to the PDF
+    // region stops browser page-zoom without touching global viewport config.
+    const onGestureStart = (e: Event) => e.preventDefault();
+
+    sc.addEventListener("touchstart", onTouchStart, { passive: false });
+    sc.addEventListener("touchmove", onTouchMove, { passive: false });
+    sc.addEventListener("touchend", endPinch);
+    sc.addEventListener("touchcancel", endPinch);
+    sc.addEventListener("gesturestart", onGestureStart);
+
+    return () => {
+      sc.removeEventListener("touchstart", onTouchStart);
+      sc.removeEventListener("touchmove", onTouchMove);
+      sc.removeEventListener("touchend", endPinch);
+      sc.removeEventListener("touchcancel", endPinch);
+      sc.removeEventListener("gesturestart", onGestureStart);
+      const p = pinchRef.current;
+      if (p.raf !== null) {
+        cancelAnimationFrame(p.raf);
+        p.raf = null;
+      }
+      p.active = false;
+      p.pending = null;
+    };
+  }, [doc, minZoom, maxZoom]);
+
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
@@ -532,6 +657,10 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
         <div
           ref={scrollContainerRef}
           className="overflow-y-auto bg-background h-full w-full"
+          // Scoped to the PDF region only: the browser may pan here
+          // (one-finger scroll preserved) but may not pinch-zoom or
+          // double-tap-zoom the page. Global app zoom behavior untouched.
+          style={{ touchAction: "pan-x pan-y" }}
         >
         <div
           className="relative mx-auto"

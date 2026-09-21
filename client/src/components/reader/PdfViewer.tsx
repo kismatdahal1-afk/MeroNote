@@ -8,10 +8,22 @@ import { useToast } from "../../state/ToastProvider";
 import { cx, clamp } from "../../lib/utils";
 import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
 
-// PDF-only zoom steps. Applied to the PDF page render width inside
-// PdfCanvas — the header, counter, and shell are never scaled.
-const ZOOM_LEVELS = [0.75, 0.85, 1, 1.1, 1.25];
-const DEFAULT_ZOOM_INDEX = 2;
+// PDF-only zoom steps, shared by the [-] % [+] buttons and the mobile
+// two-finger pinch gesture (single pdfZoom source of truth). Applied to the
+// PDF page render width inside PdfCanvas — the header, counter, and shell
+// are never scaled. Desktop default stays 100% (unchanged appearance);
+// mobile opens zoomed out for a comfortably framed fit-width view.
+const ZOOM_LEVELS = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25];
+const DEFAULT_ZOOM_INDEX = 5; // 100%
+const MOBILE_DEFAULT_ZOOM = 0.65;
+
+function isMobileViewport(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(max-width: 767px)").matches
+  );
+}
 
 interface PdfViewerProps {
   resource: { id: string; title: string; pageCount: number };
@@ -62,7 +74,9 @@ export function PdfViewer({
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<'portrait' | 'landscape'>('portrait');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [pdfZoom, setPdfZoom] = useState(ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]);
+  const [pdfZoom, setPdfZoom] = useState(() =>
+    isMobileViewport() ? MOBILE_DEFAULT_ZOOM : ZOOM_LEVELS[DEFAULT_ZOOM_INDEX],
+  );
   const programmaticScrollRef = useRef(false);
 
   useEffect(() => {
@@ -372,7 +386,17 @@ export function PdfViewer({
               </div>
             ) : (
               <div className="mx-auto w-full max-w-[850px] px-3 py-2 h-full md:px-2">
-                <PdfCanvas url={fileUrl} page={page} onStateChange={handlePdfState} onPageChange={handlePageChange} programmaticScrollRef={programmaticScrollRef} zoom={pdfZoom} />
+                <PdfCanvas
+                  url={fileUrl}
+                  page={page}
+                  onStateChange={handlePdfState}
+                  onPageChange={handlePageChange}
+                  programmaticScrollRef={programmaticScrollRef}
+                  zoom={pdfZoom}
+                  onZoomChange={setPdfZoom}
+                  minZoom={ZOOM_LEVELS[0]}
+                  maxZoom={ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
+                />
               </div>
             )}
           </div>
