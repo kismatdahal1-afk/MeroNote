@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import {
   Bookmark, ChevronLeft, ChevronRight, Download, FileWarning, Loader2, Search,
   RectangleHorizontal, RectangleVertical, Maximize2,
@@ -57,6 +57,7 @@ export function PdfViewer({
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<'portrait' | 'landscape'>('portrait');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const programmaticScrollRef = useRef(false);
 
   useEffect(() => {
     if (docPages !== null) setPage((p) => clamp(p, 1, docPages));
@@ -78,6 +79,7 @@ export function PdfViewer({
 
   const goToPage = useCallback((next: number) => {
     const p = clamp(next, 1, totalPages);
+    programmaticScrollRef.current = true;
     setPage(p);
     onPageChange?.(p, totalPages);
   }, [onPageChange, totalPages]);
@@ -315,7 +317,7 @@ export function PdfViewer({
             )}
           </header>
 
-          <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
+          <div className="flex-1 min-h-0 overflow-hidden bg-background">
             {urlError || docError ? (
               <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
                 <FileWarning className="size-8 text-muted-foreground" aria-hidden="true" />
@@ -339,8 +341,8 @@ export function PdfViewer({
                 </p>
               </div>
             ) : (
-              <div className="mx-auto w-full max-w-[850px] px-2 py-2">
-                <PdfCanvas url={fileUrl} page={page} onStateChange={handlePdfState} onPageChange={handlePageChange} />
+              <div className="mx-auto w-full max-w-[850px] px-2 py-2 h-full">
+                <PdfCanvas url={fileUrl} page={page} onStateChange={handlePdfState} onPageChange={handlePageChange} programmaticScrollRef={programmaticScrollRef} />
               </div>
             )}
           </div>
