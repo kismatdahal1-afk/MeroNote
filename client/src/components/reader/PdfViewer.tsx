@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import {
   Bookmark, ChevronLeft, ChevronRight, Download, FileWarning, Loader2, Search,
-  RectangleHorizontal, RectangleVertical, Maximize2, Minus, Plus,
+  Maximize2, Minus, Plus,
 } from "lucide-react";
 import { IconButton } from "../common/IconButton";
 import { useToast } from "../../state/ToastProvider";
@@ -74,7 +74,6 @@ export function PdfViewer({
   const [page, setPage] = useState(() => clamp(initialPage, 1, totalPages));
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<'portrait' | 'landscape'>('portrait');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [pdfZoom, setPdfZoom] = useState(ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]);
   // UI zoom state stays platform-independent (100% = 1.0 everywhere); only
@@ -120,6 +119,20 @@ export function PdfViewer({
   }, []);
   const zoomIn = useCallback(() => stepZoom(1), [stepZoom]);
   const zoomOut = useCallback(() => stepZoom(-1), [stepZoom]);
+  // Pinch delivers continuous values; snap them to the supported steps so
+  // every gesture commit settles exactly like a button press (one render,
+  // no teardown churn, no canvas flash). Unchanged values bail out of
+  // rendering entirely. Button steps pass through untouched — exact steps
+  // snap to themselves — so there is still exactly one zoom source of truth.
+  const handlePinchZoom = useCallback((z: number) => {
+    setPdfZoom(() => {
+      let best = 0;
+      for (let i = 0; i < ZOOM_LEVELS.length; i++) {
+        if (Math.abs(ZOOM_LEVELS[i] - z) < Math.abs(ZOOM_LEVELS[best] - z)) best = i;
+      }
+      return ZOOM_LEVELS[best];
+    });
+  }, []);
   const zoomLabel = `${Math.round(pdfZoom * 100)}%`;
 
   const handleFullscreen = () => {
@@ -143,10 +156,6 @@ export function PdfViewer({
     document.addEventListener("fullscreenchange", sync);
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
-
-  const toggleViewMode = () => {
-    setViewMode((v) => (v === 'portrait' ? 'landscape' : 'portrait'));
-  };
 
   const isPage = variant === "page";
 
@@ -249,14 +258,6 @@ export function PdfViewer({
                 />
               )}
               <IconButton
-                icon={viewMode === 'portrait' ? RectangleHorizontal : RectangleVertical}
-                label={viewMode === 'portrait' ? 'Switch to landscape' : 'Switch to portrait'}
-                variant={viewMode === 'landscape' ? "active" : "bar"}
-                onClick={toggleViewMode}
-                size="sm"
-                className="w-12 h-6 px-1.5 rounded"
-              />
-              <IconButton
                 icon={Maximize2}
                 label={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
                 variant={isFullscreen ? 'active' : 'bar'}
@@ -315,14 +316,6 @@ export function PdfViewer({
                   onClick={onDownload}
                 />
               )}
-              <IconButton
-                icon={viewMode === 'portrait' ? RectangleHorizontal : RectangleVertical}
-                label={viewMode === 'portrait' ? 'Switch to landscape' : 'Switch to portrait'}
-                variant={viewMode === 'landscape' ? "active" : "bar"}
-                size="sm"
-                onClick={toggleViewMode}
-                className="w-12 h-6 px-1.5 rounded"
-              />
               <IconButton
                 icon={Maximize2}
                 label={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
@@ -398,7 +391,7 @@ export function PdfViewer({
                   onPageChange={handlePageChange}
                   programmaticScrollRef={programmaticScrollRef}
                   zoom={pdfZoom * zoomReference}
-                  onZoomChange={setPdfZoom}
+                  onZoomChange={handlePinchZoom}
                   minZoom={ZOOM_LEVELS[0]}
                   maxZoom={ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
                 />

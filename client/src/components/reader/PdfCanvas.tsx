@@ -148,7 +148,8 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     raf: number | null;
     pending: number | null;
     lastSent: number;
-  }>({ active: false, startDist: 0, startZoom: 1, raf: null, pending: null, lastSent: zoom });
+    skipAnchorOnce: boolean;
+  }>({ active: false, startDist: 0, startZoom: 1, raf: null, pending: null, lastSent: zoom, skipAnchorOnce: false });
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
@@ -439,10 +440,13 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
         cancelAnimationFrame(p.raf);
         p.raf = null;
       }
-      // Settle the exact final value synchronously on release.
+      // Settle the exact final value synchronously on release. The release
+      // commit must not yank the scroll position either (flag consumed by
+      // the zoom effect); it only applies when a value is actually emitted.
       if (p.pending !== null) {
         const value = p.pending;
         p.pending = null;
+        p.skipAnchorOnce = true;
         emitZoom(value);
       }
     };
@@ -470,6 +474,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       }
       p.active = false;
       p.pending = null;
+      p.skipAnchorOnce = false;
     };
   }, [doc, minZoom, maxZoom]);
 
@@ -497,19 +502,30 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   // Zoom changes every reserved page height, so re-anchor the scroll
   // position to the top of the current page using the fresh geometry.
   // Guarded by prevZoomRef: plain resizes and the initial pageInfos load
-  // never scroll. The counter stays on the current page with no spurious
-  // onPageChange, and jump/prev/next offsets remain exact.
+  // never scroll. During (or just after) a pinch gesture the scroll
+  // position is never moved — the counter is resynced from the live scroll
+  // offset with the fresh geometry instead, so pinch never causes a
+  // scroll-position jump. Jump/prev/next offsets remain exact.
   useEffect(() => {
     if (prevZoomRef.current === zoom) return;
     prevZoomRef.current = zoom;
     const sc = scrollContainerRef.current;
     if (!sc || virtualData.numPages === 0) return;
+    if (pinchRef.current.active || pinchRef.current.skipAnchorOnce) {
+      pinchRef.current.skipAnchorOnce = false;
+      const h = sc.clientHeight;
+      const closest = findClosestPage(sc.scrollTop, h > 0 ? h : viewportHeightRef.current);
+      if (closest !== pageRef.current) {
+        onPageChangeRef.current?.(closest, virtualData.numPages);
+      }
+      return;
+    }
     const clamped = Math.max(1, Math.min(virtualData.numPages, pageRef.current));
     const targetTop = virtualData.offsets[clamped - 1] ?? 0;
     if (Math.abs(sc.scrollTop - targetTop) > 2) {
       sc.scrollTop = targetTop;
     }
-  }, [zoom, virtualData]);
+  }, [zoom, virtualData, findClosestPage]);
 
   useEffect(() => {
     if (!doc || virtualData.numPages === 0) return;
