@@ -127,7 +127,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth, 
   );
 });
 
-export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1, onZoomChange, minZoom = 0.5, maxZoom = 1.25 }: PdfCanvasProps) {
+export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1, onZoomChange, minZoom = 0.2, maxZoom = 1.25 }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const destroyedRef = useRef(false);
