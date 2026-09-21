@@ -26,65 +26,45 @@ import { decideReadingSource, readingSourceLabel, type ReadingSource } from "../
 import { BackButton } from "../common/BackButton";
 import { PdfViewer } from "./PdfViewer";
 
-/**
- * Student PDF Reader page shell (Phase 2).
- * Delegates all viewer chrome/behavior to the shared PdfViewer so the
- * Phase 6 PDF.js integration drops in once for student + admin views.
- * When `admin` is set, back/details links stay inside the admin flow.
- * The admin navigation source (entry-point state) is forwarded so the
- * sidebar keeps highlighting the section the admin came from.
- */
 export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const { resourceId } = useParams<{ resourceId: string }>();
   const { state } = useLocation();
   const via = (state as ResourceNavState | null)?.via;
-  /** Student navigation context: the breadcrumb mirrors the actual entry
-   *  point (Resources / Favorites / Bookmarks / Downloads). A Subject crumb
-   *  appears only when the user actually navigated through that subject
-   *  (fromSubject matches) — direct Favorites/Bookmarks → Resource opens
-   *  never invent one. Without state (direct URL, refresh) it falls back
-   *  to the Semester trail. */
   const entry = entryPointFromState(state);
   const entryRoot = !admin ? entryRootFor(entry) : undefined;
   const fromSubject = subjectIdFromState(state);
-  /** Link back to the detail page preserves the full trail so
-   *  reader → detail keeps the same breadcrumb. */
   const detailNavState = !admin
     ? buildResourceNavState(entry, fromSubject)
     : undefined;
-  /** Admin navigation context: Semesters / Resources / Drafts entry point.
-   *  Stateless visits (direct URL, refresh) fall back to Resources. */
   const adminEntry = adminEntryPointFromState(state);
   const adminRoot = adminEntryRootFor(adminEntry);
-    const { data: meta, error: metaError } = useApiQuery(`reader-meta-${resourceId ?? ""}`, async (signal) => {
-     if (!resourceId || resourceId === "null" || resourceId === "undefined") throw new Error("Invalid resource id.");
-     const resource = await fetchResource(resourceId, signal);
-    const [subject, semester] = await Promise.all([
-      fetchSubject(resource.subjectId, signal).catch(() => null),
-      fetchSemester(resource.semesterId, signal).catch(() => null),
-    ]);
-    return { resource, subject, semester };
-  });
+
+  const { data: meta, error: metaError, loading: metaLoading } = useApiQuery(
+    `reader-meta-${resourceId ?? ""}`,
+    async (signal) => {
+      if (!resourceId || resourceId === "null" || resourceId === "undefined") throw new Error("Invalid resource id.");
+      const resource = await fetchResource(resourceId, signal);
+      const [subject, semester] = await Promise.all([
+        fetchSubject(resource.subjectId, signal).catch(() => null),
+        fetchSemester(resource.semesterId, signal).catch(() => null),
+      ]);
+      return { resource, subject, semester };
+    },
+  );
+
   const resource = meta?.resource ?? null;
   const { toast } = useToast();
   const { getProgress, setReadingProgress, addBookmark, getBookmark, getDownload, startDownload, markOpened } = useLibrary();
   const baseRoute = admin ? "/admin/resources" : "/resources";
   const detailState = admin && via ? { via } : undefined;
 
-  // Phase 6 secure file access: short-lived presigned URL per resource.
-  // The binary is streamed by PDF.js — never stored in app state.
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [urlLoading, setUrlLoading] = useState(true);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
   const [source, setSource] = useState<ReadingSource | null>(null);
   const openResourceId = resource?.id;
-
-  // Phase 8 local-first loading: an explicitly downloaded blob opens
-  // directly (object URL revoked on change/unmount); otherwise the existing
-  // remote presigned-URL flow runs. Corrupt local records are dropped.
   const localObjectUrl = useRef<string | null>(null);
-
   const metaResource = meta?.resource ?? null;
 
   useEffect(() => {
@@ -114,7 +94,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       }
     };
 
-    // Streaming path for large files (no temp buffering — see Step 7/8).
     const openRemoteStream = () => {
       fetchResourceFileUrl(rid).then(
         ({ url }) => {
@@ -131,7 +110,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     };
 
     (async () => {
-      // 1. Permanent download always wins (Phase 8 IndexedDB).
       try {
         const local = await resolveLocalFileUrl(rid);
         if (cancelled) {
@@ -142,11 +120,8 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           showObjectUrl(local, "download");
           return;
         }
-      } catch {
-        // Storage failure falls through to temp cache, then network.
-      }
+      } catch {}
 
-      // 2. Valid temporary cache.
       try {
         const temp = await getTempPdf(rid);
         if (cancelled) return;
@@ -154,20 +129,17 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           showObjectUrl(URL.createObjectURL(temp), "cache");
           return;
         }
-      } catch {
-        // Temp-cache failure falls through to network (never breaks online).
-      }
+      } catch {}
 
-      // 3/4. Network: fetch-and-cache when small enough, stream when large.
       const decision = decideReadingSource({ hasPermanentDownload: false, hasTempCache: false, fileSize: metaResource.fileSize });
-       if (decision === "network-fetch") {
-         try {
-           const { url } = await fetchResourceFileUrl(rid);
-           const controller = new AbortController();
-           const timeout = setTimeout(() => controller.abort(), 15000);
-           const res = await fetch(url, { credentials: "omit", signal: controller.signal });
-           clearTimeout(timeout);
-           if (!res.ok) throw new Error(`PDF fetch failed with status ${res.status}.`);
+      if (decision === "network-fetch") {
+        try {
+          const { url } = await fetchResourceFileUrl(rid);
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 15000);
+          const res = await fetch(url, { credentials: "omit", signal: controller.signal });
+          clearTimeout(timeout);
+          if (!res.ok) throw new Error(`PDF fetch failed with status ${res.status}.`);
           const buffer = await res.arrayBuffer();
           const head = new TextDecoder().decode(new Uint8Array(buffer).slice(0, 5));
           if (head !== "%PDF-") {
@@ -175,25 +147,22 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             return;
           }
           const blob = new Blob([buffer], { type: "application/pdf" });
-          // Best-effort temp write — render proceeds even if it fails.
           await putTempPdf(rid, blob).catch(() => {});
           if (!cancelled) showObjectUrl(URL.createObjectURL(blob), "network-fetch");
           return;
         } catch (err) {
-           // Fall back to streaming (e.g. transient failure); offline lands
-           // in the friendly error path there.
-           if (cancelled) return;
-           if (err instanceof DOMException && err.name === "AbortError") {
-             fail("The file request timed out. Check your connection and try again.");
-             return;
-           }
-           if (err instanceof FileApiError && !navigator.onLine) {
-             fail(err.message);
-             return;
-           }
-           openRemoteStream();
-           return;
-         }
+          if (cancelled) return;
+          if (err instanceof DOMException && err.name === "AbortError") {
+            fail("The file request timed out. Check your connection and try again.");
+            return;
+          }
+          if (err instanceof FileApiError && !navigator.onLine) {
+            fail(err.message);
+            return;
+          }
+          openRemoteStream();
+          return;
+        }
       }
       if (decision === "network-stream") {
         openRemoteStream();
@@ -211,15 +180,9 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     };
   }, [openResourceId, retryNonce, metaResource]);
 
-  // Phase 7 progress sync (best-effort; local state stays authoritative).
-  // Persists page changes debounced (1.5s trailing edge, flushed on unmount)
-  // and seeds local progress from the server once per resource. Both no-op
-  // for mock ids and guests (see lib/studyApi).
   const { status: authStatus } = useUser();
   const progressTimer = useRef<number | null>(null);
   const pendingPage = useRef<number | null>(null);
-  // True once the user navigates locally this session: server seeding must
-  // never overwrite newer local progress that arrived while fetching.
   const touchedLocally = useRef(false);
 
   const persistProgress = (page: number) => {
@@ -255,8 +218,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       pendingPage.current = null;
       if (next !== null) void putServerProgress(rid, next).catch(() => {});
     };
-    // getProgress/setReadingProgress intentionally excluded: re-running on
-    // every local progress write would refetch in a loop post-integration.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openResourceId, authStatus, metaResource]);
 
@@ -269,6 +230,20 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     markOpened(resource.id);
     persistProgress(page);
   }, [resource?.id ?? "", totalPages, setReadingProgress, markOpened, persistProgress]);
+
+  if (metaLoading) {
+    return (
+      <div className="reader-bar flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="text-center">
+          <p className="text-lg font-bold text-foreground">Loading resource…</p>
+          <ReaderSkeleton />
+          <div className="mt-3 flex justify-center">
+            <BackButton fallbackTo={admin ? adminRoot.to : "/dashboard"} label="Go back" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!resource) {
     return (
@@ -286,10 +261,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             </>
           )}
           <div className="mt-3 flex justify-center">
-            <BackButton
-              fallbackTo={admin ? adminRoot.to : "/dashboard"}
-              label="Go back"
-            />
+            <BackButton fallbackTo={admin ? adminRoot.to : "/dashboard"} label="Go back" />
           </div>
         </div>
       </div>
@@ -335,7 +307,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
 
   return (
     <PdfViewer
-      // Fresh viewer state (page, zoom, PDF.js doc) per document.
       key={resource.id}
       resource={resource}
       subtitle={subject ? `${subject.name} · ${resource.pageCount} pages` : `${resource.pageCount} pages`}
@@ -345,7 +316,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       urlLoading={urlLoading}
       urlError={urlError}
       sourceLabel={source ? readingSourceLabel(source) : null}
-       onRetryFile={() => setRetryNonce((n) => n + 1)}
+      onRetryFile={() => setRetryNonce((n) => n + 1)}
       breadcrumbs={
         admin ? (
           <>
@@ -454,6 +425,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       bookmarked={bookmarked}
       onDownload={handleDownload}
       downloadActive={download?.status === "completed"}
-      />
+    />
   );
 }

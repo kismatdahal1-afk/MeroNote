@@ -8,8 +8,6 @@ import { useToast } from "../../state/ToastProvider";
 import { cx, clamp } from "../../lib/utils";
 import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
 
-const RENDER_SCALE = 1.5;
-
 interface PdfViewerProps {
   resource: { id: string; title: string; pageCount: number };
   subtitle?: string;
@@ -125,225 +123,227 @@ export function PdfViewer({
     >
       <main
         className={cx(
-          "flex-1 min-h-0 overflow-y-auto overflow-x-hidden",
+          "flex-1 min-h-0 overflow-hidden",
           isPage ? "pb-0" : "",
         )}
       >
-        <header
-          className={cx(
-            "sticky top-0 z-30 flex-shrink-0 flex flex-col",
-            isPage
-              ? "bg-surface/95 backdrop-blur-md"
-              : "bg-surface-muted/50",
-          )}
-        >
-          {breadcrumbs && isPage && (
-            <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background/95 px-3 py-0.5 text-[10px] md:text-xs font-medium text-muted-foreground/80 backdrop-blur-sm whitespace-nowrap overflow-hidden">
-              {breadcrumbs}
-            </div>
-          )}
-
-          <div
+        <div className="flex flex-col h-full">
+          <header
             className={cx(
-              "hidden items-center gap-2 border-b border-border px-3 lg:px-4",
-              isPage ? "h-14" : "h-12",
-              "md:flex",
+              "sticky top-0 z-30 flex-shrink-0 flex flex-col",
+              isPage
+                ? "bg-surface/95 backdrop-blur-md"
+                : "bg-surface-muted/50",
             )}
           >
-            {toolbarLeading}
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
-              {subtitle && <p className="truncate text-xs font-medium text-muted-foreground">{subtitle}</p>}
-              {sourceLabel && (
-                <p className="mt-0.5 truncate text-[11px] font-bold text-success">{sourceLabel}</p>
-              )}
-            </div>
-
-            <div className="hidden items-center gap-1 md:flex">
-              <IconButton icon={ChevronLeft} label="Previous page" variant="bar" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
-              <div className="flex h-9 items-center gap-1 rounded-lg border border-border-strong bg-surface-muted px-2">
-                <input
-                  type="number"
-                  value={page}
-                  min={1}
-                  max={totalPages}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    if (v >= 1 && v <= totalPages) goToPage(v);
-                  }}
-                  aria-label="Page number"
-                  className="w-12 bg-transparent text-center text-sm font-semibold text-foreground focus:outline-none"
-                />
-                <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">/ {totalPages}</span>
+            {breadcrumbs && isPage && (
+              <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background/95 px-3 py-0.5 text-[10px] md:text-xs font-medium text-muted-foreground/80 backdrop-blur-sm whitespace-nowrap overflow-hidden">
+                {breadcrumbs}
               </div>
-              <IconButton icon={ChevronRight} label="Next page" variant="bar" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
-            </div>
-
-            <IconButton
-              icon={Search}
-              label={searchOpen ? "Close search" : "Search in document"}
-              variant={searchOpen ? "active" : "bar"}
-              onClick={() => setSearchOpen((s) => !s)}
-            />
-
-            {onBookmark && (
-              <IconButton
-                icon={Bookmark}
-                label="Bookmark current page"
-                variant={bookmarked ? "bookmark" : "bar"}
-                filled={bookmarked}
-                onClick={() => onBookmark(page)}
-              />
             )}
-            {onDownload && (
-              <IconButton
-                icon={Download}
-                label="Download resource"
-                variant={downloadActive ? "active" : "bar"}
-                onClick={onDownload}
-              />
-            )}
-            <IconButton
-              icon={viewMode === 'portrait' ? RectangleHorizontal : RectangleVertical}
-              label={viewMode === 'portrait' ? 'Switch to landscape' : 'Switch to portrait'}
-              variant={viewMode === 'landscape' ? "active" : "bar"}
-              onClick={toggleViewMode}
-              size="sm"
-              className="w-12 h-6 px-1.5 rounded"
-            />
-            <IconButton
-              icon={Maximize2}
-              label={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
-              variant={isFullscreen ? 'active' : 'bar'}
-              onClick={handleFullscreen}
-            />
-          </div>
 
-          <div className="flex md:hidden items-center gap-2 border-b border-border px-3 py-1">
-            {toolbarLeading}
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
-              {subtitle && <p className="truncate text-[11px] font-medium text-muted-foreground">{subtitle}</p>}
-              {sourceLabel && (
-                <p className="truncate text-[10px] font-bold text-success">{sourceLabel}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
-            <div className="flex items-center gap-1 rounded-md bg-surface-muted px-1.5">
-              <IconButton icon={ChevronLeft} label="Previous page" variant="bar" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
-              <div className="flex h-7 items-center gap-0.5">
-                <span className="text-xs font-bold text-foreground">{page}</span>
-                <span className="text-[10px] font-medium text-muted-foreground">/ {totalPages}</span>
-              </div>
-              <IconButton icon={ChevronRight} label="Next page" variant="bar" size="sm" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
-            </div>
-            <IconButton
-              icon={Search}
-              label={searchOpen ? "Close search" : "Search in document"}
-              variant={searchOpen ? "active" : "bar"}
-              size="sm"
-              onClick={() => setSearchOpen((s) => !s)}
-            />
-            {onBookmark && (
-              <IconButton
-                icon={Bookmark}
-                label="Bookmark"
-                variant={bookmarked ? "bookmark" : "bar"}
-                filled={bookmarked}
-                size="sm"
-                onClick={() => onBookmark(page)}
-              />
-            )}
-            {onDownload && (
-              <IconButton
-                icon={Download}
-                label="Download"
-                variant={downloadActive ? "active" : "bar"}
-                size="sm"
-                onClick={onDownload}
-              />
-            )}
-            <IconButton
-              icon={viewMode === 'portrait' ? RectangleHorizontal : RectangleVertical}
-              label={viewMode === 'portrait' ? 'Switch to landscape' : 'Switch to portrait'}
-              variant={viewMode === 'landscape' ? "active" : "bar"}
-              size="sm"
-              onClick={toggleViewMode}
-              className="w-12 h-6 px-1.5 rounded"
-            />
-            <IconButton
-              icon={Maximize2}
-              label={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
-              variant={isFullscreen ? 'active' : 'bar'}
-              size="sm"
-              onClick={handleFullscreen}
-            />
-          </div>
-
-          {searchOpen && (
             <div
-              className="border-b border-border bg-surface/95 px-3 py-2 backdrop-blur-sm"
+              className={cx(
+                "hidden items-center gap-2 border-b border-border px-3 lg:px-4",
+                isPage ? "h-14" : "h-12",
+                "md:flex",
+              )}
             >
-              <form
-                className="mx-auto flex max-w-xl items-center gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  toast(searchQuery ? `Search: "${searchQuery}" (available in Phase 6)` : "Enter a search term", "info");
-                }}
-              >
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search in document..."
-                  aria-label="Search in document"
-                  className="h-9 w-full rounded-lg border border-border-strong bg-surface-muted px-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+              {toolbarLeading}
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
+                {subtitle && <p className="truncate text-xs font-medium text-muted-foreground">{subtitle}</p>}
+                {sourceLabel && (
+                  <p className="mt-0.5 truncate text-[11px] font-bold text-success">{sourceLabel}</p>
+                )}
+              </div>
+
+              <div className="hidden items-center gap-1 md:flex">
+                <IconButton icon={ChevronLeft} label="Previous page" variant="bar" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
+                <div className="flex h-9 items-center gap-1 rounded-lg border border-border-strong bg-surface-muted px-2">
+                  <input
+                    type="number"
+                    value={page}
+                    min={1}
+                    max={totalPages}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (v >= 1 && v <= totalPages) goToPage(v);
+                    }}
+                    aria-label="Page number"
+                    className="w-12 bg-transparent text-center text-sm font-semibold text-foreground focus:outline-none"
+                  />
+                  <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">/ {totalPages}</span>
+                </div>
+                <IconButton icon={ChevronRight} label="Next page" variant="bar" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
+              </div>
+
+              <IconButton
+                icon={Search}
+                label={searchOpen ? "Close search" : "Search in document"}
+                variant={searchOpen ? "active" : "bar"}
+                onClick={() => setSearchOpen((s) => !s)}
+              />
+
+              {onBookmark && (
+                <IconButton
+                  icon={Bookmark}
+                  label="Bookmark current page"
+                  variant={bookmarked ? "bookmark" : "bar"}
+                  filled={bookmarked}
+                  onClick={() => onBookmark?.(page)}
                 />
-                {searchQuery && (
+              )}
+              {onDownload && (
+                <IconButton
+                  icon={Download}
+                  label="Download resource"
+                  variant={downloadActive ? "active" : "bar"}
+                  onClick={onDownload}
+                />
+              )}
+              <IconButton
+                icon={viewMode === 'portrait' ? RectangleHorizontal : RectangleVertical}
+                label={viewMode === 'portrait' ? 'Switch to landscape' : 'Switch to portrait'}
+                variant={viewMode === 'landscape' ? "active" : "bar"}
+                onClick={toggleViewMode}
+                size="sm"
+                className="w-12 h-6 px-1.5 rounded"
+              />
+              <IconButton
+                icon={Maximize2}
+                label={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
+                variant={isFullscreen ? 'active' : 'bar'}
+                onClick={handleFullscreen}
+              />
+            </div>
+
+            <div className="flex md:hidden items-center gap-2 border-b border-border px-3 py-1">
+              {toolbarLeading}
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
+                {subtitle && <p className="truncate text-[11px] font-medium text-muted-foreground">{subtitle}</p>}
+                {sourceLabel && (
+                  <p className="truncate text-[10px] font-bold text-success">{sourceLabel}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
+              <div className="flex items-center gap-1 rounded-md bg-surface-muted px-1.5">
+                <IconButton icon={ChevronLeft} label="Previous page" variant="bar" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
+                <div className="flex h-7 items-center gap-0.5">
+                  <span className="text-xs font-bold text-foreground">{page}</span>
+                  <span className="text-[10px] font-medium text-muted-foreground">/ {totalPages}</span>
+                </div>
+                <IconButton icon={ChevronRight} label="Next page" variant="bar" size="sm" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
+              </div>
+              <IconButton
+                icon={Search}
+                label={searchOpen ? "Close search" : "Search in document"}
+                variant={searchOpen ? "active" : "bar"}
+                size="sm"
+                onClick={() => setSearchOpen((s) => !s)}
+              />
+              {onBookmark && (
+                <IconButton
+                  icon={Bookmark}
+                  label="Bookmark"
+                  variant={bookmarked ? "bookmark" : "bar"}
+                  filled={bookmarked}
+                  size="sm"
+                  onClick={() => onBookmark?.(page)}
+                />
+              )}
+              {onDownload && (
+                <IconButton
+                  icon={Download}
+                  label="Download"
+                  variant={downloadActive ? "active" : "bar"}
+                  size="sm"
+                  onClick={onDownload}
+                />
+              )}
+              <IconButton
+                icon={viewMode === 'portrait' ? RectangleHorizontal : RectangleVertical}
+                label={viewMode === 'portrait' ? 'Switch to landscape' : 'Switch to portrait'}
+                variant={viewMode === 'landscape' ? "active" : "bar"}
+                size="sm"
+                onClick={toggleViewMode}
+                className="w-12 h-6 px-1.5 rounded"
+              />
+              <IconButton
+                icon={Maximize2}
+                label={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
+                variant={isFullscreen ? 'active' : 'bar'}
+                size="sm"
+                onClick={handleFullscreen}
+              />
+            </div>
+
+            {searchOpen && (
+              <div
+                className="border-b border-border bg-surface/95 px-3 py-2 backdrop-blur-sm"
+              >
+                <form
+                  className="mx-auto flex max-w-xl items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    toast(searchQuery ? `Search: "${searchQuery}" (available in Phase 6)` : "Enter a search term", "info");
+                  }}
+                >
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search in document..."
+                    aria-label="Search in document"
+                    className="h-9 w-full rounded-lg border border-border-strong bg-surface-muted px-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
+                      className="shrink-0 rounded-lg p-1 text-muted-foreground hover:text-foreground"
+                      aria-label="Close search"
+                    >
+                      <Search className="size-4" />
+                    </button>
+                  )}
+                </form>
+              </div>
+            )}
+          </header>
+
+          <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
+            {urlError || docError ? (
+              <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
+                <FileWarning className="size-8 text-muted-foreground" aria-hidden="true" />
+                <p className="text-sm font-bold text-foreground">Couldn't open this PDF</p>
+                <p className="max-w-sm text-xs font-medium text-muted-foreground">{urlError ?? docError}</p>
+                {onRetryFile && (
                   <button
                     type="button"
-                    onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
-                    className="shrink-0 rounded-lg p-1 text-muted-foreground hover:text-foreground"
-                    aria-label="Close search"
+                    onClick={onRetryFile}
+                    className="mt-1 rounded-lg bg-primary-muted px-3.5 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   >
-                    <Search className="size-4" />
+                    Try again
                   </button>
                 )}
-              </form>
-            </div>
-          )}
-        </header>
-
-        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
-          {urlError || docError ? (
-            <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
-              <FileWarning className="size-8 text-muted-foreground" aria-hidden="true" />
-              <p className="text-sm font-bold text-foreground">Couldn't open this PDF</p>
-              <p className="max-w-sm text-xs font-medium text-muted-foreground">{urlError ?? docError}</p>
-              {onRetryFile && (
-                <button
-                  type="button"
-                  onClick={onRetryFile}
-                  className="mt-1 rounded-lg bg-primary-muted px-3.5 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                >
-                  Try again
-                </button>
-              )}
-            </div>
-          ) : urlLoading || !fileUrl ? (
-            <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8" role="status" aria-label="Loading PDF">
-              <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
-              <p className="text-xs font-semibold text-muted-foreground">
-                {urlLoading ? "Requesting secure access…" : "Loading PDF…"}
-              </p>
-            </div>
-          ) : (
-            <div className="mx-auto w-full max-w-[850px] px-2">
-              <PdfCanvas url={fileUrl} page={page} renderScale={RENDER_SCALE} onStateChange={handlePdfState} onPageChange={handlePageChange} />
-            </div>
-          )}
+              </div>
+            ) : urlLoading || !fileUrl ? (
+              <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8" role="status" aria-label="Loading PDF">
+                <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
+                <p className="text-xs font-semibold text-muted-foreground">
+                  {urlLoading ? "Requesting secure access…" : "Loading PDF…"}
+                </p>
+              </div>
+            ) : (
+              <div className="mx-auto w-full max-w-[850px] px-2 py-2">
+                <PdfCanvas url={fileUrl} page={page} onStateChange={handlePdfState} onPageChange={handlePageChange} />
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

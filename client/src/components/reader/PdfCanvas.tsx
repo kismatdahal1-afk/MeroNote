@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
 import { describePdfError } from "../../lib/pdfErrors";
 
@@ -18,7 +18,6 @@ export interface PdfLoadState {
 interface PdfCanvasProps {
   url: string | null;
   page: number;
-  renderScale: number;
   onStateChange: (state: PdfLoadState) => void;
   onPageChange?: (page: number, totalPages: number) => void;
 }
@@ -39,11 +38,10 @@ interface PageInfo {
 interface PageRendererProps {
   pdf: PDFDocumentProxy;
   pageNum: number;
-  renderScale: number;
   containerWidth: number;
 }
 
-const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale, containerWidth }: PageRendererProps) {
+const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth }: PageRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cancelledRef = useRef(false);
   const renderTaskRef = useRef<Promise<void> | null>(null);
@@ -57,19 +55,23 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale, con
       try {
         const p = await pdf.getPage(pageNum);
         if (cancelledRef.current) return;
-        const vp = p.getViewport({ scale: renderScale });
+
+        const naturalVp = p.getViewport({ scale: 1 });
+        const scale = containerWidth / naturalVp.width;
+        const vp = p.getViewport({ scale });
+
         const c = canvasRef.current;
         if (!c) return;
 
-        const backingW = Math.round(containerWidth * dpr * renderScale);
-        const backingH = Math.round(containerWidth * (vp.height / vp.width) * dpr * renderScale);
+        const backingW = Math.round(vp.width * dpr);
+        const backingH = Math.round(vp.height * dpr);
 
         c.width = backingW;
         c.height = backingH;
 
         const ctx = c.getContext("2d");
         if (!ctx) return;
-        ctx.setTransform(dpr * renderScale, 0, 0, dpr * renderScale, 0, 0);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
         const rt = p.render({ canvasContext: ctx, viewport: vp });
         currentRenderPromise = rt.promise;
@@ -90,7 +92,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale, con
       cancelledRef.current = true;
       renderTaskRef.current = null;
     };
-  }, [pdf, pageNum, renderScale, containerWidth]);
+  }, [pdf, pageNum, containerWidth]);
 
   return (
     <canvas
@@ -101,7 +103,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, renderScale, con
   );
 });
 
-export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange }: PdfCanvasProps) {
+export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const destroyedRef = useRef(false);
@@ -111,6 +113,8 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
   const pageRef = useRef(page);
   const scrollRafRef = useRef<number | null>(null);
   const resizeTimerRef = useRef<number | null>(null);
+  const viewportHeightRef = useRef(0);
+  const scrollFromIndicator = useRef(false);
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
@@ -119,7 +123,12 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [loadState, setLoadState] = useState<PdfLoadState>({ status: "loading" });
   const [pageInfos, setPageInfos] = useState<PageInfo[]>([]);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth;
+    }
+    return 850;
+  });
   const [scrollTop, setScrollTop] = useState(0);
 
   const virtualData = useMemo(() => {
@@ -136,7 +145,6 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     return { offsets, totalHeight: total, numPages: pageInfos.length };
   }, [pageInfos, containerWidth]);
 
-  // Binary search: find first page whose bottom > scrollTop
   const findFirstVisible = useCallback((scrollTop: number): number => {
     const num = virtualData.numPages;
     if (num === 0) return 1;
@@ -151,7 +159,6 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     return Math.max(1, lo);
   }, [virtualData]);
 
-  // Binary search: find last page whose top < scrollBottom
   const findLastVisible = useCallback((scrollBottom: number): number => {
     const num = virtualData.numPages;
     if (num === 0) return 0;
@@ -166,7 +173,6 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     return Math.min(num, lo + OVERSCAN_BELOW);
   }, [virtualData]);
 
-  // Find closest page to viewport center
   const findClosestPage = useCallback((scrollTop: number, viewportHeight: number): number => {
     const num = virtualData.numPages;
     if (num === 0) return 1;
@@ -183,17 +189,17 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     return closest;
   }, [virtualData]);
 
-  // Determine mounted range from scroll position
   const mountedRange = useMemo(() => {
     if (virtualData.numPages === 0) {
       return { start: 1, end: 0 };
     }
+    const viewportHeight = viewportHeightRef.current;
+    const scrollBottom = scrollTop + viewportHeight;
     const start = findFirstVisible(scrollTop);
-    const end = findLastVisible(scrollTop + (scrollContainerRef.current?.clientHeight ?? 0));
+    const end = findLastVisible(scrollBottom);
     return { start: Math.max(1, start - OVERSCAN_ABOVE), end };
   }, [virtualData, findFirstVisible, findLastVisible, scrollTop]);
 
-  // Build page elements for visible range
   const pageElements = useMemo(() => {
     const elements: React.ReactNode[] = [];
     if (virtualData.numPages === 0 || !doc) return elements;
@@ -211,25 +217,24 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
           className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
           style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
         >
-          <PageRenderer pdf={doc} pageNum={i} renderScale={renderScale} containerWidth={containerWidth} />
+          <PageRenderer pdf={doc} pageNum={i} containerWidth={containerWidth} />
         </div>
       );
     }
 
     return elements;
-  }, [virtualData, mountedRange, pageInfos, doc, renderScale, containerWidth]);
+  }, [virtualData, mountedRange, pageInfos, doc, containerWidth]);
 
-  // Update page indicator from scroll position
-  const updatePageIndicator = useCallback((currentScrollTop: number, viewportHeight: number) => {
+  const updatePageIndicator = useCallback(() => {
     if (isInitialMount.current || virtualData.numPages === 0) return;
-    const closestPage = findClosestPage(currentScrollTop, viewportHeight);
+    const closestPage = findClosestPage(scrollTop, viewportHeightRef.current);
     if (closestPage !== pageRef.current) {
-      onStateChangeRef.current({ status: "ready", totalPages: virtualData.numPages });
+      scrollFromIndicator.current = true;
       onPageChangeRef.current?.(closestPage, virtualData.numPages);
+      scrollFromIndicator.current = false;
     }
-  }, [virtualData, findClosestPage]);
+  }, [virtualData, findClosestPage, scrollTop]);
 
-  // Scroll handler with RAF throttling
   const handleScroll = useCallback(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
@@ -238,12 +243,14 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
       scrollRafRef.current = null;
       const sc = scrollContainerRef.current;
       if (!sc || virtualData.numPages === 0) return;
-      setScrollTop(sc.scrollTop);
-      updatePageIndicator(sc.scrollTop, sc.clientHeight);
+      const newScrollTop = sc.scrollTop;
+      const newViewportHeight = sc.clientHeight;
+      viewportHeightRef.current = newViewportHeight;
+      setScrollTop(newScrollTop);
+      updatePageIndicator();
     });
   }, [virtualData, updatePageIndicator]);
 
-  // Scroll listener
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
@@ -254,24 +261,22 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     };
   }, [handleScroll]);
 
-  // Scroll-to-page effect
   useEffect(() => {
+    if (scrollFromIndicator.current) return;
     const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer || virtualData.numPages === 0) return;
+    if (!scrollContainer) return;
     const targetTop = virtualData.offsets[Math.max(0, page - 1)] ?? 0;
     scrollContainer.scrollTop = targetTop;
     if (isInitialMount.current) {
       isInitialMount.current = false;
     }
-  }, [page, virtualData]);
+  }, [page, virtualData.offsets]);
 
-  // Load PDF document
   useEffect(() => {
     if (!url) {
       setDoc(null);
       setLoadState({ status: "loading" });
       setPageInfos([]);
-      setContainerWidth(0);
       return;
     }
 
@@ -280,7 +285,6 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
 
     setLoadState({ status: "loading" });
     setPageInfos([]);
-    setContainerWidth(0);
 
     const task = getDocument({
       url,
@@ -334,10 +338,18 @@ export function PdfCanvas({ url, page, renderScale, onStateChange, onPageChange 
     };
   }, [url]);
 
-  // ResizeObserver for container width
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    const measure = () => {
+      const newWidth = container.getBoundingClientRect().width;
+      if (newWidth > 0 && Math.abs(newWidth - containerWidth) > 1) {
+        setContainerWidth(newWidth);
+      }
+    };
+
+    measure();
 
     const observer = new ResizeObserver((entries) => {
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
