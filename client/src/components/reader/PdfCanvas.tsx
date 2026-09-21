@@ -26,6 +26,7 @@ const MAX_DPR = 2;
 const OVERSCAN_ABOVE = 5;
 const OVERSCAN_BELOW = 5;
 const PAGE_GAP_PX = 12;
+const MAX_CONTAINER_WIDTH = 850;
 
 function getDpr(): number {
   return Math.min(window.devicePixelRatio || 1, MAX_DPR);
@@ -114,7 +115,6 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
   const scrollRafRef = useRef<number | null>(null);
   const resizeTimerRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);
-  const scrollFromIndicator = useRef(false);
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
@@ -123,12 +123,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [loadState, setLoadState] = useState<PdfLoadState>({ status: "loading" });
   const [pageInfos, setPageInfos] = useState<PageInfo[]>([]);
-  const [containerWidth, setContainerWidth] = useState(() => {
-    if (typeof window !== "undefined") {
-      return window.innerWidth;
-    }
-    return 850;
-  });
+  const [containerWidth, setContainerWidth] = useState(850);
   const [scrollTop, setScrollTop] = useState(0);
 
   const virtualData = useMemo(() => {
@@ -229,9 +224,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
     if (isInitialMount.current || virtualData.numPages === 0) return;
     const closestPage = findClosestPage(scrollTop, viewportHeightRef.current);
     if (closestPage !== pageRef.current) {
-      scrollFromIndicator.current = true;
       onPageChangeRef.current?.(closestPage, virtualData.numPages);
-      scrollFromIndicator.current = false;
     }
   }, [virtualData, findClosestPage, scrollTop]);
 
@@ -262,11 +255,13 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
   }, [handleScroll]);
 
   useEffect(() => {
-    if (scrollFromIndicator.current) return;
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
     const targetTop = virtualData.offsets[Math.max(0, page - 1)] ?? 0;
-    scrollContainer.scrollTop = targetTop;
+    const currentScrollTop = scrollContainer.scrollTop;
+    if (Math.abs(currentScrollTop - targetTop) > 5) {
+      scrollContainer.scrollTop = targetTop;
+    }
     if (isInitialMount.current) {
       isInitialMount.current = false;
     }
@@ -344,8 +339,9 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
 
     const measure = () => {
       const newWidth = container.getBoundingClientRect().width;
-      if (newWidth > 0 && Math.abs(newWidth - containerWidth) > 1) {
-        setContainerWidth(newWidth);
+      const clampedWidth = Math.min(newWidth, MAX_CONTAINER_WIDTH);
+      if (clampedWidth > 0 && Math.abs(clampedWidth - containerWidth) > 1) {
+        setContainerWidth(clampedWidth);
       }
     };
 
@@ -356,7 +352,10 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
       resizeTimerRef.current = window.setTimeout(() => {
         const entry = entries[0];
         if (entry) {
-          const newWidth = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+          const newWidth = Math.min(
+            entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width,
+            MAX_CONTAINER_WIDTH
+          );
           if (newWidth > 0 && Math.abs(newWidth - containerWidth) > 1) {
             setContainerWidth(newWidth);
           }
@@ -393,16 +392,16 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full">
+    <div ref={containerRef} className="w-full h-full flex justify-center">
       <div
         ref={scrollContainerRef}
-        className="overflow-y-auto overflow-x-hidden bg-background h-full"
+        className="overflow-y-auto overflow-x-hidden bg-background h-full w-full"
       >
         <div
           className="relative mx-auto"
           style={{
             height: virtualData.totalHeight || undefined,
-            maxWidth: "100%",
+            maxWidth: containerWidth,
           }}
         >
           {pageElements}
