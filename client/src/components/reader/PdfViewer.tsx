@@ -13,8 +13,8 @@ import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
 // PDF page render width inside PdfCanvas — the header, counter, and shell
 // are never scaled. Desktop default stays 100% (unchanged appearance);
 // mobile opens zoomed out for a comfortably framed fit-width view.
-const ZOOM_LEVELS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25];
-const DEFAULT_ZOOM_INDEX = 8; // 100%
+const ZOOM_LEVELS = [0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2.0];
+const DEFAULT_ZOOM_INDEX = 4; // 100%
 // Mobile-only render reference: on a mobile viewport the 100% UI zoom state
 // renders at the existing 40% scale (100% UI -> 0.4 render). Desktop uses 1.
 const MOBILE_RENDER_REFERENCE = 0.4;
