@@ -679,10 +679,13 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     <div ref={containerRef} className="w-full h-full flex justify-center">
         <div
           ref={scrollContainerRef}
-          className="overflow-y-auto bg-background h-full w-full"
+          className="overflow-y-auto overscroll-contain bg-background h-full w-full"
           // Scoped to the PDF region only: the browser may pan here
           // (one-finger scroll preserved) but may not pinch-zoom or
           // double-tap-zoom the page. Global app zoom behavior untouched.
+          // overscroll-contain: gestures hitting the top/bottom boundary
+          // stay inside this container and never chain out to ancestors,
+          // so overscroll can never slide the fixed Reader header.
           style={{ touchAction: "pan-x pan-y" }}
         >
         <div
