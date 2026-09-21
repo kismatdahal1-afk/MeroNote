@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
 import { describePdfError } from "../../lib/pdfErrors";
+import { Skeleton } from "../common/Skeleton";
 
 try {
   GlobalWorkerOptions.workerSrc = new URL(
@@ -23,7 +24,6 @@ interface PdfCanvasProps {
 }
 
 const MAX_DPR = 2;
-const OVERSCAN_BELOW = 5;
 const PAGE_GAP_PX = 12;
 const MAX_CONTAINER_WIDTH = 850;
 
@@ -153,34 +153,6 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
     return { offsets, totalHeight: total, numPages: pageInfos.length };
   }, [pageInfos, containerWidth]);
 
-  const findFirstVisible = useCallback((scrollTop: number): number => {
-    const num = virtualData.numPages;
-    if (num === 0) return 1;
-    let lo = 0;
-    let hi = num;
-    while (lo < hi) {
-      const mid = Math.floor((lo + hi) / 2);
-      const pageBottom = virtualData.offsets[mid + 1] - PAGE_GAP_PX;
-      if (pageBottom <= scrollTop) lo = mid + 1;
-      else hi = mid;
-    }
-    return Math.max(1, lo);
-  }, [virtualData]);
-
-  const findLastVisible = useCallback((scrollBottom: number): number => {
-    const num = virtualData.numPages;
-    if (num === 0) return 0;
-    let lo = 1;
-    let hi = num;
-    while (lo < hi) {
-      const mid = Math.ceil((lo + hi) / 2);
-      const pageTop = virtualData.offsets[mid - 1];
-      if (pageTop >= scrollBottom) hi = mid - 1;
-      else lo = mid;
-    }
-    return Math.min(num, lo + OVERSCAN_BELOW);
-  }, [virtualData]);
-
   const findClosestPage = useCallback((scrollTop: number, viewportHeight: number): number => {
     const num = virtualData.numPages;
     if (num === 0) return 1;
@@ -197,19 +169,13 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
     return closest;
   }, [virtualData]);
 
-  const loadWindow = useMemo(() => {
-    if (virtualData.numPages === 0) {
-      return { start: 1, end: 0 };
+  const nextPageToRender = useMemo(() => {
+    if (virtualData.numPages === 0) return 0;
+    for (let i = 1; i <= virtualData.numPages; i++) {
+      if (!renderedPages.has(i)) return i;
     }
-    const viewportHeight = viewportHeightRef.current;
-    const scrollBottom = scrollTop + viewportHeight;
-    const start = findFirstVisible(scrollTop);
-    const end = findLastVisible(scrollBottom);
-    return {
-      start: Math.max(1, start - 1),
-      end: Math.min(virtualData.numPages, end + 1),
-    };
-  }, [virtualData, findFirstVisible, findLastVisible, scrollTop]);
+    return virtualData.numPages + 1;
+  }, [virtualData, renderedPages]);
 
   const pageElements = useMemo(() => {
     const elements: React.ReactNode[] = [];
@@ -220,9 +186,9 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
       const aspectRatio = dim ? dim.aspectRatio : 297 / 210;
       const top = virtualData.offsets[i - 1];
       const isRendered = renderedPages.has(i);
-      const isInLoadWindow = i >= loadWindow.start && i <= loadWindow.end;
+      const isNextToRender = i === nextPageToRender;
 
-      if (isRendered || isInLoadWindow) {
+      if (isRendered) {
         elements.push(
           <div
             key={i}
@@ -233,7 +199,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
             <PageRenderer pdf={doc} pageNum={i} containerWidth={containerWidth} onRendered={handlePageRendered} />
           </div>
         );
-      } else {
+      } else if (isNextToRender) {
         elements.push(
           <div
             key={i}
@@ -241,14 +207,23 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange }: PdfCanvasP
             className="absolute left-0 right-0 rounded-lg bg-surface border border-border flex items-center justify-center"
             style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
           >
-            <span className="text-xs text-muted-foreground">Loading page…</span>
+            <Skeleton className="h-8 w-48" />
           </div>
+        );
+      } else {
+        elements.push(
+          <div
+            key={i}
+            data-page={i}
+            className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
+            style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
+          />
         );
       }
     }
 
     return elements;
-  }, [virtualData, loadWindow, pageInfos, doc, containerWidth, renderedPages, handlePageRendered]);
+  }, [virtualData, pageInfos, doc, containerWidth, renderedPages, nextPageToRender, handlePageRendered]);
 
   const updatePageIndicator = useCallback(() => {
     if (isInitialMount.current || virtualData.numPages === 0) return;
