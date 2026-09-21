@@ -22,6 +22,9 @@ interface PdfCanvasProps {
   onStateChange: (state: PdfLoadState) => void;
   onPageChange?: (page: number, totalPages: number) => void;
   programmaticScrollRef?: React.MutableRefObject<boolean>;
+  /** PDF-only zoom multiplier (1 = fit width). Affects page render width
+      and reserved geometry only — never the header, counter, or shell. */
+  zoom?: number;
 }
 
 const MAX_DPR = 2;
@@ -118,7 +121,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth, 
   );
 });
 
-export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef }: PdfCanvasProps) {
+export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1 }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const destroyedRef = useRef(false);
@@ -129,6 +132,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   const scrollRafRef = useRef<number | null>(null);
   const resizeTimerRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);
+  const prevZoomRef = useRef(zoom);
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
@@ -142,6 +146,15 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   const [viewportHeight, setViewportHeight] = useState(0);
   const [renderedPages, setRenderedPages] = useState<Set<number>>(new Set());
   const [erroredPages, setErroredPages] = useState<Set<number>>(new Set());
+
+  // Effective PDF page display/render width. Zoom scales the measured
+  // container width; every consumer below (reserved heights, offsets,
+  // canvas scale, element widths) derives from this one value so visual
+  // geometry and calculated geometry can never disagree.
+  const renderWidth = useMemo(
+    () => Math.max(0, containerWidth * zoom),
+    [containerWidth, zoom],
+  );
 
   const handlePageRendered = useCallback((pageNum: number) => {
     setRenderedPages(prev => {
@@ -177,18 +190,18 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   }, []);
 
   const virtualData = useMemo(() => {
-    if (pageInfos.length === 0 || containerWidth <= 0) {
+    if (pageInfos.length === 0 || renderWidth <= 0) {
       return { offsets: [0] as number[], totalHeight: 0, numPages: 0 };
     }
     const offsets: number[] = [0];
     let total = 0;
     for (let i = 0; i < pageInfos.length; i++) {
-      const h = containerWidth * pageInfos[i].aspectRatio;
+      const h = renderWidth * pageInfos[i].aspectRatio;
       total += h + PAGE_GAP_PX;
       offsets.push(total);
     }
     return { offsets, totalHeight: total, numPages: pageInfos.length };
-  }, [pageInfos, containerWidth]);
+  }, [pageInfos, renderWidth]);
 
   const findClosestPage = useCallback((scrollTop: number, viewportHeight: number): number => {
     const num = virtualData.numPages;
@@ -248,9 +261,9 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
             key={i}
             data-page={i}
             className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
-            style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
+            style={{ top, left: 0, right: 0, width: renderWidth, aspectRatio: `${aspectRatio} / 1` }}
           >
-            <PageRenderer pdf={doc} pageNum={i} containerWidth={containerWidth} onRendered={handlePageRendered} onRenderError={handleRenderError} />
+            <PageRenderer pdf={doc} pageNum={i} containerWidth={renderWidth} onRendered={handlePageRendered} onRenderError={handleRenderError} />
           </div>
         );
       } else if (isErrored) {
@@ -259,7 +272,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
             key={i}
             data-page={i}
             className="absolute left-0 right-0 rounded-lg bg-surface border border-border flex flex-col items-center justify-center gap-2 p-4 text-center"
-            style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
+            style={{ top, left: 0, right: 0, width: renderWidth, aspectRatio: `${aspectRatio} / 1` }}
           >
             <p className="text-xs font-semibold text-foreground">Couldn&apos;t render this page</p>
             <button
@@ -277,9 +290,9 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
             key={i}
             data-page={i}
             className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
-            style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
+            style={{ top, left: 0, right: 0, width: renderWidth, aspectRatio: `${aspectRatio} / 1` }}
           >
-            <PageRenderer pdf={doc} pageNum={i} containerWidth={containerWidth} onRendered={handlePageRendered} onRenderError={handleRenderError} />
+            <PageRenderer pdf={doc} pageNum={i} containerWidth={renderWidth} onRendered={handlePageRendered} onRenderError={handleRenderError} />
             <div className="absolute inset-0 flex items-center justify-center bg-surface rounded-lg" aria-hidden="true">
               <Skeleton className="h-8 w-48" />
             </div>
@@ -291,14 +304,14 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
             key={i}
             data-page={i}
             className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
-            style={{ top, left: 0, right: 0, width: containerWidth, aspectRatio: `${aspectRatio} / 1` }}
+            style={{ top, left: 0, right: 0, width: renderWidth, aspectRatio: `${aspectRatio} / 1` }}
           />
         );
       }
     }
 
     return elements;
-  }, [virtualData, pageInfos, doc, containerWidth, renderedPages, erroredPages, activeLoadingPage, handlePageRendered, handleRenderError, retryPage]);
+  }, [virtualData, pageInfos, doc, renderWidth, renderedPages, erroredPages, activeLoadingPage, handlePageRendered, handleRenderError, retryPage]);
 
   const updatePageIndicator = useCallback(() => {
     if (isInitialMount.current || virtualData.numPages === 0) return;
@@ -355,6 +368,23 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     }
     programmaticScrollRef.current = false;
   }, [page, virtualData.offsets]);
+
+  // Zoom changes every reserved page height, so re-anchor the scroll
+  // position to the top of the current page using the fresh geometry.
+  // Guarded by prevZoomRef: plain resizes and the initial pageInfos load
+  // never scroll. The counter stays on the current page with no spurious
+  // onPageChange, and jump/prev/next offsets remain exact.
+  useEffect(() => {
+    if (prevZoomRef.current === zoom) return;
+    prevZoomRef.current = zoom;
+    const sc = scrollContainerRef.current;
+    if (!sc || virtualData.numPages === 0) return;
+    const clamped = Math.max(1, Math.min(virtualData.numPages, pageRef.current));
+    const targetTop = virtualData.offsets[clamped - 1] ?? 0;
+    if (Math.abs(sc.scrollTop - targetTop) > 2) {
+      sc.scrollTop = targetTop;
+    }
+  }, [zoom, virtualData]);
 
   useEffect(() => {
     if (!doc || virtualData.numPages === 0) return;
@@ -441,12 +471,18 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     const container = containerRef.current;
     if (!container) return;
 
-    const measure = () => {
-      const newWidth = container.getBoundingClientRect().width;
-      const clampedWidth = Math.min(newWidth, MAX_CONTAINER_WIDTH);
-      if (clampedWidth > 0 && Math.abs(clampedWidth - containerWidth) > 1) {
-        setContainerWidth(clampedWidth);
+    // Floor to whole CSS pixels: page elements are absolutely positioned
+    // with this exact width, so a fractional width could exceed the scroll
+    // container by a subpixel and cause horizontal drift on mobile.
+    const clampWidth = (raw: number) => {
+      const clampedWidth = Math.floor(Math.min(raw, MAX_CONTAINER_WIDTH));
+      if (clampedWidth > 0) {
+        setContainerWidth((prev) => (prev === clampedWidth ? prev : clampedWidth));
       }
+    };
+
+    const measure = () => {
+      clampWidth(container.getBoundingClientRect().width);
     };
 
     measure();
@@ -456,13 +492,9 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       resizeTimerRef.current = window.setTimeout(() => {
         const entry = entries[0];
         if (entry) {
-          const newWidth = Math.min(
-            entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width,
-            MAX_CONTAINER_WIDTH
+          clampWidth(
+            entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width
           );
-          if (newWidth > 0 && Math.abs(newWidth - containerWidth) > 1) {
-            setContainerWidth(newWidth);
-          }
         }
       }, 150);
     });
@@ -472,7 +504,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       observer.disconnect();
       if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
     };
-  }, [containerWidth]);
+  }, []);
 
   if (loadState.status === "loading") {
     return (
@@ -505,7 +537,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
           className="relative mx-auto"
           style={{
             height: virtualData.totalHeight || undefined,
-            maxWidth: containerWidth,
+            maxWidth: renderWidth,
           }}
         >
           {pageElements}

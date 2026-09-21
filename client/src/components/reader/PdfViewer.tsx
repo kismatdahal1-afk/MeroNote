@@ -1,12 +1,17 @@
 import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import {
   Bookmark, ChevronLeft, ChevronRight, Download, FileWarning, Loader2, Search,
-  RectangleHorizontal, RectangleVertical, Maximize2,
+  RectangleHorizontal, RectangleVertical, Maximize2, Minus, Plus,
 } from "lucide-react";
 import { IconButton } from "../common/IconButton";
 import { useToast } from "../../state/ToastProvider";
 import { cx, clamp } from "../../lib/utils";
 import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
+
+// PDF-only zoom steps. Applied to the PDF page render width inside
+// PdfCanvas — the header, counter, and shell are never scaled.
+const ZOOM_LEVELS = [0.75, 0.85, 1, 1.1, 1.25];
+const DEFAULT_ZOOM_INDEX = 2;
 
 interface PdfViewerProps {
   resource: { id: string; title: string; pageCount: number };
@@ -57,6 +62,7 @@ export function PdfViewer({
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<'portrait' | 'landscape'>('portrait');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [pdfZoom, setPdfZoom] = useState(ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]);
   const programmaticScrollRef = useRef(false);
 
   useEffect(() => {
@@ -83,6 +89,19 @@ export function PdfViewer({
     setPage(p);
     onPageChange?.(p, totalPages);
   }, [onPageChange, totalPages]);
+
+  const stepZoom = useCallback((dir: 1 | -1) => {
+    setPdfZoom((z) => {
+      let best = 0;
+      for (let i = 0; i < ZOOM_LEVELS.length; i++) {
+        if (Math.abs(ZOOM_LEVELS[i] - z) < Math.abs(ZOOM_LEVELS[best] - z)) best = i;
+      }
+      return ZOOM_LEVELS[clamp(best + dir, 0, ZOOM_LEVELS.length - 1)];
+    });
+  }, []);
+  const zoomIn = useCallback(() => stepZoom(1), [stepZoom]);
+  const zoomOut = useCallback(() => stepZoom(-1), [stepZoom]);
+  const zoomLabel = `${Math.round(pdfZoom * 100)}%`;
 
   const handleFullscreen = () => {
     try {
@@ -180,6 +199,12 @@ export function PdfViewer({
                 <IconButton icon={ChevronRight} label="Next page" variant="bar" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
               </div>
 
+              <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border-strong bg-surface-muted px-1" role="group" aria-label="PDF zoom">
+                <IconButton icon={Minus} label="Zoom out PDF" variant="bar" size="sm" onClick={zoomOut} disabled={pdfZoom <= ZOOM_LEVELS[0]} />
+                <span className="min-w-10 text-center text-xs font-bold tabular-nums text-foreground" aria-live="polite">{zoomLabel}</span>
+                <IconButton icon={Plus} label="Zoom in PDF" variant="bar" size="sm" onClick={zoomIn} disabled={pdfZoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]} />
+              </div>
+
               <IconButton
                 icon={Search}
                 label={searchOpen ? "Close search" : "Search in document"}
@@ -239,6 +264,11 @@ export function PdfViewer({
                   <span className="text-[10px] font-medium text-muted-foreground">/ {totalPages}</span>
                 </div>
                 <IconButton icon={ChevronRight} label="Next page" variant="bar" size="sm" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
+              </div>
+              <div className="flex items-center gap-0.5 rounded-md bg-surface-muted px-1" role="group" aria-label="PDF zoom">
+                <IconButton icon={Minus} label="Zoom out PDF" variant="bar" size="sm" onClick={zoomOut} disabled={pdfZoom <= ZOOM_LEVELS[0]} />
+                <span className="min-w-10 text-center text-[11px] font-bold tabular-nums text-foreground" aria-live="polite">{zoomLabel}</span>
+                <IconButton icon={Plus} label="Zoom in PDF" variant="bar" size="sm" onClick={zoomIn} disabled={pdfZoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]} />
               </div>
               <IconButton
                 icon={Search}
@@ -341,8 +371,8 @@ export function PdfViewer({
                 </p>
               </div>
             ) : (
-              <div className="mx-auto w-full max-w-[850px] px-2 py-2 h-full">
-                <PdfCanvas url={fileUrl} page={page} onStateChange={handlePdfState} onPageChange={handlePageChange} programmaticScrollRef={programmaticScrollRef} />
+              <div className="mx-auto w-full max-w-[850px] px-3 py-2 h-full md:px-2">
+                <PdfCanvas url={fileUrl} page={page} onStateChange={handlePdfState} onPageChange={handlePageChange} programmaticScrollRef={programmaticScrollRef} zoom={pdfZoom} />
               </div>
             )}
           </div>
