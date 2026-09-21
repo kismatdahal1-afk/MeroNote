@@ -15,7 +15,9 @@ import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
 // mobile opens zoomed out for a comfortably framed fit-width view.
 const ZOOM_LEVELS = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25];
 const DEFAULT_ZOOM_INDEX = 8; // 100%
-const MOBILE_DEFAULT_ZOOM = 0.65;
+// Mobile-only render reference: on a mobile viewport the 100% UI zoom state
+// renders at the existing 40% scale (100% UI -> 0.4 render). Desktop uses 1.
+const MOBILE_RENDER_REFERENCE = 0.4;
 
 function isMobileViewport(): boolean {
   return (
@@ -74,8 +76,11 @@ export function PdfViewer({
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<'portrait' | 'landscape'>('portrait');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [pdfZoom, setPdfZoom] = useState(() =>
-    isMobileViewport() ? MOBILE_DEFAULT_ZOOM : ZOOM_LEVELS[DEFAULT_ZOOM_INDEX],
+  const [pdfZoom, setPdfZoom] = useState(ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]);
+  // UI zoom state stays platform-independent (100% = 1.0 everywhere); only
+  // the render mapping below is mobile-adjusted. Captured once at mount.
+  const [zoomReference] = useState(() =>
+    isMobileViewport() ? MOBILE_RENDER_REFERENCE : 1,
   );
   const programmaticScrollRef = useRef(false);
 
@@ -392,7 +397,7 @@ export function PdfViewer({
                   onStateChange={handlePdfState}
                   onPageChange={handlePageChange}
                   programmaticScrollRef={programmaticScrollRef}
-                  zoom={pdfZoom}
+                  zoom={pdfZoom * zoomReference}
                   onZoomChange={setPdfZoom}
                   minZoom={ZOOM_LEVELS[0]}
                   maxZoom={ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
