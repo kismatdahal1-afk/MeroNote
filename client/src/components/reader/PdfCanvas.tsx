@@ -26,8 +26,15 @@ interface PdfCanvasProps {
       and reserved geometry only — never the header, counter, or shell. */
   zoom?: number;
   /** Shared-zoom writer used by the PDF-local pinch gesture. Same state
-      as the header [-] % [+] buttons: exactly one source of truth. */
+      as the header [-] % [+] buttons: exactly one source of truth.
+      Values are UI-space zoom states (the ZOOM_LEVELS steps). */
   onZoomChange?: (zoom: number) => void;
+  /** UI-space zoom mirroring the button/snapped state. The pinch gesture
+      must calculate from this — NOT from the render-scaled `zoom` prop —
+      otherwise a platform render reference (e.g. mobile 0.4) corrupts the
+      gesture base and every new pinch restarts from the reference scale.
+      Defaults to `zoom` (desktop identity mapping). */
+  uiZoom?: number;
   /** Clamp bounds for pinch zoom (defaults cover the supported range). */
   minZoom?: number;
   maxZoom?: number;
@@ -127,7 +134,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth, 
   );
 });
 
-export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1, onZoomChange, minZoom = 0.2, maxZoom = 1.25 }: PdfCanvasProps) {
+export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1, onZoomChange, uiZoom = zoom, minZoom = 0.2, maxZoom = 1.25 }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const destroyedRef = useRef(false);
@@ -139,7 +146,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   const resizeTimerRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);
   const prevZoomRef = useRef(zoom);
-  const zoomRef = useRef(zoom);
+  const uiZoomRef = useRef(uiZoom);
   const onZoomChangeRef = useRef(onZoomChange);
   const pinchRef = useRef<{
     active: boolean;
@@ -149,12 +156,12 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     pending: number | null;
     lastSent: number;
     skipAnchorOnce: boolean;
-  }>({ active: false, startDist: 0, startZoom: 1, raf: null, pending: null, lastSent: zoom, skipAnchorOnce: false });
+  }>({ active: false, startDist: 0, startZoom: 1, raf: null, pending: null, lastSent: uiZoom, skipAnchorOnce: false });
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
   onPageChangeRef.current = onPageChange;
-  zoomRef.current = zoom;
+  uiZoomRef.current = uiZoom;
   onZoomChangeRef.current = onZoomChange;
 
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
@@ -414,8 +421,8 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
         const p = pinchRef.current;
         p.active = true;
         p.startDist = Math.max(1, fingerDist(e.touches[0], e.touches[1]));
-        p.startZoom = zoomRef.current;
-        p.lastSent = zoomRef.current;
+        p.startZoom = uiZoomRef.current;
+        p.lastSent = uiZoomRef.current;
         p.pending = null;
         // Take over this two-finger gesture only. Single-finger taps
         // (including Retry buttons) never enter this branch.

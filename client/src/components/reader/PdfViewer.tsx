@@ -392,6 +392,7 @@ export function PdfViewer({
                   programmaticScrollRef={programmaticScrollRef}
                   zoom={pdfZoom * zoomReference}
                   onZoomChange={handlePinchZoom}
+                  uiZoom={pdfZoom}
                   minZoom={ZOOM_LEVELS[0]}
                   maxZoom={ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
                 />
