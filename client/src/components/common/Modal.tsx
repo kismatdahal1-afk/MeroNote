@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cx } from "../../lib/utils";
 
@@ -30,7 +31,15 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
 
   if (!open) return null;
 
-  return (
+  // Portal to document.body so the dialog always layers at the top-level
+  // stacking context (fixed inset-0 z-50). Without this, a modal rendered
+  // inline inside an isolating ancestor (e.g. the Student Dashboard, which
+  // wraps every section in position:relative + z-index:1) is trapped below
+  // later sibling sections and the sticky app header. All markup, classes,
+  // and behavior below are unchanged; React events still bubble through
+  // the portal, and the .dark theme class lives on <html>, above the
+  // portal target, so theming is unaffected.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -69,6 +78,7 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
