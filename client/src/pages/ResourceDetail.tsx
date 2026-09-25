@@ -264,30 +264,34 @@ export default function ResourceDetail() {
             </Button>
           ) : (
             <>
-              <IconButton
-                icon={Heart}
-                label={favorite ? "Remove from favorites" : "Add to favorites"}
-                variant={favorite ? "favorite" : "default"}
-                filled={favorite}
-                aria-pressed={favorite}
-                onClick={handleFavorite}
-              />
-              <IconButton
-                icon={Bookmark}
-                label={bookmarked ? "Bookmarked" : "Bookmark this resource"}
-                variant={bookmarked ? "bookmark" : "default"}
-                filled={bookmarked}
-                aria-pressed={bookmarked}
-                onClick={handleBookmark}
-              />
-              <Button variant="outline" onClick={handleDownload}>
-                <Download className="size-4" aria-hidden="true" />
-                {download?.status === "completed" ? "Downloaded" : "Download"}
-              </Button>
-              <Button onClick={openReader}>
-                <Eye className="size-4" aria-hidden="true" />
-                {progress ? "Continue reading" : "Read now"}
-              </Button>
+              <span className="flex items-center gap-1 sm:gap-2">
+                <IconButton
+                  icon={Heart}
+                  label={favorite ? "Remove from favorites" : "Add to favorites"}
+                  variant={favorite ? "favorite" : "default"}
+                  filled={favorite}
+                  aria-pressed={favorite}
+                  onClick={handleFavorite}
+                />
+                <IconButton
+                  icon={Bookmark}
+                  label={bookmarked ? "Bookmarked" : "Bookmark this resource"}
+                  variant={bookmarked ? "bookmark" : "default"}
+                  filled={bookmarked}
+                  aria-pressed={bookmarked}
+                  onClick={handleBookmark}
+                />
+              </span>
+              <span className="flex w-full gap-2 sm:w-auto">
+                <Button variant="outline" onClick={handleDownload} className="flex-1 sm:flex-none">
+                  <Download className="size-4" aria-hidden="true" />
+                  {download?.status === "completed" ? "Downloaded" : "Download"}
+                </Button>
+                <Button onClick={openReader} className="flex-1 sm:flex-none">
+                  <Eye className="size-4" aria-hidden="true" />
+                  {progress ? "Continue reading" : "Read now"}
+                </Button>
+              </span>
             </>
           )
         }
