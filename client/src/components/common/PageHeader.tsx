@@ -59,7 +59,7 @@ export function PageHeader({ title, subtitle, breadcrumbs, actions, compactBread
             <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
           )}
         </div>
-        {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+        {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
       </div>
     </div>
   );
