@@ -79,11 +79,11 @@ export function ContinueReadingSection({ resource, onRemove }: { resource: Resou
         <ProgressBar value={ratio} label={`Reading progress ${pct}%`} className="mt-1.5" />
       </div>
 
-      <div className="relative z-10 mt-4 flex items-center gap-2.5">
+      <div className="relative z-10 mt-4 flex flex-wrap items-center gap-2.5">
         <Link
           to={`/reader/${resource.id}`}
           onClick={() => markOpened(resource.id)}
-          className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="inline-flex h-10 flex-none items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:flex-1"
           aria-label={`Resume ${resource.title} at page ${lastPage}`}
         >
           <Play className="size-4 fill-current" aria-hidden="true" />
@@ -91,7 +91,7 @@ export function ContinueReadingSection({ resource, onRemove }: { resource: Resou
         </Link>
         <Link
           to={`/resources/${resource.id}`}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-bold text-foreground transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="inline-flex h-10 flex-none items-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-bold text-foreground transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:flex-none"
         >
           <List className="size-4" aria-hidden="true" />
           Index
