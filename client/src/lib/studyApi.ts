@@ -137,25 +137,54 @@ export interface StudyProgressRow {
   updatedAt: string;
 }
 
-async function list<T>(path: string): Promise<T[] | null> {
-  try {
-    const res = await fetch(`${API_URL}${path}`, { credentials: "include" });
+/**
+ * Phase 17 fetch-all: follows the server pagination envelope so personal
+ * lists are never silently truncated at the 100-row page cap. The backend
+ * limit stays untouched (requests still use limit=100); pages are fetched
+ * sequentially until the envelope's page count is reached. Any page failure
+ * returns null (failure, never partial data). MAX_PAGES bounds adversarial
+ * totals; realistic personal lists resolve in a single request.
+ */
+const PAGE_SIZE = 100;
+const MAX_PAGES = 100;
+
+async function list<T>(basePath: string): Promise<T[] | null> {
+  const all: T[] = [];
+  let page = 1;
+  let pages = 1;
+  while (page <= pages && page <= MAX_PAGES) {
+    const separator = basePath.includes("?") ? "&" : "?";
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}${basePath}${separator}limit=${PAGE_SIZE}&page=${page}`, {
+        credentials: "include",
+      });
+    } catch {
+      return null;
+    }
     if (!res.ok) return null;
-    const json = (await res.json().catch(() => null)) as { data?: T[] } | null;
-    return Array.isArray(json?.data) ? json.data : null;
-  } catch {
-    return null;
+    const json = (await res.json().catch(() => null)) as {
+      data?: T[];
+      pagination?: { page?: number; pages?: number; total?: number };
+    } | null;
+    if (!Array.isArray(json?.data)) return null;
+    all.push(...json.data);
+    const totalPages = json?.pagination?.pages;
+    pages = typeof totalPages === "number" && Number.isFinite(totalPages) && totalPages >= 1 ? Math.floor(totalPages) : 1;
+    if (json.data.length === 0) break;
+    page += 1;
   }
+  return all;
 }
 
 export function listFavorites(): Promise<StudyFavoriteRow[] | null> {
-  return list<StudyFavoriteRow>("/api/me/favorites?limit=100");
+  return list<StudyFavoriteRow>("/api/me/favorites");
 }
 
 export function listBookmarks(): Promise<StudyBookmarkRow[] | null> {
-  return list<StudyBookmarkRow>("/api/me/bookmarks?limit=100");
+  return list<StudyBookmarkRow>("/api/me/bookmarks");
 }
 
 export function listProgress(): Promise<StudyProgressRow[] | null> {
-  return list<StudyProgressRow>("/api/me/progress?limit=100");
+  return list<StudyProgressRow>("/api/me/progress");
 }

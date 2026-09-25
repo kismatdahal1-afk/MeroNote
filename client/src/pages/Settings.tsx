@@ -1,8 +1,8 @@
 ﻿import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Sun, Moon, Monitor, Palette, BookOpen, HardDrive, Info, ShieldCheck,
-  Bell, Pencil, Trash2, FolderOpen, ChevronRight, Check,
+  Bell, Pencil, Trash2, FolderOpen, ChevronRight, Check, LogOut,
 } from "lucide-react";
 import { PageHeader, Card } from "../components/common/PageHeader";
 import { Badge } from "../components/common/Badge";
@@ -106,14 +106,16 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
-  const { name, email, role, setName } = useUser();
+  const { name, email, role, setName, logout } = useUser();
   const { totalDownloadSize, downloads } = useLibrary();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const completed = downloads.filter((d) => d.status === "completed").length;
 
   const [editOpen, setEditOpen] = useState(false);
   const [draftName, setDraftName] = useState(name);
   const [nameError, setNameError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const openEdit = () => {
     setDraftName(name);
@@ -134,6 +136,21 @@ export default function Settings() {
     setName(trimmed);
     setEditOpen(false);
     toast("Profile updated");
+  };
+
+  /** Phase 17 logout entry: ends the session, providers reset to guest state. */
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+      toast("Logged out");
+      navigate("/login");
+    } catch {
+      toast("Could not log out. Please try again.", "error");
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const themeOptions: { value: "light" | "dark" | "system"; label: string; icon: typeof Sun }[] = [
@@ -177,10 +194,14 @@ export default function Settings() {
               <p className="mt-1 text-xs font-medium text-muted-foreground/70">
                 CSIT Study Library member
               </p>
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={openEdit}>
                   <Pencil className="size-3.5" aria-hidden="true" />
                   Edit Profile
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleLogout} loading={loggingOut}>
+                  <LogOut className="size-3.5" aria-hidden="true" />
+                  Log out
                 </Button>
               </div>
             </div>

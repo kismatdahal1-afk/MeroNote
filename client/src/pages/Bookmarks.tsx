@@ -31,7 +31,7 @@ export default function Bookmarks() {
   // Server rows are authoritative when authed; guests keep local-only lists
   // (LibraryProvider) resolved here so logged-out users never see a false
   // empty state after saving a page.
-  const { status } = useUser();
+  const { status, user } = useUser();
   const { bookmarks: localBookmarks, bookmarkedSubjects: localSubjectIds, removeBookmark } = useLibrary();
   const isGuest = status !== "authed";
   const { toast } = useToast();
@@ -44,7 +44,10 @@ export default function Bookmarks() {
   const [type, setType] = useState<TypeFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
-  const { data, error, loading, retry } = useApiQuery(`me-bookmarks:${status}`, () =>
+  // Phase 17: key includes the account id so a user switch always refetches
+  // instead of showing the previous account's rows.
+  const accountKey = status === "authed" ? (user?.id ?? "authed") : "guest";
+  const { data, error, loading, retry } = useApiQuery(`me-bookmarks:${accountKey}`, () =>
     status === "authed" ? listBookmarks().then((rows) => rows ?? []) : Promise.resolve([]),
   );
   const rows: StudyBookmarkRow[] = useMemo(() => data ?? [], [data]);

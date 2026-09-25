@@ -102,6 +102,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       await logoutRequest();
     } finally {
+      // Phase 17: the local display-name override is personal state — clear
+      // it so a guest or the next account never inherits the previous name.
+      writeStoredName(null);
+      setNameOverride(null);
       setUser(null);
       setStatus("guest");
     }

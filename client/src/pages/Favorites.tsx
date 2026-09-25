@@ -23,9 +23,12 @@ export default function Favorites() {
   // Server rows are authoritative when authed; guests keep local-only lists
   // (LibraryProvider) resolved here so logged-out users never see a false
   // empty state after tapping the heart icon.
-  const { status } = useUser();
+  const { status, user } = useUser();
   const { favorites: localFavResourceIds, favoriteSubjects: localFavSubjectIds } = useLibrary();
   const isGuest = status !== "authed";
+  // Phase 17: key includes the account id so a user switch always refetches
+  // instead of showing the previous account's rows.
+  const accountKey = status === "authed" ? (user?.id ?? "authed") : "guest";
   const { subjects: taxonomySubjects } = useTaxonomy();
   const [query, setQuery] = useState("");
   const [semesterId, setSemesterId] = useState("");
@@ -33,7 +36,7 @@ export default function Favorites() {
   const [type, setType] = useState<TypeFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
-  const { data, error, loading, retry } = useApiQuery(`me-favorites:${status}`, async (signal) => {
+  const { data, error, loading, retry } = useApiQuery(`me-favorites:${accountKey}`, async (signal) => {
     const [favRows, semesters] = await Promise.all([
       status === "authed" ? listFavorites() : Promise.resolve(null),
       fetchSemesters(signal).catch(() => ({ rows: [], total: 0 })),

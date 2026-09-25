@@ -26,6 +26,14 @@ import {
   progressRowToProgress,
 } from "../lib/personalAdapters";
 import {
+  buildServerClaimSets,
+  libraryMirrorKey,
+  removeClaimedBookmarks,
+  removeClaimedIds,
+  selectGuestBookmarkMerge,
+  selectGuestFavoriteMerge,
+} from "../lib/librarySync";
+import {
   createBookmark as createServerBookmark,
   deleteBookmarkById as deleteServerBookmarkById,
   deleteFavorite as deleteServerFavorite,
@@ -40,6 +48,15 @@ import {
  * Personal study state: server-authoritative lists (hydrated on login),
  * local-only downloads/recent. Toggles stay optimistic with best-effort
  * write-through; localStorage keeps favorites/bookmarks for guests.
+ *
+ * Phase 17 lifecycle:
+ * - Guest mirrors live under the legacy shared keys (guest namespace).
+ * - Each authenticated user hydrates from the server (fetch-all, server
+ *   wins) into a `...v2.<userId>` mirror namespace that never leaks across
+ *   accounts. In-memory state resets on login/logout/switch so one user's
+ *   data never flashes under another user.
+ * - Guest saves merge once into a fresh account via the idempotent
+ *   favorite/bookmark APIs; guest reading progress stays memory-only.
  */
 
 interface LibraryContextValue {
@@ -75,21 +92,23 @@ interface LibraryContextValue {
   progress: ReadingProgress[];
   getProgress: (resourceId: string) => ReadingProgress | undefined;
   setReadingProgress: (resourceId: string, page: number, total: number) => void;
+
+  /** True while the account lists are being hydrated after login. */
+  isHydrating: boolean;
+  /** Last hydration failure, if any (null means empty data is genuine). */
+  libraryError: string | null;
+  /** Retry the last failed hydration. */
+  retryHydration: () => void;
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null);
 
 /**
- * Persistence for the save-lists (frontend only — same pattern as the theme,
- * user, CMS and semester-status providers). Without this, every browser
- * refresh resets favorites/bookmarks to seeds and wipes ALL saved subjects
- * (which have no seeds), on both desktop and mobile.
+ * Device-local download registry (Phase 18 owns user/device separation).
+ * Personal save-lists use per-namespace mirrors via libraryMirrorKey
+ * (see lib/librarySync): legacy keys for guests, v2.<userId> when authed.
  */
 const STORAGE_KEYS = {
-  favorites: "meronote.library.favorites.v1",
-  favoriteSubjects: "meronote.library.favoriteSubjects.v1",
-  bookmarks: "meronote.library.bookmarks.v1",
-  bookmarkedSubjects: "meronote.library.bookmarkedSubjects.v1",
   /** Completed download rows only — blobs live in IndexedDB, states do not. */
   downloads: "meronote.library.downloads.v1",
 } as const;
@@ -161,25 +180,65 @@ function asBookmarkArray(raw: unknown): Bookmark[] | null {
   return list;
 }
 
+/**
+ * Remove server-claimed entries from the legacy guest mirrors. Runs only
+ * after a successful hydration: entries the account now holds can never be
+ * re-merged into a different account on a shared device, while unclaimed
+ * entries (merge failures, deleted elsewhere) stay for guest use.
+ */
+function pruneClaimedGuestMirrors(
+  favRows: { targetType: string; targetId: string }[],
+  bmRows: { targetType: string; targetId: string }[],
+): void {
+  if (typeof window === "undefined") return;
+  const claimed = buildServerClaimSets(favRows, bmRows);
+  const pruneIds = (base: "favorites" | "favoriteSubjects" | "bookmarkedSubjects", set: Set<string>): void => {
+    if (set.size === 0) return;
+    const key = libraryMirrorKey(base, null);
+    const current = readStored(key, [], asStringArray);
+    const pruned = removeClaimedIds(current, set);
+    if (pruned.length !== current.length) writeStored(key, pruned);
+  };
+  pruneIds("favorites", claimed.favoriteResourceIds);
+  pruneIds("favoriteSubjects", claimed.favoriteSubjectIds);
+  pruneIds("bookmarkedSubjects", claimed.bookmarkSubjectIds);
+  if (claimed.bookmarkResourceIds.size > 0) {
+    const key = libraryMirrorKey("bookmarks", null);
+    const current = readStored(key, [], asBookmarkArray);
+    const pruned = removeClaimedBookmarks(current, claimed.bookmarkResourceIds);
+    if (pruned.length !== current.length) writeStored(key, pruned);
+  }
+}
+
 export function LibraryProvider({ children }: { children: ReactNode }) {
   // Server is authoritative after hydration; toggles stay optimistic with
   // best-effort write-through. Work is lazy so guests never fire requests.
-  const { status } = useUser();
+  const { status, user } = useUser();
+  const userId = status === "authed" ? (user?.id ?? null) : null;
   const syncPersonal = (makeWork: () => Promise<unknown>): void => {
     if (status !== "authed") return;
     makeWork().catch(() => {});
   };
+  // Identity of the authenticated user for guarding async completions: a
+  // hydration or id-swap response must never be applied after logout or a
+  // user switch (Phase 16 SemesterStatusProvider uses the same pattern).
+  const actorRef = useRef<string | null>(null);
+  const [hydratedFor, setHydratedFor] = useState<string | null>(null);
+  const [isHydrating, setIsHydrating] = useState(false);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const mergedRef = useRef<Set<string>>(new Set());
   const [favorites, setFavorites] = useState<string[]>(() =>
-    readStored(STORAGE_KEYS.favorites, [], asStringArray),
+    readStored(libraryMirrorKey("favorites", null), [], asStringArray),
   );
   const [favoriteSubjects, setFavoriteSubjects] = useState<string[]>(() =>
-    readStored(STORAGE_KEYS.favoriteSubjects, [], asStringArray),
+    readStored(libraryMirrorKey("favoriteSubjects", null), [], asStringArray),
   );
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() =>
-    readStored(STORAGE_KEYS.bookmarks, [], asBookmarkArray),
+    readStored(libraryMirrorKey("bookmarks", null), [], asBookmarkArray),
   );
   const [bookmarkedSubjects, setBookmarkedSubjects] = useState<string[]>(() =>
-    readStored(STORAGE_KEYS.bookmarkedSubjects, [], asStringArray),
+    readStored(libraryMirrorKey("bookmarkedSubjects", null), [], asStringArray),
   );
   /** Server bookmark ids for subject bookmarks — deletes address `:id`. */
   const [subjectBookmarkIds, setSubjectBookmarkIds] = useState<Record<string, string>>({});
@@ -188,56 +247,135 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<ReadingProgress[]>([]);
   const nextId = useRef(100);
 
-  /* Server hydration on login: API lists replace local state (guests keep
-   * their local lists). Failures keep current state — never wipe on error. */
+  /* Authenticated lifecycle: reset → merge guests → hydrate (server wins).
+   * Logout/guest: reload the guest namespace; never leave another user's
+   * in-memory state active. Failures surface via libraryError and keep the
+   * cleared state (never mistaken for empty data); retry re-runs hydration. */
   useEffect(() => {
-    if (status !== "authed") {
-      setFavorites([]);
-      setFavoriteSubjects([]);
-      setBookmarks([]);
-      setBookmarkedSubjects([]);
+    if (status === "loading") return;
+    if (status !== "authed" || !userId) {
+      setFavorites(readStored(libraryMirrorKey("favorites", null), [], asStringArray));
+      setFavoriteSubjects(readStored(libraryMirrorKey("favoriteSubjects", null), [], asStringArray));
+      setBookmarks(readStored(libraryMirrorKey("bookmarks", null), [], asBookmarkArray));
+      setBookmarkedSubjects(readStored(libraryMirrorKey("bookmarkedSubjects", null), [], asStringArray));
       setSubjectBookmarkIds({});
       setProgress([]);
+      setRecent([]);
+      setHydratedFor("guest");
+      setIsHydrating(false);
+      setLibraryError(null);
       return;
     }
+    // Pre-login guest lists (closure holds the latest committed render state)
+    // are the one-time merge source; the reset below prevents any stale flash.
+    const guestFavorites = favorites;
+    const guestFavoriteSubjects = favoriteSubjects;
+    const guestBookmarks = bookmarks;
+    const guestBookmarkedSubjects = bookmarkedSubjects;
+    const actor = userId;
+    actorRef.current = actor;
+
     let cancelled = false;
-    void Promise.all([listServerFavorites(), listServerBookmarks(), listServerProgress()]).then(
-      ([favRows, bmRows, progRows]) => {
-        if (cancelled) return;
-        if (favRows) {
-          setFavorites(favRows.filter((r) => r.targetType === "resource").map((r) => r.targetId));
-          setFavoriteSubjects(favRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
+    setIsHydrating(true);
+    setLibraryError(null);
+    setFavorites([]);
+    setFavoriteSubjects([]);
+    setBookmarks([]);
+    setBookmarkedSubjects([]);
+    setSubjectBookmarkIds({});
+    setProgress([]);
+    setRecent([]);
+
+    const alive = (): boolean => !cancelled && actorRef.current === actor;
+
+    void (async () => {
+      if (!mergedRef.current.has(actor)) {
+        mergedRef.current.add(actor);
+        const favMerge = selectGuestFavoriteMerge(guestFavorites, guestFavoriteSubjects);
+        for (const id of favMerge.resourceIds) {
+          if (!alive()) return;
+          await putServerFavorite("resource", id).catch(() => null);
         }
-        if (bmRows) {
-          setBookmarks(bmRows.map(bookmarkRowToBookmark).filter((b): b is Bookmark => b !== null));
-          setBookmarkedSubjects(bmRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
-          const subjectIds: Record<string, string> = {};
-          for (const row of bmRows) {
-            if (row.targetType === "subject" && typeof row._id === "string") subjectIds[row.targetId] = row._id;
-          }
-          setSubjectBookmarkIds(subjectIds);
+        for (const id of favMerge.subjectIds) {
+          if (!alive()) return;
+          await putServerFavorite("subject", id).catch(() => null);
         }
-        if (progRows) setProgress(progRows.map(progressRowToProgress));
-      },
-    ).catch(() => {});
+        const bmMerge = selectGuestBookmarkMerge(guestBookmarks, guestBookmarkedSubjects);
+        for (const entry of bmMerge.resources) {
+          if (!alive()) return;
+          await createServerBookmark({
+            targetType: "resource",
+            targetId: entry.targetId,
+            page: entry.page,
+            note: entry.note,
+          }).catch(() => null);
+        }
+        for (const id of bmMerge.subjectIds) {
+          if (!alive()) return;
+          await createServerBookmark({ targetType: "subject", targetId: id }).catch(() => null);
+        }
+      }
+      if (!alive()) return;
+      const [favRows, bmRows, progRows] = await Promise.all([
+        listServerFavorites(),
+        listServerBookmarks(),
+        listServerProgress(),
+      ]);
+      if (!alive()) return;
+      if (favRows && bmRows && progRows) {
+        setFavorites(favRows.filter((r) => r.targetType === "resource").map((r) => r.targetId));
+        setFavoriteSubjects(favRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
+        setBookmarks(bmRows.map(bookmarkRowToBookmark).filter((b): b is Bookmark => b !== null));
+        setBookmarkedSubjects(bmRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
+        const subjectIds: Record<string, string> = {};
+        for (const row of bmRows) {
+          if (row.targetType === "subject" && typeof row._id === "string") subjectIds[row.targetId] = row._id;
+        }
+        setSubjectBookmarkIds(subjectIds);
+        setProgress(progRows.map(progressRowToProgress));
+        pruneClaimedGuestMirrors(favRows, bmRows);
+        setHydratedFor(actor);
+        setLibraryError(null);
+      } else {
+        // Failure is not empty: keep cleared state and expose retry. Guest
+        // mirrors in storage remain intact for logout/retry recovery.
+        setHydratedFor(actor);
+        setLibraryError("Could not load your library. Check your connection and try again.");
+      }
+      setIsHydrating(false);
+    })().catch(() => {
+      if (!cancelled && actorRef.current === actor) {
+        setHydratedFor(actor);
+        setLibraryError("Could not load your library. Check your connection and try again.");
+        setIsHydrating(false);
+      }
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [status]);
+    // Guest lists intentionally read once per login (not deps): re-running on
+    // every toggle would restart hydration and re-merge continuously.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, userId, retryCount]);
 
-  /* Write-through: every save/unsave survives reloads on desktop and mobile. */
+  /* Write-through per namespace: authed lists persist under v2.<userId>,
+   * guest lists under the legacy keys. Gated on hydratedFor so pre-hydration
+   * optimistic edits land in the right namespace after hydration replaces. */
   useEffect(() => {
-    writeStored(STORAGE_KEYS.favorites, favorites);
-  }, [favorites]);
-  useEffect(() => {
-    writeStored(STORAGE_KEYS.favoriteSubjects, favoriteSubjects);
-  }, [favoriteSubjects]);
-  useEffect(() => {
-    writeStored(STORAGE_KEYS.bookmarks, bookmarks);
-  }, [bookmarks]);
-  useEffect(() => {
-    writeStored(STORAGE_KEYS.bookmarkedSubjects, bookmarkedSubjects);
-  }, [bookmarkedSubjects]);
+    if (status === "loading" || hydratedFor === null) return;
+    if (status === "authed" && userId && hydratedFor === userId) {
+      writeStored(libraryMirrorKey("favorites", userId), favorites);
+      writeStored(libraryMirrorKey("favoriteSubjects", userId), favoriteSubjects);
+      writeStored(libraryMirrorKey("bookmarks", userId), bookmarks);
+      writeStored(libraryMirrorKey("bookmarkedSubjects", userId), bookmarkedSubjects);
+    } else if (status !== "authed" && hydratedFor === "guest") {
+      writeStored(libraryMirrorKey("favorites", null), favorites);
+      writeStored(libraryMirrorKey("favoriteSubjects", null), favoriteSubjects);
+      writeStored(libraryMirrorKey("bookmarks", null), bookmarks);
+      writeStored(libraryMirrorKey("bookmarkedSubjects", null), bookmarkedSubjects);
+    }
+  }, [favorites, favoriteSubjects, bookmarks, bookmarkedSubjects, hydratedFor, status, userId]);
 
   /* Downloads: restore completed rows whose blobs still exist, drop orphans. */
   useEffect(() => {
@@ -317,6 +455,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     if (adding) {
       syncPersonal(() =>
         createServerBookmark({ targetType: "subject", targetId: subjectId }).then((row) => {
+          // Drop late responses after logout/user-switch (actor guard).
+          if (actorRef.current !== userId) return;
           if (row && typeof row._id === "string") {
             const serverId = row._id;
             setSubjectBookmarkIds((prev) => ({ ...prev, [subjectId]: serverId }));
@@ -337,7 +477,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           : Promise.resolve(false),
       );
     }
-  }, [bookmarkedSubjects, status, subjectBookmarkIds]);
+  }, [bookmarkedSubjects, status, subjectBookmarkIds, userId]);
 
   const getBookmark = useCallback(
     (resourceId: string) =>
@@ -365,6 +505,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       });
       syncPersonal(() =>
         createServerBookmark({ targetType: "resource", targetId: resource.id, page, note }).then((row) => {
+          // Drop late id-swaps after logout/user-switch (actor guard).
+          if (actorRef.current !== userId) return;
           if (row && typeof row._id === "string") {
             const serverId = row._id;
             setBookmarks((prev) => prev.map((b) => (b.id === tempId ? { ...b, id: serverId } : b)));
@@ -372,7 +514,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         }),
       );
     },
-    [status],
+    [status, userId],
   );
 
   const removeBookmark = useCallback((bookmarkId: string) => {
@@ -469,7 +611,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       ...prev.filter((r) => r.resourceId !== resourceId),
     ]);
   }, []);
-
   const getProgress = useCallback(
     (resourceId: string) => progress.find((p) => p.resourceId === resourceId),
     [progress],
@@ -501,6 +642,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const retryHydration = useCallback(() => {
+    setLibraryError(null);
+    setRetryCount((n) => n + 1);
+  }, []);
+
   const value = useMemo(
     () => ({
       favorites,
@@ -527,6 +673,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       progress,
       getProgress,
       setReadingProgress,
+      isHydrating,
+      libraryError,
+      retryHydration,
     }),
     [
       favorites,
@@ -553,6 +702,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       progress,
       getProgress,
       setReadingProgress,
+      isHydrating,
+      libraryError,
+      retryHydration,
     ],
   );
 
