@@ -449,8 +449,8 @@ export default function ResourceDetail() {
           <h3 className="text-sm font-bold text-foreground">Quick info</h3>
           <ul className="mt-3 space-y-2.5 text-sm text-muted-foreground">
             <li className="flex items-center justify-between gap-3">
-              <span className="font-medium">File</span>
-              <span className="truncate font-mono text-xs">{resource.fileName}</span>
+              <span className="shrink-0 font-medium">File</span>
+              <span className="min-w-0 truncate font-mono text-xs">{resource.fileName}</span>
             </li>
             <li className="flex items-center justify-between gap-3">
               <span className="font-medium">Updated</span>
