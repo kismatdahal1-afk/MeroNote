@@ -38,7 +38,7 @@ export function ContinueReadingSection({ resource, onRemove }: { resource: Resou
   const pct = Math.round(ratio * 100);
 
   return (
-    <Card interactive className="group relative p-4 sm:p-5">
+    <Card interactive className="group relative min-w-0 p-4 sm:p-5">
       {/* Stretched link — makes the whole card clickable (opens the reader) */}
       <Link
         to={`/reader/${resource.id}`}
