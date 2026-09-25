@@ -392,10 +392,10 @@ export default function ResourceDetail() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="p-6 lg:col-span-2">
+        <Card className="min-w-0 p-6 lg:col-span-2">
           <h2 className="text-base font-bold text-foreground">Details</h2>
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 sm:gap-x-8">
-            <div>
+            <div className="min-w-0">
               <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <Layers className="size-3.5" aria-hidden="true" />
                 Type
@@ -407,31 +407,31 @@ export default function ResourceDetail() {
                 </span>
               </dd>
             </div>
-            <div>
+            <div className="min-w-0">
               <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <BookOpen className="size-3.5" aria-hidden="true" /> Subject
               </dt>
-              <dd className="mt-1 text-sm font-medium text-foreground">{subject?.name}</dd>
+              <dd className="mt-1 break-words text-sm font-medium text-foreground">{subject?.name}</dd>
             </div>
-            <div>
+            <div className="min-w-0">
               <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <GraduationCap className="size-3.5" aria-hidden="true" /> Semester
               </dt>
-              <dd className="mt-1 text-sm font-medium text-foreground">{semester?.name}</dd>
+              <dd className="mt-1 break-words text-sm font-medium text-foreground">{semester?.name}</dd>
             </div>
-            <div>
+            <div className="min-w-0">
               <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <FileText className="size-3.5" aria-hidden="true" /> Pages
               </dt>
               <dd className="mt-1 text-sm font-medium text-foreground">{resource.pageCount}</dd>
             </div>
-            <div>
+            <div className="min-w-0">
               <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <FileText className="size-3.5" aria-hidden="true" /> File size
               </dt>
               <dd className="mt-1 text-sm font-medium text-foreground">{formatFileSize(resource.fileSize)}</dd>
             </div>
-            <div>
+            <div className="min-w-0">
               <dt className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
                 <Calendar className="size-3.5" aria-hidden="true" /> Added
               </dt>
@@ -453,7 +453,7 @@ export default function ResourceDetail() {
           )}
         </Card>
 
-        <Card className="h-fit p-5">
+        <Card className="h-fit min-w-0 p-5">
           <h3 className="text-sm font-bold text-foreground">Quick info</h3>
           <ul className="mt-3 space-y-2.5 text-sm text-muted-foreground">
             <li className="flex items-center justify-between gap-3">
