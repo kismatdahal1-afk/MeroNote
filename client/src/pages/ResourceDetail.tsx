@@ -282,14 +282,18 @@ export default function ResourceDetail() {
                   onClick={handleBookmark}
                 />
               </span>
-              <span className="flex gap-2">
-                <Button variant="outline" onClick={handleDownload}>
-                  <Download className="size-4" aria-hidden="true" />
-                  {download?.status === "completed" ? "Downloaded" : "Download"}
+              <span className="flex w-full gap-2 sm:w-auto">
+                <Button variant="outline" onClick={handleDownload} className="min-w-0 flex-1 sm:flex-none">
+                  <Download className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">
+                    {download?.status === "completed" ? "Downloaded" : "Download"}
+                  </span>
                 </Button>
-                <Button onClick={openReader}>
-                  <Eye className="size-4" aria-hidden="true" />
-                  {inContinueReading ? "Continue Reading" : "Read"}
+                <Button onClick={openReader} className="min-w-0 flex-1 sm:flex-none">
+                  <Eye className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">
+                    {inContinueReading ? "Continue Reading" : "Read"}
+                  </span>
                 </Button>
               </span>
             </>
