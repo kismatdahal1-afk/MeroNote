@@ -170,6 +170,12 @@ export default function AdminSettings() {
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
+  // Keep the draft in sync with the database-backed name while the modal
+  // is closed (auth resolves async; avoids editing a stale placeholder).
+  useEffect(() => {
+    if (!editOpen) setDraftName(name);
+  }, [name, editOpen]);
+
   const countsQuery = useApiQuery("admin-settings-counts", async (signal) => {
     const [resources, notices] = await Promise.all([
       adminList<Resource>("resources", { limit: 1 }, signal).catch(() => ({ total: 0 })),
@@ -472,7 +478,7 @@ export default function AdminSettings() {
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={saveEdit} loading={saving}>Save Changes</Button>
+            <Button onClick={() => void saveEdit()} loading={saving}>Save Changes</Button>
           </>
         }
       >

@@ -118,6 +118,12 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
+  // Keep the draft in sync with the database-backed name while the modal
+  // is closed (auth resolves async; avoids editing a stale placeholder).
+  useEffect(() => {
+    if (!editOpen) setDraftName(name);
+  }, [name, editOpen]);
+
   const openEdit = () => {
     setDraftName(name);
     setNameError("");
@@ -371,7 +377,7 @@ export default function Settings() {
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={saveEdit} loading={saving}>Save Changes</Button>
+            <Button onClick={() => void saveEdit()} loading={saving}>Save Changes</Button>
           </>
         }
       >
