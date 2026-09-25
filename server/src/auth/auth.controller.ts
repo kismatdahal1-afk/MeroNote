@@ -134,3 +134,41 @@ export async function me(req: Request, res: Response): Promise<void> {
   }
   res.json({ status: "ok", data: toSafeUser(user) });
 }
+
+/**
+ * PATCH /api/auth/me — Edit Profile (name only).
+ *
+ * Updates ONLY the authenticated user's display name in the `users`
+ * collection. The email is immutable here: even if the client sends an
+ * `email` field (manipulated request), it is ignored and never written.
+ * Ownership always derives from req.user (never from client userId), so
+ * another user's profile can never be affected.
+ */
+export async function updateProfile(req: Request, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ status: "error", message: "Authentication required." });
+    return;
+  }
+  const name = readString(req.body, "name");
+  if (!name) {
+    res.status(400).json({ status: "error", message: "Name cannot be empty." });
+    return;
+  }
+  if (name.length > 80) {
+    res.status(400).json({ status: "error", message: "Name must be at most 80 characters." });
+    return;
+  }
+
+  // NOTE: only `name` is written. Any `email` (or other) field in the
+  // request body is deliberately ignored to keep the email immutable.
+  const user = await User.findByIdAndUpdate(
+    req.user.id,
+    { $set: { name } },
+    { returnDocument: "after", runValidators: true },
+  ).exec();
+  if (!user) {
+    res.status(401).json({ status: "error", message: "Authentication required." });
+    return;
+  }
+  res.json({ status: "ok", data: toSafeUser(user) });
+}

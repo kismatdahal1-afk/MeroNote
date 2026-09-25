@@ -62,3 +62,10 @@ export function registerRequest(email: string, password: string, confirmPassword
 export function logoutRequest(): Promise<void> {
   return request<void>("/api/auth/logout", { method: "POST" });
 }
+
+export function updateProfileRequest(name: string): Promise<AuthUser> {
+  return request<AuthUser>("/api/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+}

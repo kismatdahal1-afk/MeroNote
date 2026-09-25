@@ -167,6 +167,7 @@ export default function AdminSettings() {
   const [editOpen, setEditOpen] = useState(false);
   const [draftName, setDraftName] = useState(name);
   const [nameError, setNameError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const countsQuery = useApiQuery("admin-settings-counts", async (signal) => {
@@ -204,19 +205,31 @@ export default function AdminSettings() {
     setEditOpen(true);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
+    if (saving) return;
     const trimmed = draftName.trim();
     if (!trimmed) {
       setNameError("Name cannot be empty.");
+      return;
+    }
+    if (trimmed.length > 80) {
+      setNameError("Name must be at most 80 characters.");
       return;
     }
     if (trimmed === name) {
       setEditOpen(false);
       return;
     }
-    setName(trimmed);
-    setEditOpen(false);
-    toast("Profile updated");
+    setSaving(true);
+    try {
+      await setName(trimmed);
+      setEditOpen(false);
+      toast("Profile updated");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not update profile.", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   /** Same logout entry as Student Settings: ends the session, providers reset. */
@@ -459,7 +472,7 @@ export default function AdminSettings() {
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={saveEdit}>Save Changes</Button>
+            <Button onClick={saveEdit} loading={saving}>Save Changes</Button>
           </>
         }
       >

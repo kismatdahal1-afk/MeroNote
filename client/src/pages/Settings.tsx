@@ -115,6 +115,7 @@ export default function Settings() {
   const [editOpen, setEditOpen] = useState(false);
   const [draftName, setDraftName] = useState(name);
   const [nameError, setNameError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const openEdit = () => {
@@ -123,19 +124,31 @@ export default function Settings() {
     setEditOpen(true);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
+    if (saving) return;
     const trimmed = draftName.trim();
     if (!trimmed) {
       setNameError("Name cannot be empty.");
+      return;
+    }
+    if (trimmed.length > 80) {
+      setNameError("Name must be at most 80 characters.");
       return;
     }
     if (trimmed === name) {
       setEditOpen(false);
       return;
     }
-    setName(trimmed);
-    setEditOpen(false);
-    toast("Profile updated");
+    setSaving(true);
+    try {
+      await setName(trimmed);
+      setEditOpen(false);
+      toast("Profile updated");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not update profile.", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
   /** Phase 17 logout entry: ends the session, providers reset to guest state. */
@@ -348,7 +361,7 @@ export default function Settings() {
         </Card>
       </div>
 
-      {/* Edit profile — renames the account (local display name) */}
+      {/* Edit profile — persists display name to the users record */}
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
@@ -358,7 +371,7 @@ export default function Settings() {
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={saveEdit}>Save Changes</Button>
+            <Button onClick={saveEdit} loading={saving}>Save Changes</Button>
           </>
         }
       >

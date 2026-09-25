@@ -1,14 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { fetchMe, loginRequest, logoutRequest, registerRequest, type AuthUser } from "../lib/authApi";
+import { fetchMe, loginRequest, logoutRequest, registerRequest, updateProfileRequest, type AuthUser } from "../lib/authApi";
 
 /**
  * Session-backed account state (Phase 3).
- * Identity (email/role) always comes from the server session — never from
- * local storage. The display name keeps its local Settings override on top
- * of the server name (server-side rename is a later phase).
+ * Identity (name/email/role) always comes from the server session backed by
+ * the `users` database record — never from local storage. Settings →
+ * Edit Profile persists via PATCH /api/auth/me so the name survives
+ * refresh, logout/login, and future sessions.
  */
-
-const STORAGE_KEY = "meronote-user-name";
 
 type AuthStatus = "loading" | "authed" | "guest";
 
@@ -17,14 +16,14 @@ interface UserContextValue {
   user: AuthUser | null;
   /** Session resolution state. */
   status: AuthStatus;
-  /** Display name (server name + local Settings override). */
+  /** Display name (database-backed user.name; "Student" when guest). */
   name: string;
   /** Server email ("" when guest). */
   email: string;
   /** Server role — drives portal access ("USER" when guest). */
   role: "USER" | "ADMIN";
-  /** Local display-name override (Settings → Edit Profile). */
-  setName: (name: string) => void;
+  /** Persist display-name change to the users record + sync user state. */
+  setName: (name: string) => Promise<AuthUser>;
   login: (email: string, password: string, remember: boolean) => Promise<AuthUser>;
   register: (email: string, password: string, confirmPassword: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
@@ -33,30 +32,21 @@ interface UserContextValue {
 
 const UserContext = createContext<UserContextValue | null>(null);
 
-function readStoredName(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw && raw.trim() ? raw : null;
-  } catch {
-    return null;
-  }
-}
+/** Legacy local-only override key — removed; cleaned up once if present. */
+const LEGACY_STORAGE_KEY = "meronote-user-name";
 
-function writeStoredName(name: string | null): void {
+function clearLegacyStoredName(): void {
   if (typeof window === "undefined") return;
   try {
-    if (name) window.localStorage.setItem(STORAGE_KEY, name);
-    else window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {
-    // Storage unavailable — keep UI-only state.
+    // Storage unavailable — nothing to clean.
   }
 }
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
-  const [nameOverride, setNameOverride] = useState<string | null>(() => readStoredName());
 
   const refresh = useCallback(async () => {
     try {
@@ -70,20 +60,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    clearLegacyStoredName();
     void refresh();
   }, [refresh]);
 
-  const setName = useCallback((next: string) => {
+  const setName = useCallback(async (next: string) => {
     const trimmed = next.trim();
-    if (!trimmed) return;
-    setNameOverride(trimmed);
-    writeStoredName(trimmed);
+    if (!trimmed) throw new Error("Name cannot be empty.");
+    const updated = await updateProfileRequest(trimmed);
+    setUser(updated);
+    return updated;
   }, []);
 
   const login = useCallback(async (email: string, password: string, remember: boolean) => {
     const authed = await loginRequest(email, password, remember);
-    writeStoredName(null);
-    setNameOverride(null);
     setUser(authed);
     setStatus("authed");
     return authed;
@@ -91,8 +81,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(async (email: string, password: string, confirmPassword: string) => {
     const authed = await registerRequest(email, password, confirmPassword);
-    writeStoredName(null);
-    setNameOverride(null);
     setUser(authed);
     setStatus("authed");
     return authed;
@@ -102,10 +90,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       await logoutRequest();
     } finally {
-      // Phase 17: the local display-name override is personal state — clear
-      // it so a guest or the next account never inherits the previous name.
-      writeStoredName(null);
-      setNameOverride(null);
       setUser(null);
       setStatus("guest");
     }
@@ -115,7 +99,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       status,
-      name: nameOverride ?? user?.name ?? "Student",
+      name: user?.name ?? "Student",
       email: user?.email ?? "",
       role: user?.role ?? "USER",
       setName,
@@ -124,7 +108,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       logout,
       refresh,
     }),
-    [user, status, nameOverride, setName, login, register, logout, refresh],
+    [user, status, setName, login, register, logout, refresh],
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
