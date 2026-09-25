@@ -14,3 +14,4 @@ export * from "./favorite.model";
 export * from "./bookmark.model";
 export * from "./readingProgress.model";
 export * from "./userSemesterPlan.model";
+export * from "./downloadHistory.model";

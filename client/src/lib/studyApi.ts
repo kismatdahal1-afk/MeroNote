@@ -144,11 +144,13 @@ export interface StudyProgressRow {
  * sequentially until the envelope's page count is reached. Any page failure
  * returns null (failure, never partial data). MAX_PAGES bounds adversarial
  * totals; realistic personal lists resolve in a single request.
+ *
+ * Shared by download history (Phase 18) — same envelope, same guarantees.
  */
 const PAGE_SIZE = 100;
 const MAX_PAGES = 100;
 
-async function list<T>(basePath: string): Promise<T[] | null> {
+export async function fetchAllPages<T>(basePath: string): Promise<T[] | null> {
   const all: T[] = [];
   let page = 1;
   let pages = 1;
@@ -178,13 +180,13 @@ async function list<T>(basePath: string): Promise<T[] | null> {
 }
 
 export function listFavorites(): Promise<StudyFavoriteRow[] | null> {
-  return list<StudyFavoriteRow>("/api/me/favorites");
+  return fetchAllPages<StudyFavoriteRow>("/api/me/favorites");
 }
 
 export function listBookmarks(): Promise<StudyBookmarkRow[] | null> {
-  return list<StudyBookmarkRow>("/api/me/bookmarks");
+  return fetchAllPages<StudyBookmarkRow>("/api/me/bookmarks");
 }
 
 export function listProgress(): Promise<StudyProgressRow[] | null> {
-  return list<StudyProgressRow>("/api/me/progress");
+  return fetchAllPages<StudyProgressRow>("/api/me/progress");
 }

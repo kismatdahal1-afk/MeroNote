@@ -34,6 +34,18 @@ import {
   selectGuestFavoriteMerge,
 } from "../lib/librarySync";
 import {
+  buildCompletedRow,
+  downloadMirrorKey,
+  mergeRebuiltDownloads,
+  unregisteredCompletedRows,
+  verifiedCompletedRows,
+} from "../lib/downloadRegistry";
+import {
+  getDownloadHistory,
+  registerDownloadHistory,
+  type DownloadHistoryRow,
+} from "../lib/downloadHistoryApi";
+import {
   createBookmark as createServerBookmark,
   deleteBookmarkById as deleteServerBookmarkById,
   deleteFavorite as deleteServerFavorite,
@@ -93,6 +105,15 @@ interface LibraryContextValue {
   getProgress: (resourceId: string) => ReadingProgress | undefined;
   setReadingProgress: (resourceId: string, page: number, total: number) => void;
 
+  /** Account-level download history (MongoDB: this user downloaded X). */
+  downloadHistory: DownloadHistoryRow[];
+  /** Account truth: does this user's history include the resource? */
+  isAccountDownloaded: (resourceId: string) => boolean;
+  /** Device truth: does this device physically hold the PDF bytes? */
+  hasLocalFile: (resourceId: string) => boolean;
+  /** History entry for a resource, if the account holds one. */
+  getHistoryEntry: (resourceId: string) => DownloadHistoryRow | undefined;
+
   /** True while the account lists are being hydrated after login. */
   isHydrating: boolean;
   /** Last hydration failure, if any (null means empty data is genuine). */
@@ -104,14 +125,12 @@ interface LibraryContextValue {
 const LibraryContext = createContext<LibraryContextValue | null>(null);
 
 /**
- * Device-local download registry (Phase 18 owns user/device separation).
- * Personal save-lists use per-namespace mirrors via libraryMirrorKey
- * (see lib/librarySync): legacy keys for guests, v2.<userId> when authed.
+ * Device-local download registry mirrors (completed rows only — blobs live
+ * in IndexedDB, never in mirrors). Guests use the legacy v1 key; each
+ * account gets an isolated v2.<userId> namespace (see downloadMirrorKey).
+ * The v1 key is never auto-migrated into an account (unsafe attribution).
  */
-const STORAGE_KEYS = {
-  /** Completed download rows only — blobs live in IndexedDB, states do not. */
-  downloads: "meronote.library.downloads.v1",
-} as const;
+const LEGACY_DOWNLOADS_KEY = "meronote.library.downloads.v1";
 
 function readStored<T>(key: string, fallback: T, validate: (raw: unknown) => T | null): T {
   if (typeof window === "undefined") return fallback;
@@ -245,14 +264,31 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [recent, setRecent] = useState<RecentEntry[]>([]);
   const [progress, setProgress] = useState<ReadingProgress[]>([]);
+  /** Account download history (MongoDB) for the hydrated user. */
+  const [downloadHistory, setDownloadHistory] = useState<DownloadHistoryRow[]>([]);
+  /** Device truth: resource ids whose PDF bytes exist in IndexedDB right now. */
+  const [localFileIds, setLocalFileIds] = useState<string[]>([]);
   const nextId = useRef(100);
+  // Fresh auth snapshot for completion-time decisions (history registration
+  // must use the session active when the bytes land, not a stale closure).
+  const authRef = useRef({ status, userId });
+  authRef.current = { status, userId };
+  // Latest committed device rows (see rebuild/preserve below).
+  const downloadsRef = useRef(downloads);
+  downloadsRef.current = downloads;
 
   /* Authenticated lifecycle: reset → merge guests → hydrate (server wins).
    * Logout/guest: reload the guest namespace; never leave another user's
    * in-memory state active. Failures surface via libraryError and keep the
-   * cleared state (never mistaken for empty data); retry re-runs hydration. */
+   * cleared state (never mistaken for empty data); retry re-runs hydration.
+   *
+   * Phase 18 download split: account history hydrates from MongoDB while
+   * IndexedDB stays the device truth. Completed device rows rebuild from
+   * history ∩ blobs; the legacy v1 registry is never attributed to an
+   * account (unsafe) and stays guest-local. */
   useEffect(() => {
     if (status === "loading") return;
+    let cancelled = false;
     if (status !== "authed" || !userId) {
       setFavorites(readStored(libraryMirrorKey("favorites", null), [], asStringArray));
       setFavoriteSubjects(readStored(libraryMirrorKey("favoriteSubjects", null), [], asStringArray));
@@ -261,10 +297,28 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       setSubjectBookmarkIds({});
       setProgress([]);
       setRecent([]);
+      setDownloadHistory([]);
+      // Guest device view: legacy registry rows whose blobs still exist.
+      // Orphan blobs (no row) stay invisible; rows without blobs are dropped.
+      const stored = readStored(LEGACY_DOWNLOADS_KEY, [], asDownloadRowArray);
+      listStoredIds()
+        .then((ids) => {
+          if (cancelled) return;
+          setDownloads(verifiedCompletedRows(stored, ids));
+          setLocalFileIds(ids);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setDownloads([]);
+            setLocalFileIds([]);
+          }
+        });
       setHydratedFor("guest");
       setIsHydrating(false);
       setLibraryError(null);
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
     // Pre-login guest lists (closure holds the latest committed render state)
     // are the one-time merge source; the reset below prevents any stale flash.
@@ -275,7 +329,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     const actor = userId;
     actorRef.current = actor;
 
-    let cancelled = false;
     setIsHydrating(true);
     setLibraryError(null);
     setFavorites([]);
@@ -285,6 +338,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     setSubjectBookmarkIds({});
     setProgress([]);
     setRecent([]);
+    // The previous account's registry view must not flash: drop it now; the
+    // device reconciliation below rebuilds this user's view. Blobs stay.
+    setDownloads([]);
+    setDownloadHistory([]);
+    setLocalFileIds([]);
 
     const alive = (): boolean => !cancelled && actorRef.current === actor;
 
@@ -316,13 +374,14 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         }
       }
       if (!alive()) return;
-      const [favRows, bmRows, progRows] = await Promise.all([
+      const [favRows, bmRows, progRows, dlRows] = await Promise.all([
         listServerFavorites(),
         listServerBookmarks(),
         listServerProgress(),
+        getDownloadHistory(),
       ]);
       if (!alive()) return;
-      if (favRows && bmRows && progRows) {
+      if (favRows && bmRows && progRows && dlRows) {
         setFavorites(favRows.filter((r) => r.targetType === "resource").map((r) => r.targetId));
         setFavoriteSubjects(favRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
         setBookmarks(bmRows.map(bookmarkRowToBookmark).filter((b): b is Bookmark => b !== null));
@@ -333,12 +392,75 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         }
         setSubjectBookmarkIds(subjectIds);
         setProgress(progRows.map(progressRowToProgress));
+        setDownloadHistory(dlRows);
+        // Device reconciliation: completed rows rebuild from account history
+        // ∩ physical blobs (either truth alone is insufficient). In-flight
+        // device work started before hydration finished is preserved.
+        const blobIds = await listStoredIds().catch(() => null);
+        if (!alive()) return;
+        const blobs = blobIds ?? [];
+        setLocalFileIds(blobs);
+        const historyIds = new Set(dlRows.map((r) => r.resourceId));
+        const rebuilt = dlRows
+          .filter((r) => blobs.includes(r.resourceId))
+          .map((r) => buildCompletedRow(r, 0));
+        setDownloads((prev) => mergeRebuiltDownloads(rebuilt, prev, blobs));
+        // Registration retry: blob-verified completed rows the account
+        // history lacks — e.g. the history PUT failed (or was skipped) at
+        // completion time (§32). Sources are the user's own namespaced
+        // mirror plus rows completed inside this hydration window (not yet
+        // mirrored). Orphan blobs without rows are never adopted here
+        // (Phase 19 reconciliation).
+        const mirrorRows = verifiedCompletedRows(
+          readStored(downloadMirrorKey(actor), [], asDownloadRowArray),
+          blobs,
+        );
+        const windowRows = verifiedCompletedRows(downloadsRef.current, blobs);
+        const candidates = new Map<string, DownloadItem>();
+        for (const row of [...mirrorRows, ...windowRows]) {
+          if (!candidates.has(row.resourceId) && row.sizeBytes > 0) candidates.set(row.resourceId, row);
+        }
+        const missing = unregisteredCompletedRows([...candidates.values()], historyIds);
+        const synced: DownloadHistoryRow[] = [];
+        for (const row of missing) {
+          if (!alive()) break;
+          const saved = await registerDownloadHistory(row.resourceId, row.sizeBytes).catch(() => null);
+          if (saved) synced.push(saved);
+        }
+        if (!alive()) return;
+        if (synced.length > 0) {
+          setDownloadHistory((prev) => {
+            const ids = new Set(prev.map((r) => r.resourceId));
+            const next = [...prev];
+            for (const s of synced) {
+              if (!ids.has(s.resourceId)) {
+                next.push(s);
+                ids.add(s.resourceId);
+              }
+            }
+            return next;
+          });
+          setDownloads((prev) => {
+            const ids = new Set(prev.map((d) => d.resourceId));
+            const next = [...prev];
+            for (const s of synced) {
+              if (!ids.has(s.resourceId)) next.push(buildCompletedRow(s, 0));
+            }
+            return next;
+          });
+        }
         pruneClaimedGuestMirrors(favRows, bmRows);
         setHydratedFor(actor);
         setLibraryError(null);
       } else {
-        // Failure is not empty: keep cleared state and expose retry. Guest
-        // mirrors in storage remain intact for logout/retry recovery.
+        // Failure is not empty: fall back to this user's own device mirror
+        // (blob-verified completed rows), never another user's state.
+        const mirrorRows = readStored(downloadMirrorKey(actor), [], asDownloadRowArray);
+        const blobs = await listStoredIds().catch(() => [] as string[]);
+        if (!alive()) return;
+        setLocalFileIds(blobs);
+        setDownloadHistory([]);
+        setDownloads(verifiedCompletedRows(mirrorRows, blobs));
         setHydratedFor(actor);
         setLibraryError("Could not load your library. Check your connection and try again.");
       }
@@ -346,6 +468,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     })().catch(() => {
       if (!cancelled && actorRef.current === actor) {
         setHydratedFor(actor);
+        setDownloadHistory([]);
         setLibraryError("Could not load your library. Check your connection and try again.");
         setIsHydrating(false);
       }
@@ -377,29 +500,18 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     }
   }, [favorites, favoriteSubjects, bookmarks, bookmarkedSubjects, hydratedFor, status, userId]);
 
-  /* Downloads: restore completed rows whose blobs still exist, drop orphans. */
+  /* Device registry mirror (completed rows only): per-user namespace when
+   * authed, legacy v1 key for guests. Gated like the personal lists so one
+   * account's registry never lands in another namespace. */
   useEffect(() => {
-    let cancelled = false;
-    const stored = readStored(STORAGE_KEYS.downloads, [], asDownloadRowArray);
-    listStoredIds()
-      .then((ids) => {
-        if (!cancelled) setDownloads(stored.filter((row) => ids.includes(row.resourceId)));
-      })
-      .catch(() => {
-        if (!cancelled) setDownloads([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  /* Persist completed rows only — blobs live in IndexedDB, states do not. */
-  useEffect(() => {
-    writeStored(
-      STORAGE_KEYS.downloads,
-      downloads.filter((d) => d.status === "completed"),
-    );
-  }, [downloads]);
+    if (status === "loading" || hydratedFor === null) return;
+    const completed = downloads.filter((d) => d.status === "completed");
+    if (status === "authed" && userId && hydratedFor === userId) {
+      writeStored(downloadMirrorKey(userId), completed);
+    } else if (status !== "authed" && hydratedFor === "guest") {
+      writeStored(LEGACY_DOWNLOADS_KEY, completed);
+    }
+  }, [downloads, hydratedFor, status, userId]);
 
   /* Keep generated bookmark ids unique across reloads (stored ids stay reserved). */
   useEffect(() => {
@@ -558,6 +670,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         },
         onDone: (result, sizeBytes, errorMessage) => {
           if (result === "completed") {
+            // Blob write already verified by the manager: only now may the
+            // account history be registered (§9 ordering — never before the
+            // file exists). The completed row lands regardless; a failed
+            // registration stays visible as device truth and is retried at
+            // the next hydration (§32) without deleting the valid local PDF.
             setDownloads((prev) =>
               prev.map((d) =>
                 d.id === rowId
@@ -565,6 +682,19 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
                   : d,
               ),
             );
+            setLocalFileIds((prev) => (prev.includes(resource.id) ? prev : [...prev, resource.id]));
+            const session = authRef.current;
+            if (session.status === "authed" && session.userId && isObjectIdLike(resource.id)) {
+              const owner = session.userId;
+              void registerDownloadHistory(resource.id, sizeBytes)
+                .then((row) => {
+                  if (authRef.current.userId !== owner) return;
+                  setDownloadHistory((prev) =>
+                    prev.some((r) => r.resourceId === row.resourceId) ? prev : [...prev, row],
+                  );
+                })
+                .catch(() => {});
+            }
           } else if (result === "failed") {
             setDownloads((prev) =>
               prev.map((d) =>
@@ -590,9 +720,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     const row = downloads.find((d) => d.id === downloadId);
     if (row) {
       // Local only: aborts any active fetch and deletes the IndexedDB blob.
-      // Never touches B2 or MongoDB.
+      // Never touches B2 or MongoDB (Phase 19 owns history removal).
       cancelDownloadRequest(row.resourceId);
       void deleteFile(row.resourceId).catch(() => {});
+      setLocalFileIds((prev) => prev.filter((id) => id !== row.resourceId));
     }
     setDownloads((prev) => prev.filter((d) => d.id !== downloadId));
   }, [downloads]);
@@ -603,6 +734,23 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         .filter((d) => d.status === "completed")
         .reduce((sum, d) => sum + d.sizeBytes, 0),
     [downloads],
+  );
+
+  /** Account truth: this user's download history includes the resource. */
+  const isAccountDownloaded = useCallback(
+    (resourceId: string) => downloadHistory.some((r) => r.resourceId === resourceId),
+    [downloadHistory],
+  );
+
+  /** Device truth: this device physically holds the PDF bytes right now. */
+  const hasLocalFile = useCallback(
+    (resourceId: string) => localFileIds.includes(resourceId),
+    [localFileIds],
+  );
+
+  const getHistoryEntry = useCallback(
+    (resourceId: string) => downloadHistory.find((r) => r.resourceId === resourceId),
+    [downloadHistory],
   );
 
   const markOpened = useCallback((resourceId: string) => {
@@ -668,6 +816,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       cancelDownload,
       removeDownload,
       totalDownloadSize,
+      downloadHistory,
+      isAccountDownloaded,
+      hasLocalFile,
+      getHistoryEntry,
       recent,
       markOpened,
       progress,
@@ -697,6 +849,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       cancelDownload,
       removeDownload,
       totalDownloadSize,
+      downloadHistory,
+      isAccountDownloaded,
+      hasLocalFile,
+      getHistoryEntry,
       recent,
       markOpened,
       progress,

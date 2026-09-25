@@ -215,17 +215,28 @@ describe("local reader resolution", () => {
   });
 });
 
-describe("backend invariant: no downloads collection", () => {
-  it("server models contain no download model, schema, or collection", () => {
+describe("backend invariant: IndexedDB holds bytes, download_history holds metadata", () => {
+  it("server models contain only the Phase 18 download-history metadata model (no bytes)", () => {
     // From client/src/lib/__tests__ → repo root → server/src/models.
     const here = fileURLToPath(new URL(".", import.meta.url));
     const modelsDir = resolve(here, "..", "..", "..", "..", "server", "src", "models");
     const files = readdirSync(modelsDir);
-    expect(files.some((f) => f.toLowerCase().includes("download"))).toBe(false);
+    expect(files.filter((f) => f.toLowerCase().includes("download"))).toEqual(["downloadHistory.model.ts"]);
     for (const file of files) {
       if (!file.endsWith(".model.ts") && file !== "index.ts" && file !== "enums.ts") continue;
       const content = readFileSync(join(modelsDir, file), "utf8");
-      expect(content.toLowerCase()).not.toMatch(/download/);
+      if (file === "downloadHistory.model.ts") {
+        // Metadata only: collection name present, binary/blob schema storage absent.
+        expect(content).toMatch(/download_history/);
+        expect(content).not.toMatch(/\b(Buffer|Blob|BSONBinary)\b|Schema\.Types\.Buffer/);
+      } else if (file === "index.ts") {
+        // Barrel may re-export only the sanctioned metadata model.
+        const hits = content.match(/download[a-z]*/gi) ?? [];
+        expect(hits.length).toBeGreaterThan(0);
+        expect(hits.every((h) => h.toLowerCase().startsWith("downloadhistory"))).toBe(true);
+      } else {
+        expect(content.toLowerCase()).not.toMatch(/download/);
+      }
     }
     expect(existsSync(join(modelsDir, "download.model.ts"))).toBe(false);
   });

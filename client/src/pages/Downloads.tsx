@@ -20,7 +20,13 @@ import type { Resource, ResourceType } from "../types";
 type SortKey = "recent" | "oldest" | "title" | "size";
 
 export default function Downloads() {
-  const { downloads, removeDownload, totalDownloadSize } = useLibrary();
+  const {
+    downloads,
+    removeDownload,
+    totalDownloadSize,
+    downloadHistory,
+    hasLocalFile,
+  } = useLibrary();
   const { toast } = useToast();
   const { semesters, subjects: taxonomySubjects } = useTaxonomy();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
@@ -30,12 +36,36 @@ export default function Downloads() {
   const [type, setType] = useState<ResourceType | "all">("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
+  // Combined registry view: device rows plus account-history entries whose
+  // bytes are not on this device ("remote" rows render from the same card
+  // with a Not-on-this-device state driven by hasLocalFile). Orphan blobs
+  // without history stay invisible (Phase 19 reconciliation).
+  const remoteRows = useMemo(
+    () =>
+      downloadHistory
+        .filter((h) => !downloads.some((d) => d.resourceId === h.resourceId))
+        .map((h) => ({
+          id: `dl-remote-${h.resourceId}`,
+          resourceId: h.resourceId,
+          status: "completed" as const,
+          progress: 100,
+          sizeBytes: typeof h.fileSize === "number" && h.fileSize > 0 ? h.fileSize : 0,
+          downloadedAt: h.downloadedAt,
+        })),
+    [downloadHistory, downloads],
+  );
+  const listed = useMemo(() => [...remoteRows, ...downloads], [remoteRows, downloads]);
+
   // Status transitions (downloading → completed/failed) refetch; per-chunk
   // progress ticks must not — they would refetch every resource per chunk.
-  const downloadKey = downloads.map((d) => `${d.id}:${d.status}`).join(",");
+  const downloadKey = useMemo(
+    () =>
+      [...listed.map((d) => `${d.id}:${d.status}`), `history:${downloadHistory.map((h) => h.resourceId).join(",")}`].join(","),
+    [listed, downloadHistory],
+  );
   const resolved = useApiQuery(`downloads:${downloadKey}`, async (signal) => {
     const rows = await Promise.all(
-      downloads.map(async (dl) => {
+      listed.map(async (dl) => {
         try {
           const resource = await fetchResource(dl.resourceId, signal);
           return { dl, resource };
@@ -44,7 +74,7 @@ export default function Downloads() {
         }
       }),
     );
-    return rows.filter((e): e is { dl: (typeof downloads)[number]; resource: Resource } => Boolean(e));
+    return rows.filter((e): e is { dl: (typeof listed)[number]; resource: Resource } => Boolean(e));
   });
   const entries = useMemo(() => resolved.data ?? [], [resolved.data]);
   const entriesLoading = resolved.loading;
@@ -85,8 +115,9 @@ export default function Downloads() {
     return map;
   }, [entries, semesterId, subjectId]);
 
-  const completedCount = entries.filter((e) => e.dl.status === "completed").length;
+  const completedCount = entries.filter((e) => e.dl.status === "completed" && hasLocalFile(e.dl.resourceId)).length;
   const activeCount = entries.filter((e) => e.dl.status === "downloading").length;
+  const remoteCount = entries.filter((e) => e.dl.status === "completed" && !hasLocalFile(e.dl.resourceId)).length;
 
   return (
     <div>
@@ -121,6 +152,11 @@ export default function Downloads() {
                 <span className="font-bold text-foreground">{completedCount}</span> files
                 downloaded
               </span>
+              {remoteCount > 0 && (
+                <span>
+                  <span className="font-bold text-foreground">{remoteCount}</span> not on this device
+                </span>
+              )}
               {activeCount > 0 && (
                 <span>
                   <span className="font-bold text-foreground">{activeCount}</span> in progress
@@ -131,7 +167,7 @@ export default function Downloads() {
         </div>
       </Card>
 
-      {downloads.length === 0 ? (
+      {downloads.length === 0 && downloadHistory.length === 0 ? (
         <EmptyState
           title="No downloads yet"
           message="Press the download button on any resource to keep it available offline."

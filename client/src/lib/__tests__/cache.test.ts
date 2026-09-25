@@ -205,14 +205,24 @@ describe("credential and collection safety", () => {
     expect(text).not.toMatch(/B2_|APPLICATION_KEY|secret|password|jwt|token|cookie|authorization/i);
   });
 
-  it("no MongoDB cache/download collections or models exist server-side", () => {
+  it("no MongoDB cache collections; only the Phase 18 download-history metadata model", () => {
     // Repo layout: client/.. = repo root.
     const dir = join(CLIENT_ROOT, "..", "server", "src", "models");
     const files: string[] = readdirSync(dir);
-    expect(files.some((f) => /cache|download/i.test(f))).toBe(false);
+    expect(files.some((f) => /cache/i.test(f))).toBe(false);
+    // Phase 18 sanctions exactly one metadata collection (account history);
+    // PDF bytes stay in IndexedDB and out of MongoDB.
+    expect(files.filter((f) => /download/i.test(f))).toEqual(["downloadHistory.model.ts"]);
     for (const file of files) {
       if (!file.endsWith(".model.ts")) continue;
-      expect(readFileSync(join(dir, file), "utf8")).not.toMatch(/download/i);
+      const content = readFileSync(join(dir, file), "utf8");
+      if (file === "downloadHistory.model.ts") {
+        // Phase 18 metadata only: no binary/blob schema storage (the word
+        // "blob" appears solely in comments describing IndexedDB behavior).
+        expect(content).not.toMatch(/\b(Buffer|Blob|BSONBinary)\b|Schema\.Types\.Buffer/);
+      } else {
+        expect(content).not.toMatch(/download/i);
+      }
     }
   });
 });

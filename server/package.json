@@ -20,6 +20,7 @@
     "verify:personal-study": "tsx scripts/verify-personal-study.ts",
     "verify:semester-plan": "tsx scripts/verify-semester-plan.ts",
     "verify:hydration": "tsx scripts/verify-hydration.ts",
+    "verify:download-history": "tsx scripts/verify-download-history.ts",
     "verify:admin-cms": "tsx scripts/verify-admin-cms.ts",
     "verify:db": "tsx scripts/verify-db.ts",
     "verify:auth": "tsx scripts/verify-auth.ts",

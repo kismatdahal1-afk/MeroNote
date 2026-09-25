@@ -5,6 +5,7 @@ import { deleteFavorite, listFavorites, putFavorite } from "../controllers/favor
 import { createBookmark, deleteBookmark, listBookmarks, updateBookmark } from "../controllers/bookmarks.controller";
 import { getProgress, listProgress, putProgress } from "../controllers/progress.controller";
 import { listSemesterPlan, patchSemesterPlan } from "../controllers/semesterPlan.controller";
+import { listDownloads, putDownload } from "../controllers/downloads.controller";
 
 const router = Router();
 
@@ -27,5 +28,8 @@ router.put("/progress/:resourceId", asyncHandler(putProgress));
 
 router.get("/semester-plan", asyncHandler(listSemesterPlan));
 router.patch("/semester-plan/:semesterId", asyncHandler(patchSemesterPlan));
+
+router.get("/downloads", asyncHandler(listDownloads));
+router.put("/downloads/:resourceId", asyncHandler(putDownload));
 
 export default router;

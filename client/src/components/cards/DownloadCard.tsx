@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Trash2, Eye, CheckCircle2, Loader2, Heart, Bookmark, ChevronRight, RotateCcw, X } from "lucide-react";
+import { Trash2, Eye, CheckCircle2, Loader2, Heart, Bookmark, ChevronRight, RotateCcw, X, Download, CloudOff } from "lucide-react";
 import type { DownloadItem, Resource } from "../../types";
 import { Card } from "../common/PageHeader";
 import { ProgressBar } from "../common/ProgressBar";
@@ -18,7 +18,7 @@ interface DownloadCardProps {
 
 /** Card form of a downloaded resource — mirrors ResourceCard/BookmarkCard layout. */
 export function DownloadCard({ download, resource, onRemove }: DownloadCardProps) {
-  const { markOpened, isFavorite, toggleFavorite, getBookmark, addBookmark, cancelDownload, startDownload } = useLibrary();
+  const { markOpened, isFavorite, toggleFavorite, getBookmark, addBookmark, cancelDownload, startDownload, hasLocalFile } = useLibrary();
   const { toast } = useToast();
 
   const typeConfig = RESOURCE_TYPE_CONFIG[resource.type];
@@ -33,11 +33,20 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
   const subjectDisplayName = subjectName(resource.subjectId);
   const semesterDisplayName = semesterName(resource.semesterId);
   const completed = download.status === "completed";
+  // Phase 18 account/device split: a completed row without bytes on this
+  // device is account history from elsewhere ("remote") — offer Download,
+  // never a dead Read link or a delete of a file that isn't here.
+  const remote = completed && !hasLocalFile(resource.id);
   const favorite = isFavorite(resource.id);
   const bookmarked = Boolean(getBookmark(resource.id));
 
   const handleRetry = () => {
     startDownload(resource);
+  };
+
+  const handleDownloadRemote = () => {
+    startDownload(resource);
+    toast("Download started");
   };
 
   const handleFavorite = () => {
@@ -105,16 +114,34 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
               onClick={handleBookmark}
               className="pointer-events-auto relative"
             />
-            <IconButton
-              icon={Trash2}
-              label={`Delete ${resource.title} from downloads`}
-              size="sm"
-              variant="danger"
-              onClick={() => onRemove(download.id)}
-              className="pointer-events-auto relative"
-            />
+            {!remote && (
+              <IconButton
+                icon={Trash2}
+                label={`Delete ${resource.title} from downloads`}
+                size="sm"
+                variant="danger"
+                onClick={() => onRemove(download.id)}
+                className="pointer-events-auto relative"
+              />
+            )}
           </div>
         </div>
+        {remote && (
+          <div className="mt-2.5 flex items-center gap-2">
+            <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+              <CloudOff className="size-3.5" aria-hidden="true" />
+              Not on this device
+            </p>
+            <button
+              type="button"
+              onClick={handleDownloadRemote}
+              className="pointer-events-auto relative inline-flex h-7 items-center gap-1 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <Download className="size-3.5" aria-hidden="true" />
+              Download
+            </button>
+          </div>
+        )}
         {download.status === "downloading" && (
           <div className="mt-2.5 flex items-center gap-2.5">
             <ProgressBar value={download.progress / 100} label={`Download progress ${download.progress}%`} className="max-w-48" />
@@ -174,14 +201,16 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
             {typeConfig.label}
           </span>
         </div>
-        <IconButton
-          icon={Trash2}
-          label={`Delete ${resource.title} from downloads`}
-          size="sm"
-          variant="danger"
-          onClick={() => onRemove(download.id)}
-          className="pointer-events-auto relative"
-        />
+        {!remote && (
+          <IconButton
+            icon={Trash2}
+            label={`Delete ${resource.title} from downloads`}
+            size="sm"
+            variant="danger"
+            onClick={() => onRemove(download.id)}
+            className="pointer-events-auto relative"
+          />
+        )}
       </div>
 
       <div className="pointer-events-none mt-3 flex min-w-0 flex-1 flex-col">
@@ -236,32 +265,48 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
 
       <div className="pointer-events-none relative z-10 mt-4 flex items-center justify-between gap-2 border-t border-border pt-3 text-xs font-medium text-muted-foreground">
         <span className="inline-flex min-w-0 items-center gap-1.5">
-          {completed ? (
+          {remote ? (
+            <CloudOff className="size-3.5 shrink-0" aria-hidden="true" />
+          ) : completed ? (
             <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-hidden="true" />
           ) : (
             <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" aria-hidden="true" />
           )}
           <span className="truncate">
-            {completed
-              ? `${formatFileSize(download.sizeBytes)} · ${formatRelativeTime(download.downloadedAt)}`
-              : download.status === "failed"
-                ? (download.error ?? "Failed")
-                : download.status === "cancelled"
-                  ? "Cancelled"
-                  : "Downloading…"}
+            {remote
+              ? "Not on this device"
+              : completed
+                ? `${formatFileSize(download.sizeBytes)} · ${formatRelativeTime(download.downloadedAt)}`
+                : download.status === "failed"
+                  ? (download.error ?? "Failed")
+                  : download.status === "cancelled"
+                    ? "Cancelled"
+                    : "Downloading…"}
           </span>
         </span>
-        {completed && (
-          <Link
-            to={`/reader/${resource.id}`}
-            state={{ via: "downloads" }}
-            onClick={() => markOpened(resource.id)}
-            className="pointer-events-auto relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
-            aria-label={`Open ${resource.title}`}
+        {remote ? (
+          <button
+            type="button"
+            onClick={handleDownloadRemote}
+            className="pointer-events-auto relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            aria-label={`Download ${resource.title} to this device`}
           >
-            <Eye className="size-3.5" aria-hidden="true" />
-            Read
-          </Link>
+            <Download className="size-3.5" aria-hidden="true" />
+            Download
+          </button>
+        ) : (
+          completed && (
+            <Link
+              to={`/reader/${resource.id}`}
+              state={{ via: "downloads" }}
+              onClick={() => markOpened(resource.id)}
+              className="pointer-events-auto relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-primary-muted px-2.5 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover"
+              aria-label={`Open ${resource.title}`}
+            >
+              <Eye className="size-3.5" aria-hidden="true" />
+              Read
+            </Link>
+          )
         )}
       </div>
       </div>
