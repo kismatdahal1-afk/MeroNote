@@ -14,27 +14,28 @@ interface QuickNavigationProps {
   items: QuickNavItem[];
 }
 
-/** Compact horizontally scrollable pill/tab row (never overflows). */
+/** Compact pill/tab row: equal thirds on mobile (never scrolls), natural widths on desktop. */
 export function QuickNavigation({ items }: QuickNavigationProps) {
   return (
     <nav
       aria-label="Quick navigation"
-      className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex gap-1.5 overflow-x-auto sm:gap-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {items.map(({ to, label, icon: Icon, count }) => (
         <Link
           key={to}
           to={to}
           className={cx(
-            "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs font-bold transition-colors",
+            "inline-flex h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 text-[11px] font-bold transition-colors",
             "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
             "border border-border bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+            "sm:flex-none sm:px-3.5 sm:text-xs",
           )}
         >
-          <Icon className="size-3.5" aria-hidden="true" />
-          {label}
+          <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 truncate">{label}</span>
           {count !== undefined && (
-            <span className="rounded-full bg-primary-muted px-1.5 py-px text-[10px] font-bold text-primary">
+            <span className="shrink-0 rounded-full bg-primary-muted px-1.5 py-px text-[10px] font-bold text-primary">
               {count}
             </span>
           )}
