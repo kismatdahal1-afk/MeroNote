@@ -199,7 +199,7 @@ export default function Settings() {
                   <Pencil className="size-3.5" aria-hidden="true" />
                   Edit Profile
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleLogout} loading={loggingOut}>
+                <Button variant="danger" size="sm" onClick={handleLogout} loading={loggingOut}>
                   <LogOut className="size-3.5" aria-hidden="true" />
                   Log out
                 </Button>
