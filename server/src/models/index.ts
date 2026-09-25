@@ -1,5 +1,5 @@
 /**
- * Barrel export for the 10 Phase 1 collections.
+ * Barrel export for the 10 Phase 1 collections + Phase 16 semester plans.
  * Importing this module has no side effects (no connection is opened).
  */
 export * from "./enums";
@@ -13,3 +13,4 @@ export * from "./notice.model";
 export * from "./favorite.model";
 export * from "./bookmark.model";
 export * from "./readingProgress.model";
+export * from "./userSemesterPlan.model";

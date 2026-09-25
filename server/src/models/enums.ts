@@ -46,6 +46,10 @@ export const SUBJECT_CATEGORIES = ["core", "elective", "practical"] as const;
 
 export const USER_ROLES = ["USER", "ADMIN"] as const;
 
+/** User-specific semester plan status (Phase 16). Mirrors the existing
+ *  frontend SemesterUserStatus terminology: upcoming | ongoing | passed. */
+export const SEMESTER_USER_STATUSES = ["upcoming", "ongoing", "passed"] as const;
+
 export const FAVORITE_TARGETS = ["resource", "subject"] as const;
 
 export const ALLOWED_MIME_TYPES = ["application/pdf"] as const;

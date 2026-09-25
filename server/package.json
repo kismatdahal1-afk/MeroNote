@@ -18,6 +18,7 @@
     "verify:upload-timing": "tsx scripts/verify-upload-timing.ts",
     "verify:search": "tsx scripts/verify-search.ts",
     "verify:personal-study": "tsx scripts/verify-personal-study.ts",
+    "verify:semester-plan": "tsx scripts/verify-semester-plan.ts",
     "verify:admin-cms": "tsx scripts/verify-admin-cms.ts",
     "verify:db": "tsx scripts/verify-db.ts",
     "verify:auth": "tsx scripts/verify-auth.ts",
