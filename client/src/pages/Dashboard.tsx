@@ -1,8 +1,10 @@
 ﻿import { useNavigate } from "react-router-dom";
 import {
   GraduationCap, BookOpen, FileStack, HardDriveDownload, Search as SearchIcon, SlidersHorizontal, BadgeCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { Card } from "../components/common/PageHeader";
+import { Button } from "../components/common/Button";
 import { ExamCard } from "../components/dashboard/ExamCard";
 import { StudySummaryGrid } from "../components/dashboard/StudySummaryGrid";
 import { ContinueReadingSection, DashboardSectionHeader } from "../components/dashboard/ContinueReadingSection";
@@ -21,7 +23,7 @@ import { ErrorState } from "../components/common/States";
 import type { Resource } from "../types";
 
 export default function Dashboard() {
-  const { favorites, favoriteSubjects, bookmarks, bookmarkedSubjects, downloads, recent, progress } = useLibrary();
+  const { favorites, favoriteSubjects, bookmarks, bookmarkedSubjects, downloads, recent, progress, libraryError, retryHydration } = useLibrary();
   const { name } = useUser();
   const navigate = useNavigate();
 
@@ -151,6 +153,22 @@ export default function Dashboard() {
       <div className="mb-3.5">
         <ExamCard startDelay={210} />
       </div>
+
+      {/* Personalization hydration failure: provider-exclusive state below
+          (Continue Reading, Recently Opened) would otherwise look silently
+          empty. Other pages fetch independently with their own error states. */}
+      {libraryError && (
+        <div
+          role="alert"
+          className="mb-3.5 flex items-center gap-3 rounded-xl border border-error/30 bg-error-muted/30 px-4 py-3"
+        >
+          <AlertTriangle className="size-5 shrink-0 text-error" aria-hidden="true" />
+          <p className="min-w-0 flex-1 text-sm font-medium text-foreground">{libraryError}</p>
+          <Button variant="outline" size="sm" onClick={retryHydration} className="shrink-0">
+            Retry
+          </Button>
+        </div>
+      )}
 
       {/* Notices & reminders — admin-managed, loaded from the CMS store */}
       <div className="mb-3.5">

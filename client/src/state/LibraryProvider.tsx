@@ -405,9 +405,17 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         getPreferences(),
       ]);
       if (!alive()) return;
-      if (favRows && bmRows && progRows && dlRows && prefs) {
+      // Phase 20: apply each successful list independently. One failing
+      // endpoint must not discard the other lists' valid data — failure is
+      // still surfaced via libraryError, never mistaken for empty state.
+      let failed = false;
+      if (favRows) {
         setFavorites(favRows.filter((r) => r.targetType === "resource").map((r) => r.targetId));
         setFavoriteSubjects(favRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
+      } else {
+        failed = true;
+      }
+      if (bmRows) {
         setBookmarks(bmRows.map(bookmarkRowToBookmark).filter((b): b is Bookmark => b !== null));
         setBookmarkedSubjects(bmRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
         const subjectIds: Record<string, string> = {};
@@ -415,7 +423,15 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           if (row.targetType === "subject" && typeof row._id === "string") subjectIds[row.targetId] = row._id;
         }
         setSubjectBookmarkIds(subjectIds);
+      } else {
+        failed = true;
+      }
+      if (progRows) {
         setProgress(progRows.map(progressRowToProgress));
+      } else {
+        failed = true;
+      }
+      if (prefs) {
         // Server recent history replaces the memory-only list (defensive
         // dedupe/cap; guests keep memory-only recents that are never merged).
         // Opens fired while hydration was in flight are newest — keep them
@@ -435,6 +451,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
             return [...fresh, ...recents].slice(0, 20);
           });
         }
+      } else {
+        failed = true;
+      }
+      if (dlRows) {
         setDownloadHistory(dlRows);
         // Device reconciliation: completed rows rebuild from account history
         // ∩ physical blobs (either truth alone is insufficient). In-flight
@@ -539,12 +559,15 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
             );
           }
         }
-        pruneClaimedGuestMirrors(favRows, bmRows);
+        if (favRows && bmRows) pruneClaimedGuestMirrors(favRows, bmRows);
         setHydratedFor(actor);
-        setLibraryError(null);
+        setLibraryError(failed ? "Could not load your library. Check your connection and try again." : null);
       } else {
-        // Failure is not empty: fall back to this user's own device mirror
-        // (blob-verified completed rows), never another user's state.
+        // Download history failed while other lists may have succeeded (see
+        // above): fall back to this user's own device mirror (blob-verified
+        // completed rows), never another user's state — but keep the failure
+        // surfaced so it is never mistaken for empty history.
+        failed = true;
         const mirrorRows = readStored(downloadMirrorKey(actor), [], asDownloadRowArray);
         const blobs = await listStoredIds().catch(() => [] as string[]);
         if (!alive()) return;
