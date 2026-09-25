@@ -83,3 +83,22 @@ export function mergeRebuiltDownloads(
 export function downloadMirrorKey(userId: string | null): string {
   return userId ? `meronote.library.downloads.v2.${userId}` : "meronote.library.downloads.v1";
 }
+
+/**
+ * Verification staleness bound (Phase 19): a history row whose local file
+ * was confirmed within this window skips its server write; older rows
+ * re-verify once per hydration at most. Event-driven, never polled.
+ */
+export const VERIFICATION_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Due when never verified or the last confirmation exceeds the stale bound. */
+export function isVerificationDue(
+  lastVerifiedAt: string | undefined,
+  nowMs: number,
+  maxAgeMs: number = VERIFICATION_STALE_MS,
+): boolean {
+  if (!lastVerifiedAt) return true;
+  const at = Date.parse(lastVerifiedAt);
+  if (Number.isNaN(at)) return true;
+  return nowMs - at > maxAgeMs;
+}

@@ -14,6 +14,11 @@ export interface DownloadHistoryInput {
   fileSize?: number;
 }
 
+export interface DownloadVerifyInput {
+  verify?: boolean;
+  fileSize?: number;
+}
+
 export interface DownloadHistoryResource {
   _id: string;
   title: string;
@@ -104,6 +109,33 @@ function serialize(scalars: RowScalars, resource: LeanResource | null): Download
 /** A resource can enter download history only while student-visible. */
 export async function downloadTargetIsLive(resourceId: string): Promise<boolean> {
   return (await Resource.exists({ _id: resourceId, ...liveResourceFilter() })) !== null;
+}
+
+/** Hard-remove one history row (idempotent). Blobs are device-local and untouched. */
+export async function removeDownload(userId: string, resourceId: string): Promise<boolean> {
+  const removed = await DownloadHistory.findOneAndDelete({ userId, resourceId }).exec();
+  return removed !== null;
+}
+
+/**
+ * Verification/metadata refresh without reordering: optionally stamps
+ * lastVerifiedAt (caller confirmed the local file exists) and/or corrects
+ * fileSize. downloadedAt is never touched. Null when no row exists.
+ */
+export async function verifyDownload(
+  userId: string,
+  resourceId: string,
+  input: DownloadVerifyInput,
+): Promise<DownloadHistoryRow | null> {
+  const set: Record<string, unknown> = {};
+  if (input.verify) set.lastVerifiedAt = new Date();
+  if (input.fileSize !== undefined) set.fileSize = input.fileSize;
+  const doc = await DownloadHistory.findOneAndUpdate({ userId, resourceId }, { $set: set }, { returnDocument: "after" })
+    .populate("resourceId", RESOURCE_FIELDS)
+    .exec();
+  if (!doc) return null;
+  const plain = doc.toObject() as unknown as RowScalars & { resourceId: unknown };
+  return serialize(plain, asResource(plain.resourceId));
 }
 
 const RESOURCE_FIELDS = "title description type tags pageCount fileSize subjectId semesterId";

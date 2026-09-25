@@ -14,10 +14,12 @@ interface DownloadCardProps {
   download: DownloadItem;
   resource: Resource;
   onRemove: (downloadId: string) => void;
+  /** Remove the account-history entry (remote rows only; file stays if present). */
+  onRemoveHistory?: (resourceId: string) => void;
 }
 
 /** Card form of a downloaded resource — mirrors ResourceCard/BookmarkCard layout. */
-export function DownloadCard({ download, resource, onRemove }: DownloadCardProps) {
+export function DownloadCard({ download, resource, onRemove, onRemoveHistory }: DownloadCardProps) {
   const { markOpened, isFavorite, toggleFavorite, getBookmark, addBookmark, cancelDownload, startDownload, hasLocalFile } = useLibrary();
   const { toast } = useToast();
 
@@ -124,6 +126,16 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
                 className="pointer-events-auto relative"
               />
             )}
+            {remote && onRemoveHistory && (
+              <IconButton
+                icon={Trash2}
+                label={`Remove ${resource.title} from Downloads history`}
+                size="sm"
+                variant="danger"
+                onClick={() => onRemoveHistory(resource.id)}
+                className="pointer-events-auto relative"
+              />
+            )}
           </div>
         </div>
         {remote && (
@@ -208,6 +220,16 @@ export function DownloadCard({ download, resource, onRemove }: DownloadCardProps
             size="sm"
             variant="danger"
             onClick={() => onRemove(download.id)}
+            className="pointer-events-auto relative"
+          />
+        )}
+        {remote && onRemoveHistory && (
+          <IconButton
+            icon={Trash2}
+            label={`Remove ${resource.title} from Downloads history`}
+            size="sm"
+            variant="danger"
+            onClick={() => onRemoveHistory(resource.id)}
             className="pointer-events-auto relative"
           />
         )}

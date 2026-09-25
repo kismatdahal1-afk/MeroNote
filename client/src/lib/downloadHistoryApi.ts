@@ -80,3 +80,64 @@ export async function registerDownloadHistory(resourceId: string, fileSize: numb
   }
   return json.data;
 }
+
+/**
+ * Remove one resource from account Downloads (hard delete, idempotent).
+ * Never touches the physical IndexedDB blob: a removed entry whose file
+ * remains becomes a local-only orphan for reconciliation. Re-download
+ * reactivates via the standard idempotent PUT.
+ */
+export async function deleteDownloadHistory(resourceId: string): Promise<boolean> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/me/downloads/${resourceId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+  } catch {
+    throw new DownloadHistoryError(0, "Cannot reach the server. Check your connection and try again.");
+  }
+  const json = (await res.json().catch(() => null)) as { data?: { removed?: boolean }; message?: string } | null;
+  if (!res.ok) {
+    throw new DownloadHistoryError(
+      res.status,
+      typeof json?.message === "string" && json.message ? json.message : "Could not remove download history.",
+    );
+  }
+  return json?.data?.removed === true;
+}
+
+export interface DownloadVerifyInput {
+  verify?: boolean;
+  fileSize?: number;
+}
+
+/**
+ * Verification/metadata refresh that never reorders history: stamps
+ * lastVerifiedAt and/or corrects fileSize. Null-safe callers only invoke
+ * this after confirming the local file exists.
+ */
+export async function verifyDownloadHistory(
+  resourceId: string,
+  input: DownloadVerifyInput,
+): Promise<DownloadHistoryRow> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/me/downloads/${resourceId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  } catch {
+    throw new DownloadHistoryError(0, "Cannot reach the server. Check your connection and try again.");
+  }
+  const json = (await res.json().catch(() => null)) as { data?: DownloadHistoryRow; message?: string } | null;
+  if (!res.ok || !json?.data) {
+    throw new DownloadHistoryError(
+      res.status,
+      typeof json?.message === "string" && json.message ? json.message : "Could not verify download history.",
+    );
+  }
+  return json.data;
+}

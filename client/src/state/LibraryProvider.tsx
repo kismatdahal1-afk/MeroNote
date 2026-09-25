@@ -15,7 +15,7 @@ import type {
   ReadingProgress,
   Resource,
 } from "../types";
-import { deleteFile, listStoredIds } from "../lib/downloadStore";
+import { deleteFile, getFile, listStoredIds } from "../lib/downloadStore";
 import {
   cancelDownloadRequest,
   startDownloadRequest,
@@ -43,8 +43,18 @@ import {
 import {
   getDownloadHistory,
   registerDownloadHistory,
+  deleteDownloadHistory,
+  verifyDownloadHistory,
   type DownloadHistoryRow,
 } from "../lib/downloadHistoryApi";
+import {
+  VERIFICATION_STALE_MS,
+  isVerificationDue,
+} from "../lib/downloadRegistry";
+import {
+  getPreferences,
+  recordRecentOpened,
+} from "../lib/preferencesApi";
 import {
   createBookmark as createServerBookmark,
   deleteBookmarkById as deleteServerBookmarkById,
@@ -109,10 +119,23 @@ interface LibraryContextValue {
   downloadHistory: DownloadHistoryRow[];
   /** Account truth: does this user's history include the resource? */
   isAccountDownloaded: (resourceId: string) => boolean;
-  /** Device truth: does this device physically hold the PDF bytes? */
+  /** Device truth: does this device physically hold the PDF bytes right now? */
   hasLocalFile: (resourceId: string) => boolean;
   /** History entry for a resource, if the account holds one. */
   getHistoryEntry: (resourceId: string) => DownloadHistoryRow | undefined;
+  /**
+   * Remove from account Downloads (history row only; local file, if any,
+   * stays and reconciles as an orphan). Resolves true when removed.
+   */
+  removeFromDownloads: (resourceId: string) => Promise<boolean>;
+  /**
+   * Adopt a local-only file into this account's history (explicit user
+   * claim; verifies the blob, registers history, shows it as saved).
+   * Resolves true when adopted.
+   */
+  adoptOrphanFile: (resourceId: string) => Promise<boolean>;
+  /** Blob ids with no history row and no active download (adoption candidates). */
+  orphanFileIds: string[];
 
   /** True while the account lists are being hydrated after login. */
   isHydrating: boolean;
@@ -374,14 +397,15 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         }
       }
       if (!alive()) return;
-      const [favRows, bmRows, progRows, dlRows] = await Promise.all([
+      const [favRows, bmRows, progRows, dlRows, prefs] = await Promise.all([
         listServerFavorites(),
         listServerBookmarks(),
         listServerProgress(),
         getDownloadHistory(),
+        getPreferences(),
       ]);
       if (!alive()) return;
-      if (favRows && bmRows && progRows && dlRows) {
+      if (favRows && bmRows && progRows && dlRows && prefs) {
         setFavorites(favRows.filter((r) => r.targetType === "resource").map((r) => r.targetId));
         setFavoriteSubjects(favRows.filter((r) => r.targetType === "subject").map((r) => r.targetId));
         setBookmarks(bmRows.map(bookmarkRowToBookmark).filter((b): b is Bookmark => b !== null));
@@ -392,6 +416,25 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         }
         setSubjectBookmarkIds(subjectIds);
         setProgress(progRows.map(progressRowToProgress));
+        // Server recent history replaces the memory-only list (defensive
+        // dedupe/cap; guests keep memory-only recents that are never merged).
+        // Opens fired while hydration was in flight are newest — keep them
+        // ahead of the server list instead of clobbering them.
+        {
+          const seen = new Set<string>();
+          const recents: RecentEntry[] = [];
+          for (const e of prefs.recentResources) {
+            if (typeof e.resourceId !== "string" || !e.resourceId || seen.has(e.resourceId)) continue;
+            seen.add(e.resourceId);
+            recents.push({ resourceId: e.resourceId, openedAt: e.openedAt });
+            if (recents.length >= 20) break;
+          }
+          setRecent((prev) => {
+            const fresh = prev.filter((r) => !seen.has(r.resourceId));
+            for (const r of fresh) seen.add(r.resourceId);
+            return [...fresh, ...recents].slice(0, 20);
+          });
+        }
         setDownloadHistory(dlRows);
         // Device reconciliation: completed rows rebuild from account history
         // ∩ physical blobs (either truth alone is insufficient). In-flight
@@ -432,9 +475,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           setDownloadHistory((prev) => {
             const ids = new Set(prev.map((r) => r.resourceId));
             const next = [...prev];
-            for (const s of synced) {
+            // Fresh registrations first (server recency order).
+            for (let i = synced.length - 1; i >= 0; i -= 1) {
+              const s = synced[i];
               if (!ids.has(s.resourceId)) {
-                next.push(s);
+                next.unshift(s);
                 ids.add(s.resourceId);
               }
             }
@@ -448,6 +493,51 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
             }
             return next;
           });
+        }
+        // Event-driven verification + size reconciliation (Phase 19): for
+        // history rows whose blob is present, confirm the bytes and refresh
+        // lastVerifiedAt only when stale (>7d), and correct a differing
+        // fileSize. One bounded sequential pass per hydration — never polled.
+        // Downloaded ordering (downloadedAt) is never touched by this.
+        {
+          const nowMs = Date.now();
+          const sizeUpdates = new Map<string, number>();
+          const historyUpdates = new Map<string, DownloadHistoryRow>();
+          let checked = 0;
+          for (const entry of dlRows) {
+            if (!alive()) break;
+            if (!blobs.includes(entry.resourceId)) continue;
+            if (checked >= 100) break;
+            checked += 1;
+            const file = await getFile(entry.resourceId).catch(() => null);
+            if (!alive() || !file) continue;
+            const patch: { verify?: boolean; fileSize?: number } = {};
+            if (file.fileSize !== entry.fileSize) {
+              patch.fileSize = file.fileSize;
+              sizeUpdates.set(entry.resourceId, file.fileSize);
+            }
+            if (isVerificationDue(entry.lastVerifiedAt, nowMs, VERIFICATION_STALE_MS)) patch.verify = true;
+            if (patch.verify === undefined && patch.fileSize === undefined) continue;
+            const updated = await verifyDownloadHistory(entry.resourceId, patch).catch(() => null);
+            if (updated && alive()) historyUpdates.set(entry.resourceId, updated);
+          }
+          if (!alive()) return;
+          if (historyUpdates.size > 0) {
+            setDownloadHistory((prev) => {
+              const updates = historyUpdates;
+              return prev.map((r) => (updates.has(r.resourceId) ? (updates.get(r.resourceId) as DownloadHistoryRow) : r));
+            });
+          }
+          if (sizeUpdates.size > 0) {
+            // Device display prefers the actual local blob size (§16).
+            setDownloads((prev) =>
+              prev.map((d) =>
+                d.status === "completed" && sizeUpdates.has(d.resourceId)
+                  ? { ...d, sizeBytes: sizeUpdates.get(d.resourceId) as number }
+                  : d,
+              ),
+            );
+          }
         }
         pruneClaimedGuestMirrors(favRows, bmRows);
         setHydratedFor(actor);
@@ -689,8 +779,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
               void registerDownloadHistory(resource.id, sizeBytes)
                 .then((row) => {
                   if (authRef.current.userId !== owner) return;
+                  // Newest completion first (matches server recency order).
                   setDownloadHistory((prev) =>
-                    prev.some((r) => r.resourceId === row.resourceId) ? prev : [...prev, row],
+                    prev.some((r) => r.resourceId === row.resourceId) ? prev : [row, ...prev],
                   );
                 })
                 .catch(() => {});
@@ -753,11 +844,78 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     [downloadHistory],
   );
 
+  /**
+   * Remove from account Downloads: hard-deletes the history row (idempotent).
+   * The physical blob, if any, is intentionally kept — the entry reconciles
+   * as a local-only orphan (adoptable) rather than vanishing silently.
+   */
+  const removeFromDownloads = useCallback(async (resourceId: string): Promise<boolean> => {
+    const session = authRef.current;
+    if (session.status !== "authed" || !session.userId) return false;
+    const me = session.userId;
+    try {
+      const removed = await deleteDownloadHistory(resourceId);
+      if (authRef.current.userId !== me) return false;
+      if (removed) {
+        setDownloadHistory((prev) => prev.filter((r) => r.resourceId !== resourceId));
+        setDownloads((prev) => prev.filter((d) => d.resourceId !== resourceId));
+      }
+      return removed;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  /**
+   * Adopt a local-only file into this account (explicit user claim): verifies
+   * the blob, registers history, shows it as saved. Never silently attributes
+   * arbitrary device files — only this user-confirmed path adopts orphans.
+   */
+  const adoptOrphanFile = useCallback(async (resourceId: string): Promise<boolean> => {
+    const session = authRef.current;
+    if (session.status !== "authed" || !session.userId || !isObjectIdLike(resourceId)) return false;
+    const me = session.userId;
+    try {
+      const file = await getFile(resourceId);
+      if (!file || authRef.current.userId !== me) return false;
+      const row = await registerDownloadHistory(resourceId, file.fileSize);
+      if (authRef.current.userId !== me) return false;
+      setDownloadHistory((prev) =>
+        prev.some((r) => r.resourceId === row.resourceId) ? prev : [row, ...prev],
+      );
+      setDownloads((prev) =>
+        prev.some((d) => d.resourceId === row.resourceId)
+          ? prev
+          : [...prev, buildCompletedRow(row, file.fileSize)],
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  /** Blob ids with no history row and no active download: adoption candidates. */
+  const orphanFileIds = useMemo(() => {
+    const historyIds = new Set(downloadHistory.map((r) => r.resourceId));
+    const activeIds = new Set(
+      downloads
+        .filter((d) => d.status === "downloading" || d.status === "queued")
+        .map((d) => d.resourceId),
+    );
+    return localFileIds.filter((id) => !historyIds.has(id) && !activeIds.has(id));
+  }, [localFileIds, downloadHistory, downloads]);
+
   const markOpened = useCallback((resourceId: string) => {
     setRecent((prev) => [
       { resourceId, openedAt: new Date().toISOString() },
       ...prev.filter((r) => r.resourceId !== resourceId),
     ]);
+    // Account recent history: intentional opens persist server-side without
+    // ever blocking navigation (§30). Guests stay memory-only.
+    const session = authRef.current;
+    if (session.status === "authed" && session.userId && isObjectIdLike(resourceId)) {
+      void recordRecentOpened(resourceId);
+    }
   }, []);
   const getProgress = useCallback(
     (resourceId: string) => progress.find((p) => p.resourceId === resourceId),
@@ -820,6 +978,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       isAccountDownloaded,
       hasLocalFile,
       getHistoryEntry,
+      removeFromDownloads,
+      adoptOrphanFile,
+      orphanFileIds,
       recent,
       markOpened,
       progress,
@@ -853,6 +1014,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       isAccountDownloaded,
       hasLocalFile,
       getHistoryEntry,
+      removeFromDownloads,
+      adoptOrphanFile,
+      orphanFileIds,
       recent,
       markOpened,
       progress,

@@ -2,17 +2,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildCompletedRow,
   downloadMirrorKey,
+  isVerificationDue,
   mergeRebuiltDownloads,
   resolveDownloadState,
   unregisteredCompletedRows,
+  VERIFICATION_STALE_MS,
   verifiedCompletedRows,
 } from "../downloadRegistry";
 import {
+  deleteDownloadHistory,
   DownloadHistoryError,
   getDownloadHistory,
   registerDownloadHistory,
+  verifyDownloadHistory,
   type DownloadHistoryRow,
 } from "../downloadHistoryApi";
+import { getPreferences, recordRecentOpened } from "../preferencesApi";
 import type { DownloadItem } from "../../types";
 
 /**
@@ -162,5 +167,78 @@ describe("download history client", () => {
     const err = await registerDownloadHistory(A, 100).catch((e) => e);
     expect(err).toBeInstanceOf(DownloadHistoryError);
     expect((err as DownloadHistoryError).status).toBe(404);
+  });
+});
+
+describe("download history lifecycle client", () => {
+  it("deletes history without touching blobs (boolean result)", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(Response.json({ status: "ok", data: { removed: true } })),
+    );
+    await expect(deleteDownloadHistory(A)).resolves.toBe(true);
+  });
+
+  it("throws when removal fails (no silent history loss)", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(Response.json({ status: "error", message: "Nope." }, { status: 404 })),
+    );
+    const err = await deleteDownloadHistory(A).catch((e) => e);
+    expect(err).toBeInstanceOf(DownloadHistoryError);
+    expect((err as DownloadHistoryError).status).toBe(404);
+  });
+
+  it("verifies without reordering (PATCH, never PUT)", async () => {
+    let seenMethod = "";
+    let seenBody = "";
+    vi.stubGlobal("fetch", (_url: unknown, init?: RequestInit) => {
+      seenMethod = String(init?.method ?? "");
+      seenBody = String(init?.body ?? "");
+      return Promise.resolve(Response.json({ status: "ok", data: historyRow() }));
+    });
+    const row = await verifyDownloadHistory(A, { verify: true, fileSize: 3000 });
+    expect(seenMethod).toBe("PATCH");
+    expect(JSON.parse(seenBody)).toEqual({ verify: true, fileSize: 3000 });
+    expect(row.resourceId).toBe(A);
+  });
+});
+
+describe("verification staleness", () => {
+  const NOW = Date.parse("2026-09-25T00:00:00.000Z");
+
+  it("is due when never verified or unparseable", () => {
+    expect(isVerificationDue(undefined, NOW)).toBe(true);
+    expect(isVerificationDue("not-a-date", NOW)).toBe(true);
+  });
+
+  it("skips recently verified rows, flags stale ones", () => {
+    expect(isVerificationDue(new Date(NOW - 1000).toISOString(), NOW)).toBe(false);
+    expect(isVerificationDue(new Date(NOW - VERIFICATION_STALE_MS - 1).toISOString(), NOW)).toBe(true);
+    expect(isVerificationDue(new Date(NOW - 10).toISOString(), NOW, 5)).toBe(true);
+  });
+});
+
+describe("preferences client (recent only)", () => {
+  it("reads preferences envelope, null on failure", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(
+        Response.json({ status: "ok", data: { userId: "u", recentResources: [], createdAt: "", updatedAt: "" } }),
+      ),
+    );
+    const prefs = await getPreferences();
+    expect(prefs?.recentResources).toEqual([]);
+    vi.stubGlobal("fetch", () => Promise.resolve(new Response("{}", { status: 401 })));
+    await expect(getPreferences()).resolves.toBeNull();
+  });
+
+  it("recent recording never rejects and never blocks", async () => {
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+    await expect(recordRecentOpened(A)).resolves.toBeUndefined();
+    let seenBody = "";
+    vi.stubGlobal("fetch", (_url: unknown, init?: RequestInit) => {
+      seenBody = String(init?.body ?? "");
+      return Promise.resolve(Response.json({ status: "ok", data: { recentResources: [] } }));
+    });
+    await recordRecentOpened(A);
+    expect(JSON.parse(seenBody)).toEqual({ resourceId: A });
   });
 });

@@ -2,3 +2,4 @@
 export * from "./content";
 export * from "./semesterPlans";
 export * from "./downloads";
+export * from "./preferences";
