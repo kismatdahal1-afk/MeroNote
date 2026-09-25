@@ -282,14 +282,14 @@ export default function ResourceDetail() {
                   onClick={handleBookmark}
                 />
               </span>
-              <span className="flex w-full gap-2 sm:w-auto">
-                <Button variant="outline" onClick={handleDownload} className="flex-1 sm:flex-none">
+              <span className="flex gap-2">
+                <Button variant="outline" onClick={handleDownload}>
                   <Download className="size-4" aria-hidden="true" />
                   {download?.status === "completed" ? "Downloaded" : "Download"}
                 </Button>
-                <Button onClick={openReader} className="flex-1 sm:flex-none">
+                <Button onClick={openReader}>
                   <Eye className="size-4" aria-hidden="true" />
-                  {progress ? "Continue reading" : "Read now"}
+                  {inContinueReading ? "Continue Reading" : "Read"}
                 </Button>
               </span>
             </>
@@ -479,7 +479,7 @@ export default function ResourceDetail() {
           </ul>
           <Button className="mt-5 w-full" onClick={openReader}>
             <Eye className="size-4" aria-hidden="true" />
-            {progress ? "Continue reading" : "Read now"}
+            {inContinueReading ? "Continue Reading" : "Read"}
           </Button>
           {!isAdmin && (
             <Button

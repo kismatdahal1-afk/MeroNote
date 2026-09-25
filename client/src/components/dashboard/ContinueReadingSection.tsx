@@ -1,8 +1,7 @@
 import { Link } from "react-router-dom";
-import { Play, List, X } from "lucide-react";
+import { Play, List } from "lucide-react";
 import type { Resource } from "../../types";
 import { Card } from "../common/PageHeader";
-import { IconButton } from "../common/IconButton";
 import { ProgressBar } from "../common/ProgressBar";
 import { RESOURCE_TYPE_CONFIG } from "../../lib/resourceType";
 import { cx, formatTimestamp } from "../../lib/utils";
@@ -47,54 +46,8 @@ export function ContinueReadingSection({ resource, onRemove }: { resource: Resou
         aria-label={`Resume ${resource.title} at page ${lastPage}`}
         className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       />
-      {/* Mobile compact row — same pattern as the download cards: content lets
-          pointer events pass through to the stretched link, while real
-          controls opt back in. */}
-      <div className="pointer-events-none relative z-10 sm:hidden">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-9 shrink-0 items-center justify-center">
-            <typeConfig.icon className={cx("size-4.5", typeIconColor)} aria-hidden="true" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="line-clamp-1 text-sm font-bold leading-snug text-foreground">
-              {resource.title}
-            </p>
-            <p className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
-              Page {lastPage} of {resource.pageCount} · {pct}% completed
-            </p>
-            {subject?.name && (
-              <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground/80">
-                {subject.name}
-              </p>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <Link
-              to={`/reader/${resource.id}`}
-              onClick={() => markOpened(resource.id)}
-              aria-label={`Resume ${resource.title} at page ${lastPage}`}
-              className="pointer-events-auto relative flex size-9 items-center justify-center rounded-lg bg-primary-muted text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              <Play className="size-4 fill-current" aria-hidden="true" />
-            </Link>
-            {onRemove && (
-              <IconButton
-                icon={X}
-                label={`Remove ${resource.title} from Continue Reading`}
-                size="sm"
-                onClick={onRemove}
-                className="pointer-events-auto relative"
-              />
-            )}
-          </div>
-        </div>
-        <div className="mt-2.5">
-          <ProgressBar value={ratio} label={`Reading progress ${pct}%`} />
-        </div>
-      </div>
-
-      {/* Desktop card body — unchanged, hidden on mobile. */}
-      <div className="hidden sm:contents">
+      {/* Single layout on all screens — identical UI on mobile and laptop,
+          compact on small screens via the card padding above. */}
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-wide text-primary">
@@ -156,7 +109,6 @@ export function ContinueReadingSection({ resource, onRemove }: { resource: Resou
           </button>
         </div>
       )}
-      </div>
     </Card>
   );
 }
