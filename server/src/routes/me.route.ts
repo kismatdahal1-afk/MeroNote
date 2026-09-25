@@ -6,7 +6,12 @@ import { createBookmark, deleteBookmark, listBookmarks, updateBookmark } from ".
 import { getProgress, listProgress, putProgress } from "../controllers/progress.controller";
 import { listSemesterPlan, patchSemesterPlan } from "../controllers/semesterPlan.controller";
 import { deleteDownload, listDownloads, patchDownload, putDownload } from "../controllers/downloads.controller";
-import { getPreferencesRoute, postRecent } from "../controllers/preferences.controller";
+import {
+  deleteContinueReading,
+  getPreferencesRoute,
+  postRecent,
+  putContinueReading,
+} from "../controllers/preferences.controller";
 
 const router = Router();
 
@@ -37,5 +42,7 @@ router.delete("/downloads/:resourceId", asyncHandler(deleteDownload));
 
 router.get("/preferences", asyncHandler(getPreferencesRoute));
 router.post("/preferences/recent", asyncHandler(postRecent));
+router.put("/preferences/continue-reading/:resourceId", asyncHandler(putContinueReading));
+router.delete("/preferences/continue-reading/:resourceId", asyncHandler(deleteContinueReading));
 
 export default router;

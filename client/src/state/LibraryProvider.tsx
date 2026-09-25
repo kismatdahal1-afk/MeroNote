@@ -52,7 +52,9 @@ import {
   isVerificationDue,
 } from "../lib/downloadRegistry";
 import {
+  deleteContinueReading,
   getPreferences,
+  putContinueReading,
   recordRecentOpened,
 } from "../lib/preferencesApi";
 import {
@@ -110,6 +112,16 @@ interface LibraryContextValue {
 
   recent: RecentEntry[];
   markOpened: (resourceId: string) => void;
+
+  /**
+   * User-controlled Continue Reading list (account-persisted resource ids).
+   * Explicit adds/removes only — opens, progress, and recents never create
+   * membership. Guests keep memory-only entries that are never merged into
+   * an account and never leak across users.
+   */
+  continueReading: string[];
+  isContinueReading: (resourceId: string) => boolean;
+  toggleContinueReading: (resourceId: string) => void;
 
   progress: ReadingProgress[];
   getProgress: (resourceId: string) => ReadingProgress | undefined;
@@ -286,6 +298,8 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const [subjectBookmarkIds, setSubjectBookmarkIds] = useState<Record<string, string>>({});
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [recent, setRecent] = useState<RecentEntry[]>([]);
+  /** User-controlled Continue Reading ids (account-persisted, explicit only). */
+  const [continueReading, setContinueReading] = useState<string[]>([]);
   const [progress, setProgress] = useState<ReadingProgress[]>([]);
   /** Account download history (MongoDB) for the hydrated user. */
   const [downloadHistory, setDownloadHistory] = useState<DownloadHistoryRow[]>([]);
@@ -299,6 +313,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   // Latest committed device rows (see rebuild/preserve below).
   const downloadsRef = useRef(downloads);
   downloadsRef.current = downloads;
+  // Latest committed Continue Reading list (optimistic-toggle snapshots).
+  const continueReadingRef = useRef(continueReading);
+  continueReadingRef.current = continueReading;
 
   /* Authenticated lifecycle: reset → merge guests → hydrate (server wins).
    * Logout/guest: reload the guest namespace; never leave another user's
@@ -320,6 +337,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       setSubjectBookmarkIds({});
       setProgress([]);
       setRecent([]);
+      setContinueReading([]);
       setDownloadHistory([]);
       // Guest device view: legacy registry rows whose blobs still exist.
       // Orphan blobs (no row) stay invisible; rows without blobs are dropped.
@@ -361,6 +379,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     setSubjectBookmarkIds({});
     setProgress([]);
     setRecent([]);
+    // Guest Continue Reading is memory-only and never merges into an
+    // account (§15): a fresh login always starts from the account list.
+    setContinueReading([]);
     // The previous account's registry view must not flash: drop it now; the
     // device reconciliation below rebuilds this user's view. Blobs stay.
     setDownloads([]);
@@ -450,6 +471,18 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
             for (const r of fresh) seen.add(r.resourceId);
             return [...fresh, ...recents].slice(0, 20);
           });
+        }
+        // Continue Reading membership is explicit-only: the account list wins
+        // outright (defensive dedupe; guest entries are never merged in).
+        {
+          const seenIds = new Set<string>();
+          const reading: string[] = [];
+          for (const id of prefs.continueReading ?? []) {
+            if (typeof id !== "string" || !isObjectIdLike(id) || seenIds.has(id)) continue;
+            seenIds.add(id);
+            reading.push(id);
+          }
+          setContinueReading(reading);
         }
       } else {
         failed = true;
@@ -940,6 +973,40 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       void recordRecentOpened(resourceId);
     }
   }, []);
+
+  const isContinueReading = useCallback(
+    (resourceId: string) => continueReading.includes(resourceId),
+    [continueReading],
+  );
+
+  /**
+   * Explicit user toggle for Continue Reading. Optimistic add/remove with
+   * revert on server failure; late responses after logout/user-switch are
+   * dropped (actor guard). Guests toggle memory-only state that is never
+   * merged into an account. Never touches progress or recents.
+   */
+  const toggleContinueReading = useCallback((resourceId: string) => {
+    if (!isObjectIdLike(resourceId)) return;
+    const snapshot = continueReadingRef.current;
+    const adding = !snapshot.includes(resourceId);
+    setContinueReading((prev) =>
+      adding
+        ? prev.includes(resourceId)
+          ? prev
+          : [...prev, resourceId]
+        : prev.filter((id) => id !== resourceId),
+    );
+    const session = authRef.current;
+    if (session.status !== "authed" || !session.userId) return;
+    const actor = session.userId;
+    const work = adding ? putContinueReading(resourceId) : deleteContinueReading(resourceId);
+    // Success needs no follow-up (optimistic state already matches); failure
+    // reverts unless the user has since logged out or switched accounts.
+    void work.catch(() => {
+      if (actorRef.current !== actor) return;
+      setContinueReading(snapshot);
+    });
+  }, []);
   const getProgress = useCallback(
     (resourceId: string) => progress.find((p) => p.resourceId === resourceId),
     [progress],
@@ -1006,6 +1073,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       orphanFileIds,
       recent,
       markOpened,
+      continueReading,
+      isContinueReading,
+      toggleContinueReading,
       progress,
       getProgress,
       setReadingProgress,
@@ -1042,6 +1112,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       orphanFileIds,
       recent,
       markOpened,
+      continueReading,
+      isContinueReading,
+      toggleContinueReading,
       progress,
       getProgress,
       setReadingProgress,

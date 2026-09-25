@@ -13,18 +13,20 @@ import { RecentOpenedCard, TrendingResourceCard, TrendingTitle } from "../compon
 import { programInfo } from "../data/program";
 import { useUser } from "../state/UserProvider";
 import { useLibrary } from "../state/LibraryProvider";
+import { useToast } from "../state/ToastProvider";
 import { fetchCount, fetchNotices, fetchResources, fetchResource, fetchSemesters } from "../lib/contentApi";
 import { noticeSort, noticeWithState } from "../lib/noticeState";
 import { useApiQuery } from "../hooks/useApiQuery";
 import { NoticesBoard } from "../components/dashboard/NoticesBoard";
-import { formatTimestamp, getGreeting } from "../lib/utils";
+import { getGreeting } from "../lib/utils";
 import { DashboardSkeleton } from "../components/skeletons/pages";
 import { ErrorState } from "../components/common/States";
 import type { Resource } from "../types";
 
 export default function Dashboard() {
-  const { favorites, favoriteSubjects, bookmarks, bookmarkedSubjects, downloads, recent, progress, libraryError, retryHydration } = useLibrary();
+  const { favorites, favoriteSubjects, bookmarks, bookmarkedSubjects, downloads, recent, continueReading, toggleContinueReading, libraryError, retryHydration } = useLibrary();
   const { name } = useUser();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   const board = useApiQuery("dashboard-board", async (signal) => {
@@ -47,13 +49,13 @@ export default function Dashboard() {
     };
   });
 
-  const progressKey = progress.map((p) => `${p.resourceId}:${p.updatedAt}`).join(",");
   const recentKey = recent.map((r) => `${r.resourceId}:${r.openedAt}`).join(",");
-  const resolved = useApiQuery(`dashboard-resolved:${progressKey}:${recentKey}`, async (signal) => {
-    const sorted = [...progress].sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
-    const heroId = sorted[0]?.resourceId;
+  // Newest additions first (server keeps insertion order).
+  const continueIds = [...continueReading].reverse();
+  const continueKey = continueIds.join(",");
+  const resolved = useApiQuery(`dashboard-resolved:${recentKey}:${continueKey}`, async (signal) => {
     const recentIds = recent.slice(0, 4).map((r) => r.resourceId);
-    const ids = [...new Set([heroId, ...recentIds].filter((id): id is string => Boolean(id)))];
+    const ids = [...new Set([...recentIds, ...continueIds].filter((id): id is string => Boolean(id)))];
     const entries = await Promise.all(
       ids.map(async (id) => {
         try {
@@ -67,7 +69,7 @@ export default function Dashboard() {
     for (const resource of entries) {
       if (resource) byId.set(resource.id, resource);
     }
-    return { byId, heroId };
+    return { byId };
   });
 
   if (board.loading) return <DashboardSkeleton />;
@@ -79,9 +81,17 @@ export default function Dashboard() {
     );
   }
 
-  const hero =
-    (resolved.data?.heroId ? resolved.data.byId.get(resolved.data.heroId) ?? null : null);
-  const heroProgress = hero ? progress.find((p) => p.resourceId === hero.id) : undefined;
+  // User-controlled Continue Reading list (Phase 21): explicit membership
+  // only. Unavailable resources (deleted/hidden) filter out gracefully —
+  // membership itself is never mutated just because content vanished.
+  const continueResources = continueIds
+    .map((id) => resolved.data?.byId.get(id))
+    .filter((r): r is NonNullable<typeof r> => Boolean(r));
+
+  const handleRemoveContinue = (resourceId: string) => {
+    toggleContinueReading(resourceId);
+    toast("Removed from Continue Reading");
+  };
 
   const recentResources = recent
     .slice(0, 4)
@@ -106,7 +116,6 @@ export default function Dashboard() {
     favorites.length + favoriteSubjects.length,
     bookmarks.length + bookmarkedSubjects.length,
   );
-  const heroUpdatedAt = heroProgress?.updatedAt;
 
   return (
     <div className="student-dashboard relative">
@@ -210,13 +219,20 @@ export default function Dashboard() {
         <StudySummaryGrid stats={stats} />
       </section>
 
-      {/* Continue reading */}
+      {/* Continue reading — user-controlled persistent list (Phase 21) */}
       <section aria-labelledby="continue-heading" className="mb-7">
         <DashboardSectionHeader
           title={<span id="continue-heading">Continue Reading</span>}
-          meta={heroUpdatedAt ? formatTimestamp(heroUpdatedAt) : undefined}
         />
-        <ContinueReadingSection resource={hero} />
+        {continueResources.length > 0 ? (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {continueResources.map((r) => (
+              <ContinueReadingSection key={r.id} resource={r} onRemove={() => handleRemoveContinue(r.id)} />
+            ))}
+          </div>
+        ) : (
+          <ContinueReadingSection resource={null} />
+        )}
       </section>
 
       {/* Quick navigation */}

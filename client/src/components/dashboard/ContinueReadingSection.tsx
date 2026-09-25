@@ -9,7 +9,7 @@ import { useTaxonomy } from "../../hooks/useTaxonomy";
 import { useLibrary } from "../../state/LibraryProvider";
 
 /** Primary Continue Reading card — the dashboard's strongest element. */
-export function ContinueReadingSection({ resource }: { resource: Resource | null }) {
+export function ContinueReadingSection({ resource, onRemove }: { resource: Resource | null; onRemove?: () => void }) {
   const { getProgress, markOpened } = useLibrary();
 
   if (!resource) {
@@ -95,6 +95,18 @@ export function ContinueReadingSection({ resource }: { resource: Resource | null
           Index
         </Link>
       </div>
+      {onRemove && (
+        <div className="relative z-10 mt-2.5 flex justify-end">
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={`Remove ${resource.title} from Continue Reading`}
+            className="rounded-md px-2 py-1 text-xs font-bold text-muted-foreground transition-colors hover:text-error focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            Remove from Continue Reading
+          </button>
+        </div>
+      )}
     </Card>
   );
 }

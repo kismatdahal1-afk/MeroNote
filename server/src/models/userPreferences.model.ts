@@ -6,6 +6,16 @@ export interface IRecentEntry {
   openedAt: Date;
 }
 
+/**
+ * Explicit user-managed Continue Reading entry (Phase 21). Membership only —
+ * the resource document itself is never duplicated here. No expiration, no
+ * cap: entries live until the user removes them.
+ */
+export interface IContinueReadingEntry {
+  resourceId: Types.ObjectId;
+  addedAt: Date;
+}
+
 export interface IUserPreferences extends Document {
   userId: Types.ObjectId;
   /**
@@ -17,6 +27,8 @@ export interface IUserPreferences extends Document {
    * subjects/notices (no consumers yet).
    */
   recentResources: IRecentEntry[];
+  /** Phase 21 user-controlled Continue Reading list (insertion order). */
+  continueReading: IContinueReadingEntry[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,12 +41,21 @@ const recentEntrySchema = new Schema<IRecentEntry>(
   { _id: false },
 );
 
+const continueReadingEntrySchema = new Schema<IContinueReadingEntry>(
+  {
+    resourceId: { type: Schema.Types.ObjectId, ref: "Resource", required: true },
+    addedAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
 const userPreferencesSchema = new Schema<IUserPreferences>(
   {
     // Uniqueness enforced by the named index below (not inline, to avoid a
     // duplicate auto-index).
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     recentResources: { type: [recentEntrySchema], required: true, default: [] },
+    continueReading: { type: [continueReadingEntrySchema], required: true, default: [] },
   },
   { timestamps: true },
 );

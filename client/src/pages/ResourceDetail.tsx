@@ -46,7 +46,7 @@ export default function ResourceDetail() {
   const location = useLocation();
   const { pathname, state } = location;
   const { toast } = useToast();
-  const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, markOpened, getProgress } = useLibrary();
+  const { isFavorite, toggleFavorite, getBookmark, addBookmark, getDownload, startDownload, markOpened, getProgress, isContinueReading, toggleContinueReading } = useLibrary();
   const [editOpen, setEditOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [busyAction, setBusyAction] = useState(false);
@@ -150,6 +150,13 @@ export default function ResourceDetail() {
     }
     startDownload(resource);
     toast(download ? "Retrying download" : "Download started");
+  };
+
+  const inContinueReading = resource ? isContinueReading(resource.id) : false;
+  const handleContinueReading = () => {
+    if (!resource) return;
+    toggleContinueReading(resource.id);
+    toast(inContinueReading ? "Removed from Continue Reading" : "Added to Continue Reading");
   };
 
   const handleAdminHide = async (hidden: boolean) => {
@@ -470,6 +477,18 @@ export default function ResourceDetail() {
             <Eye className="size-4" aria-hidden="true" />
             {progress ? "Continue reading" : "Read now"}
           </Button>
+          {!isAdmin && (
+            <Button
+              variant="outline"
+              className="mt-2.5 w-full"
+              onClick={handleContinueReading}
+              aria-pressed={inContinueReading}
+              aria-label={inContinueReading ? "Remove from Continue Reading" : "Add to Continue Reading"}
+            >
+              <Bookmark className="size-4" aria-hidden="true" />
+              {inContinueReading ? "Remove from Continue Reading" : "Add to Continue Reading"}
+            </Button>
+          )}
         </Card>
       </div>
 
