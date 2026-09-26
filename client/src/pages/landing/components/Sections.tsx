@@ -122,7 +122,7 @@ function TimelineStep({
   const { step, eyebrow, title, text, icon: Icon, meta } = item;
   const chipTone = isLast ? NODE_CHIP_TONES.highlight : NODE_CHIP_TONES.muted;
   return (
-    <Reveal as="li" key={title} delay={index * 120} className="relative">
+    <Reveal as="li" key={title} delay={index * 120} className="group relative">
       {/* Mobile rail segment: node bottom edge to next node */}
       {!isLast && (
         <span
@@ -131,12 +131,17 @@ function TimelineStep({
         />
       )}
       <div className="flex items-start gap-4 text-left md:flex-col md:items-center md:text-center">
-        {/* Stroke-only circular node — transparent fill */}
+        {/* Stroke-only circular node — transparent fill. Same icon zoom
+            as the Study Experience timeline: the icon alone scales on
+            hover, circle and rails untouched. */}
         <span
           aria-hidden="true"
           className="relative z-10 flex size-11 shrink-0 items-center justify-center rounded-full border-[3px] border-primary bg-transparent text-primary shadow-card transition-transform dark:border-white"
         >
-          <Icon className="size-4" />
+          <Icon
+            className="size-4 transition-transform duration-200 ease-out motion-reduce:transition-none motion-reduce:transform-none group-hover:scale-125"
+            aria-hidden="true"
+          />
         </span>
         <div className="pt-0.5 md:pt-0">
           <p className="text-[11px] font-extrabold uppercase tracking-widest text-primary">
@@ -683,33 +688,36 @@ export function ReadingSection() {
       aria-labelledby="landing-reading-heading"
       className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12"
     >
-      <div className="grid gap-8 sm:gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
-        <Reveal>
-          <div className="lg:sticky lg:top-28">
-            <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
-              Study Experience
-            </p>
-            <h2
-              id="landing-reading-heading"
-              className="font-display mt-2 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl"
-            >
-              Where finding becomes studying.
-            </h2>
-            <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
-              Mero Note carries you past the search with a calm reader, saved
-              pages, and your place kept every time you return.
-            </p>
-            <p className="mt-4 border-l-2 border-primary/40 pl-4 text-sm leading-relaxed text-muted-foreground">
-              Read, bookmark, track, return and resume in one continuous study flow.
-            </p>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Start on desktop and continue from your phone. Your place is
-              always kept.
-            </p>
-            <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              5 steps · Reader to resume
-            </p>
-          </div>
+      <div className="block space-y-8 sm:space-y-10 lg:grid lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:space-y-0">
+        {/* Pinned intro: sticky on every breakpoint so the text stays fixed
+            in-section while the timeline scrolls. The wrapper is a direct
+            child of this tall container (block on mobile, grid item on
+            desktop), giving it room to travel. On mobile it pins as a
+            frosted card so steps slide cleanly beneath it. */}
+        <Reveal className="sticky top-24 z-20 max-lg:rounded-2xl max-lg:border max-lg:border-border max-lg:bg-surface/90 max-lg:p-4 max-lg:shadow-card max-lg:backdrop-blur-md lg:top-28">
+          <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
+            Study Experience
+          </p>
+          <h2
+            id="landing-reading-heading"
+            className="font-display mt-2 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl"
+          >
+            Where finding becomes studying.
+          </h2>
+          <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
+            Mero Note carries you past the search with a calm reader, saved
+            pages, and your place kept every time you return.
+          </p>
+          <p className="mt-4 border-l-2 border-primary/40 pl-4 text-sm leading-relaxed text-muted-foreground">
+            Read, bookmark, track, return and resume in one continuous study flow.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Start on desktop and continue from your phone. Your place is
+            always kept.
+          </p>
+          <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+            5 steps · Reader to resume
+          </p>
         </Reveal>
 
         <ol className="relative grid gap-6 sm:gap-8" aria-label="Study flow">
