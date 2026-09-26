@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
+  Bookmark,
   Check,
+  Clock,
   FileArchive,
   FileText,
   FlaskConical,
@@ -11,7 +13,9 @@ import {
   HelpCircle,
   Layers,
   PenLine,
+  Play,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Reveal } from "./Reveal";
@@ -123,14 +127,14 @@ function TimelineStep({
       {!isLast && (
         <span
           aria-hidden="true"
-          className="absolute -bottom-8 left-[22px] top-[44px] w-0.5 -translate-x-1/2 bg-primary dark:bg-white md:hidden"
+          className="absolute -bottom-8 left-[22px] top-[44px] w-[3px] -translate-x-1/2 bg-primary dark:bg-white md:hidden"
         />
       )}
       <div className="flex items-start gap-4 text-left md:flex-col md:items-center md:text-center">
         {/* Stroke-only circular node — transparent fill */}
         <span
           aria-hidden="true"
-          className="relative z-10 flex size-11 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-transparent text-primary shadow-card transition-transform dark:border-white"
+          className="relative z-10 flex size-11 shrink-0 items-center justify-center rounded-full border-[3px] border-primary bg-transparent text-primary shadow-card transition-transform dark:border-white"
         >
           <Icon className="size-4" />
         </span>
@@ -181,7 +185,7 @@ export function HierarchySection() {
               <span
                 key={pos}
                 aria-hidden="true"
-                className={`absolute top-[22px] hidden h-0.5 bg-primary dark:bg-white md:block md:w-auto md:-translate-y-1/2 ${pos}`}
+                className={`absolute top-[22px] hidden h-[3px] bg-primary dark:bg-white md:block md:w-auto md:-translate-y-1/2 ${pos}`}
               />
             ))}
             {HIERARCHY.map((item, i) => (
@@ -625,33 +629,51 @@ export function UniverseSection() {
   );
 }
 
-/* ---------- Section 5 — Reading experience (real functionality only) ---------- */
+/* ---------- Section 5 — Study experience (static timeline) ---------- */
 
-const READING_ROWS = [
+interface StudyStep {
+  n: string;
+  title: string;
+  text: string;
+  detail: string;
+  icon: LucideIcon;
+}
+
+const STUDY_STEPS: StudyStep[] = [
   {
     n: "01",
     title: "Reading",
     text: "A focused, distraction-free reader for every resource in your library.",
+    detail: "Focused reading experience",
+    icon: BookOpen,
   },
   {
     n: "02",
     title: "Bookmarks",
     text: "Mark exact pages with notes and jump straight back to them.",
+    detail: "Save pages + personal notes",
+    icon: Bookmark,
   },
   {
     n: "03",
     title: "Progress",
     text: "Your reading progress is saved to your account automatically.",
+    detail: "Automatically saved",
+    icon: TrendingUp,
   },
   {
     n: "04",
-    title: "Recent resources",
+    title: "Recent Resources",
     text: "Recently opened files are always one tap away.",
+    detail: "One-tap access",
+    icon: Clock,
   },
   {
     n: "05",
     title: "Continue studying",
     text: "Keep an explicit Continue Reading list and resume anytime.",
+    detail: "Resume where you left off",
+    icon: Play,
   },
 ];
 
@@ -659,49 +681,80 @@ export function ReadingSection() {
   return (
     <section
       aria-labelledby="landing-reading-heading"
-      className="mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-24"
+      className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12"
     >
-      <div className="grid gap-12 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <Reveal>
-            <div className="lg:sticky lg:top-28">
-              <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
-                Study Experience
-              </p>
-              <h2
-                id="landing-reading-heading"
-                className="font-display mt-2 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl"
-              >
-                From finding a resource to actually studying it.
-              </h2>
-              <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
-                Once you find what you need, Mero Note keeps the reading
-                experience focused and organized.
-              </p>
-              <Link
-                to="/register"
-                className="mt-7 inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground transition-all hover:-translate-y-0.5 hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transform-none"
-              >
-                Get Started
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
-            </div>
-          </Reveal>
-        </div>
-        <ol className="lg:col-span-7">
-          {READING_ROWS.map(({ n, title, text }, i) => (
-            <Reveal as="li" key={n} delay={i * 70}>
-              <div className="flex items-baseline gap-5 border-t border-border py-6 last:border-b">
-                <span aria-hidden="true" className="font-display text-sm font-extrabold text-primary/60">
-                  {n}
+      <div className="grid gap-8 sm:gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+        <Reveal>
+          <div className="lg:sticky lg:top-28">
+            <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
+              Study Experience
+            </p>
+            <h2
+              id="landing-reading-heading"
+              className="font-display mt-2 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl"
+            >
+              Where finding becomes studying.
+            </h2>
+            <p className="mt-3 text-base font-medium leading-relaxed text-muted-foreground">
+              Mero Note carries you past the search with a calm reader, saved
+              pages, and your place kept every time you return.
+            </p>
+            <p className="mt-4 border-l-2 border-primary/40 pl-4 text-sm leading-relaxed text-muted-foreground">
+              Read, bookmark, track, return and resume in one continuous study flow.
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Start on desktop and continue from your phone. Your place is
+              always kept.
+            </p>
+            <p className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              5 steps · Reader to resume
+            </p>
+          </div>
+        </Reveal>
+
+        <ol className="relative grid gap-6 sm:gap-8" aria-label="Study flow">
+          {STUDY_STEPS.map(({ n, title, text, detail, icon: Icon }, i) => (
+            <Reveal as="li" key={n} delay={i * 120} className="group relative">
+              {/* Gap rail segment: node bottom edge to next node top edge.
+                  Never enters a circle interior — same logic as the
+                  Organization timeline (mobile rail). */}
+              {i < STUDY_STEPS.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -bottom-6 left-[22px] top-[44px] w-[3px] -translate-x-1/2 bg-primary dark:bg-white sm:-bottom-8"
+                />
+              )}
+              <div className="flex items-start gap-4 text-left">
+                {/* Stroke-only circular node — accent color with a soft
+                    glow, no animation. Purple in bright mode, white in
+                    dark mode. The icon alone gently scales on hover. */}
+                <span
+                  aria-hidden="true"
+                  className="relative z-10 flex size-11 shrink-0 items-center justify-center rounded-full border-[3px] border-primary bg-surface text-primary shadow-[0_0_24px_-6px_var(--color-primary)] dark:border-white dark:text-white dark:shadow-[0_0_24px_-6px_rgba(255,255,255,0.35)]"
+                >
+                  <Icon
+                    className="size-4 transition-transform duration-200 ease-out motion-reduce:transition-none motion-reduce:transform-none group-hover:scale-125"
+                    aria-hidden="true"
+                  />
                 </span>
-                <div>
-                  <h3 className="font-display text-xl font-extrabold tracking-tight text-foreground">
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <h3 className="font-display text-lg font-extrabold tracking-tight text-foreground sm:text-xl">
+                    <span className="mr-2 font-mono text-sm font-bold text-primary">
+                      {n}
+                    </span>
                     {title}
                   </h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{text}</p>
+                  <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{text}</p>
+                  <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground">
+                    <span aria-hidden="true" className="size-1 shrink-0 rounded-full bg-primary" />
+                    {detail}
+                  </p>
                 </div>
               </div>
+              {/* Screen-reader step position */}
+              <span className="sr-only">
+                Step {i + 1} of {STUDY_STEPS.length}
+              </span>
             </Reveal>
           ))}
         </ol>
@@ -712,13 +765,72 @@ export function ReadingSection() {
 
 /* ---------- Section 6 — Mobile experience ---------- */
 
+const MOBILE_POINTS = [
+  {
+    n: "01",
+    title: "Same account, everywhere",
+    text: "One account, one organized library across your desktop and phone.",
+  },
+  {
+    n: "02",
+    title: "Built for smaller screens",
+    text: "Browse subjects, open resources, and keep studying comfortably from your phone.",
+  },
+  {
+    n: "03",
+    title: "Available when you need it",
+    text: "Downloaded resources stay available for offline study when you're away from the internet.",
+  },
+];
+
+const PHONE_FRAME =
+  "overflow-hidden rounded-3xl border border-border-strong bg-surface shadow-hero-rest ring-1 ring-black/5 transition-all duration-300 motion-reduce:transition-none";
+
+/** One framed phone screenshot with the shared hover-lift treatment. */
+function PhoneShot({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
+  return (
+    <div
+      className={`${PHONE_FRAME} hover:-translate-y-1 hover:scale-[1.02] hover:shadow-hero-glow motion-reduce:transform-none`}
+    >
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        loading="lazy"
+        decoding="async"
+        className="block h-auto w-full object-contain"
+      />
+    </div>
+  );
+}
+
+/** Showcase slots: side phones tilt from a planted baseline behind the vertical center phone. */
+const PHONE_SLOTS = [
+  {
+    src: "/images/phone3.jpeg",
+    alt: "Mero Note study resources on a phone",
+    slot: "relative z-10 -mr-8 w-32 shrink-0 origin-bottom -rotate-[9deg] sm:-mr-10 sm:w-40 lg:w-48",
+  },
+  {
+    src: "/images/phone1.jpeg",
+    alt: "Mero Note resource library on a phone",
+    slot: "relative z-20 w-36 shrink-0 sm:w-44 lg:w-52",
+  },
+  {
+    src: "/images/phone2.jpeg",
+    alt: "Mero Note study progress on a phone",
+    slot: "relative z-10 -ml-8 w-32 shrink-0 origin-bottom rotate-[9deg] sm:-ml-10 sm:w-40 lg:w-48",
+  },
+];
+
 export function MobileSection() {
   return (
     <section
       aria-labelledby="landing-mobile-heading"
-      className="border-y border-border bg-surface-muted/50 py-20 lg:py-24"
+      className="border-y border-border bg-surface-muted/50 py-16 lg:py-20"
     >
-      <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+      <div className="mx-auto grid w-full max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[45fr_55fr] lg:gap-12 lg:px-8">
         <Reveal>
           <div>
             <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
@@ -734,45 +846,33 @@ export function MobileSection() {
               Start on your desktop. Continue from your phone. Keep your study
               resources close wherever you are.
             </p>
-            <ul className="mt-7 space-y-3.5">
-              {[
-                ["Same account everywhere", "One library across desktop and phone."],
-                ["Readable on small screens", "The full library, fitted for mobile browsers."],
-                ["Study without internet", "Downloaded files stay available offline."],
-              ].map(([title, text]) => (
-                <li key={title} className="flex items-start gap-3">
+            <ul className="mt-8 space-y-5">
+              {MOBILE_POINTS.map(({ n, title, text }) => (
+                <li key={n} className="flex items-start gap-4">
                   <span
                     aria-hidden="true"
-                    className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-success-muted text-xs font-bold text-success"
+                    className="font-display w-7 shrink-0 pt-0.5 text-sm font-extrabold tracking-widest text-primary"
                   >
-                    ✓
+                    {n}
                   </span>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    <span className="font-bold text-foreground">{title}. </span>
-                    {text}
-                  </p>
+                  <div>
+                    <p className="text-base font-bold text-foreground">{title}</p>
+                    <p className="mt-0.5 text-[15px] leading-relaxed text-muted-foreground">{text}</p>
+                  </div>
                 </li>
               ))}
             </ul>
           </div>
         </Reveal>
         <Reveal delay={140}>
-          <figure className="mx-auto w-48 sm:w-56">
-            <div className="overflow-hidden rounded-[1.75rem] border border-border-strong bg-surface shadow-card-hover ring-1 ring-black/5">
-              <img
-                src="/images/phone.png"
-                alt="Mero Note mobile resource library"
-                width={904}
-                height={1740}
-                loading="lazy"
-                decoding="async"
-                className="block h-auto w-full object-contain"
-              />
-            </div>
-            <figcaption className="mt-3 text-center text-xs font-medium text-muted-foreground">
-              Mero Note on mobile
-            </figcaption>
-          </figure>
+          {/* three-phone showcase: shared baseline via items-end */}
+          <div className="relative flex items-end justify-center" role="group" aria-label="Mero Note on three phones">
+            {PHONE_SLOTS.map(({ src, alt, slot }) => (
+              <div key={src} className={slot}>
+                <PhoneShot src={src} alt={alt} width={702} height={1600} />
+              </div>
+            ))}
+          </div>
         </Reveal>
       </div>
     </section>
