@@ -29,7 +29,7 @@ import {
   AdminTrashSkeleton,
 } from "./components/skeletons/admin";
 
-const Welcome = lazy(() => import("./pages/Welcome"));
+const LandingPage = lazy(() => import("./pages/landing/LandingPage"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -74,7 +74,7 @@ export const router = createBrowserRouter([
   {
     element: <ScrollToTop />,
     children: [
-      { path: "/", element: withSuspense(<Welcome />) },
+      { path: "/", element: withSuspense(<LandingPage />) },
       { path: "/login", element: withSuspense(<Login />) },
       { path: "/register", element: withSuspense(<Register />) },
       {

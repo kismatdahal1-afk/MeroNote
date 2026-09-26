@@ -744,3 +744,11 @@ body {
     padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Public landing page — additive, scoped, no effect on the app shell.
+   The landing renders outside AppLayout with no fixed bottom nav, so the
+   clearance above must not apply here. Same specificity as the rule above
+   (0,1,1); placed later so it wins within the landing subtree only. */
+.landing-page main {
+  padding-bottom: 1rem;
+}
