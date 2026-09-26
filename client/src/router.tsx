@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { RequireAdmin, RequireAuth } from "./components/auth/RequireAuth";
 import { ScrollToTop } from "./components/layout/ScrollToTop";
@@ -69,24 +69,40 @@ function withSuspense(node: ReactNode, fallback?: ReactNode) {
   return <Suspense fallback={fallback ?? <PageFallback />}>{node}</Suspense>;
 }
 
-export const router = createBrowserRouter([
+/**
+ * Route table, exported for verification (see publicEntry tests).
+ *
+ * Entry design:
+ * - "/" is a PUBLIC parent whose index child is the browser-only
+ *   LandingPage. It must outrank every authenticated branch for "/",
+ *   so the protected layout is pathless and carries NO index route —
+ *   the old duplicate-`path: "/"` layout + index redirect outranked the
+ *   public route and sent every "/" visit to Login via RequireAuth.
+ * - LandingPage itself redirects authed users (role-aware) and genuine
+ *   standalone PWA windows into the app; guests in browser tabs always
+ *   see the landing, including on refresh (no redirect while guest).
+ * - PWA entry is unchanged: manifest start_url is "/dashboard", which
+ *   stays behind RequireAuth (Login when unauthenticated).
+ */
+export const appRoutes: RouteObject[] = [
   // Every page opens at the top of the viewport on navigation.
   {
     element: <ScrollToTop />,
     children: [
-      { path: "/", element: withSuspense(<LandingPage />) },
-      { path: "/login", element: withSuspense(<Login />) },
-      { path: "/register", element: withSuspense(<Register />) },
       {
         path: "/",
-        element: (
-          <RequireAuth>
-            <AppLayout />
-          </RequireAuth>
-        ),
         children: [
-          { index: true, element: <Navigate to="/dashboard" replace /> },
-          { path: "dashboard", element: withSuspense(<Dashboard />, <DashboardSkeleton />) },
+          { index: true, element: withSuspense(<LandingPage />) },
+          { path: "login", element: withSuspense(<Login />) },
+          { path: "register", element: withSuspense(<Register />) },
+          {
+            element: (
+              <RequireAuth>
+                <AppLayout />
+              </RequireAuth>
+            ),
+            children: [
+              { path: "dashboard", element: withSuspense(<Dashboard />, <DashboardSkeleton />) },
           { path: "semesters", element: withSuspense(<Semesters />, <SemestersSkeleton />) },
           { path: "semesters/:semesterId", element: withSuspense(<SemesterSubjects />, <SemesterSubjectsSkeleton />) },
           { path: "subjects/:subjectId", element: withSuspense(<SubjectDetail />, <SubjectDetailSkeleton />) },
@@ -111,8 +127,12 @@ export const router = createBrowserRouter([
           { path: "admin/trash", element: withSuspense(<RequireAdmin><AdminTrash /></RequireAdmin>, <AdminTrashSkeleton />) },
           { path: "admin/settings", element: withSuspense(<RequireAdmin><AdminSettings /></RequireAdmin>, <AdminSettingsSkeleton />) },
           { path: "*", element: withSuspense(<NotFound />) },
+            ],
+          },
         ],
       },
     ],
   },
-]);
+];
+
+export const router = createBrowserRouter(appRoutes);
