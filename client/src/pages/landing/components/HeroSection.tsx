@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { ProductComposition } from "./ProductComposition";
+import { LANDING_SECTION_IDS } from "../../../lib/site";
 
 /**
  * Hero: gradient headline → supporting copy → dual CTA →
@@ -10,6 +11,7 @@ export function HeroSection() {
   return (
     <section
       aria-labelledby="landing-hero-heading"
+      id={LANDING_SECTION_IDS.hero}
       className="relative isolate w-full overflow-hidden pb-10 pt-4 text-left md:pb-6 md:pt-6 md:text-center"
     >
       {/* Soft ambient glow behind the headline (single layer, subtle). */}

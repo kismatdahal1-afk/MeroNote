@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
@@ -12,6 +12,7 @@ import {
   GraduationCap,
   HelpCircle,
   Layers,
+  Library,
   PenLine,
   Play,
   Sparkles,
@@ -20,6 +21,14 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { Reveal } from "./Reveal";
 import { ALL_RESOURCE_TYPES } from "../../../lib/resourceType";
+import { useUser } from "../../../state/UserProvider";
+import {
+  INSTAGRAM_URL,
+  LANDING_SECTION_IDS,
+  STUDY_DESTINATIONS,
+  loginWithNext,
+  scrollToLandingSection,
+} from "../../../lib/site";
 
 /* ---------- shared section heading ---------- */
 
@@ -686,15 +695,13 @@ export function ReadingSection() {
   return (
     <section
       aria-labelledby="landing-reading-heading"
-      className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12"
+      id="study"
+      className="scroll-mt-24 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12"
     >
-      <div className="block space-y-8 sm:space-y-10 lg:grid lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:space-y-0">
-        {/* Pinned intro: sticky on every breakpoint so the text stays fixed
-            in-section while the timeline scrolls. The wrapper is a direct
-            child of this tall container (block on mobile, grid item on
-            desktop), giving it room to travel. On mobile it pins as a
-            frosted card so steps slide cleanly beneath it. */}
-        <Reveal className="sticky top-24 z-20 max-lg:rounded-2xl max-lg:border max-lg:border-border max-lg:bg-surface/90 max-lg:p-4 max-lg:shadow-card max-lg:backdrop-blur-md lg:top-28">
+      <div className="block space-y-8 lg:grid lg:grid-cols-[1fr_1.1fr] lg:gap-16 lg:space-y-0">
+        {/* Intro on top for mobile, left column on desktop. Static in
+            page flow — scrolls naturally with the rest of the page. */}
+        <Reveal>
           <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
             Study Experience
           </p>
@@ -836,7 +843,7 @@ export function MobileSection() {
   return (
     <section
       aria-labelledby="landing-mobile-heading"
-      className="border-y border-border bg-surface-muted/50 py-16 lg:py-20"
+      className="border-y border-border bg-surface-muted/50 py-8 lg:py-12"
     >
       <div className="mx-auto grid w-full max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[45fr_55fr] lg:gap-12 lg:px-8">
         <Reveal>
@@ -887,116 +894,44 @@ export function MobileSection() {
   );
 }
 
-/* ---------- Section 7 — Built around the way you study (asymmetric) ---------- */
+/* ---------- Section 8 — How it works (vertical study journey) ---------- */
 
-const PILLARS = [
+const JOURNEY_STEPS: StudyStep[] = [
   {
     n: "01",
-    title: "Organized",
-    text: "Your CSIT resources stay structured by semester, subject and topic.",
-    span: true,
+    title: "Choose your semester",
+    text: "Start where you are in the curriculum.",
+    detail: "Semester 01–08",
+    icon: Layers,
   },
   {
     n: "02",
-    title: "Discoverable",
-    text: "Find the material you need without searching through scattered folders.",
-    span: false,
+    title: "Select your subject",
+    text: "Open the subject you need today.",
+    detail: "Choose a subject",
+    icon: BookOpen,
   },
   {
     n: "03",
-    title: "Personal",
-    text: "Keep important resources close with favorites and bookmarks where supported.",
-    span: false,
+    title: "Explore your resources",
+    text: "Browse books, notes, questions and papers.",
+    detail: "Books · Notes · Questions · Papers",
+    icon: Library,
   },
   {
     n: "04",
-    title: "Continuous",
-    text: "Return to your study resources and continue from where you left off where supported.",
-    span: true,
+    title: "Open what you need",
+    text: "Read directly, no folder digging.",
+    detail: "Open resource",
+    icon: FileText,
   },
-];
-
-export function PillarsSection() {
-  return (
-    <section
-      aria-labelledby="landing-pillars-heading"
-      id="features"
-      className="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-20 sm:px-6 lg:px-8 lg:py-24"
-    >
-      <Reveal>
-        <SectionHeading
-          id="landing-pillars-heading"
-          eyebrow="Study Tools"
-          title="Built around the way you study."
-          copy="Mero Note is designed to keep your academic resources organized without getting in the way of your study."
-        />
-      </Reveal>
-      <div className="mt-14 grid gap-4 md:grid-cols-3">
-        {PILLARS.map(({ n, title, text, span }, i) => (
-          <Reveal
-            key={n}
-            delay={(i % 2) * 90}
-            className={span ? "md:col-span-2" : ""}
-          >
-            <div
-              className={
-                span
-                  ? "flex h-full flex-col justify-between gap-6 rounded-3xl bg-primary p-8 text-primary-foreground shadow-card-hover transition-transform hover:-translate-y-1 motion-reduce:transform-none sm:flex-row sm:items-center lg:p-10"
-                  : "card-glow h-full rounded-3xl border border-border bg-surface p-8 shadow-card transition-all hover:-translate-y-1 hover:shadow-card-hover motion-reduce:transform-none"
-              }
-            >
-              <div>
-                <p
-                  aria-hidden="true"
-                  className={
-                    span
-                      ? "font-display text-sm font-extrabold tracking-widest text-primary-foreground/70"
-                      : "font-display text-sm font-extrabold tracking-widest text-primary/60"
-                  }
-                >
-                  {n}
-                </p>
-                <h3
-                  className={
-                    span
-                      ? "font-display mt-2 text-2xl font-extrabold tracking-tight text-primary-foreground sm:text-3xl"
-                      : "font-display mt-2 text-2xl font-extrabold tracking-tight text-foreground"
-                  }
-                >
-                  {title}
-                </h3>
-                <p
-                  className={
-                    span
-                      ? "mt-2 max-w-md text-sm font-medium leading-relaxed text-primary-foreground/85"
-                      : "mt-2 text-sm font-medium leading-relaxed text-muted-foreground"
-                  }
-                >
-                  {text}
-                </p>
-              </div>
-              {span && (
-                <GraduationCap
-                  aria-hidden="true"
-                  className="hidden size-16 shrink-0 text-primary-foreground/25 sm:block"
-                />
-              )}
-            </div>
-          </Reveal>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ---------- Section 8 — Your study journey (calm vertical timeline) ---------- */
-
-const JOURNEY = [
-  { n: "01", title: "Choose your semester", text: "Start where you are in the curriculum." },
-  { n: "02", title: "Select your subject", text: "Open the subject you need today." },
-  { n: "03", title: "Explore your resources", text: "Browse books, notes, questions and papers." },
-  { n: "04", title: "Open what you need", text: "Read directly — no folder digging." },
-  { n: "05", title: "Continue your study", text: "Bookmark, track progress, resume anytime." },
+  {
+    n: "05",
+    title: "Continue your study",
+    text: "Bookmark, track progress, resume anytime.",
+    detail: "Resume anytime",
+    icon: Play,
+  },
 ];
 
 export function JourneySection() {
@@ -1004,144 +939,334 @@ export function JourneySection() {
     <section
       aria-labelledby="landing-journey-heading"
       id="how-it-works"
-      className="scroll-mt-24 border-t border-border bg-surface-muted/50 py-20 lg:py-24"
+      className="scroll-mt-24 border-t border-border bg-surface-muted/50 py-8 lg:py-12"
     >
-      <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 lg:px-8">
-        <Reveal>
-          <SectionHeading
-            id="landing-journey-heading"
-            eyebrow="Study Journey"
-            title="From semester to study session."
-            copy="A calm path through your library, every time you sit down to study."
-          />
-        </Reveal>
-        <ol className="relative mt-14 space-y-2 before:absolute before:bottom-6 before:left-[19px] before:top-6 before:w-px before:bg-border-strong">
-          {JOURNEY.map(({ n, title, text }, i) => (
-            <Reveal as="li" key={n} delay={i * 80}>
-              <div className="relative flex gap-5 py-4 pl-1">
-                <span
-                  aria-hidden="true"
-                  className="relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full border border-border-strong bg-surface text-xs font-extrabold text-primary shadow-card"
-                >
-                  {n}
-                </span>
-                <div className="pt-1">
-                  <h3 className="text-base font-bold text-foreground">{title}</h3>
-                  <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{text}</p>
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div className="block space-y-8 lg:grid lg:grid-cols-[1fr_1.1fr] lg:gap-12 lg:space-y-0">
+          {/* Left: short section intro — the timeline sits to the right */}
+          <Reveal>
+            <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
+              How It Works
+            </p>
+            <h2
+              id="landing-journey-heading"
+              className="font-display mt-2 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl"
+            >
+              From semester to study session.
+            </h2>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-muted-foreground sm:text-base">
+              A simple path from your curriculum to the exact resource you
+              need and back to where you left off.
+            </p>
+            <p className="mt-3 border-l-2 border-primary/40 pl-4 text-sm leading-relaxed text-muted-foreground">
+              Semester, subject, resources, resume in one guided flow.
+            </p>
+            <p className="mt-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              5 steps, Semester to resume
+            </p>
+          </Reveal>
+
+          {/* Right: timeline in the shared global style */}
+          <ol className="relative grid gap-6 sm:gap-8" aria-label="Study journey">
+            {JOURNEY_STEPS.map(({ n, title, text, detail, icon: Icon }, i) => (
+              <Reveal as="li" key={n} delay={i * 120} className="group relative">
+                {i < JOURNEY_STEPS.length - 1 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -bottom-6 left-[22px] top-[44px] w-[3px] -translate-x-1/2 bg-primary dark:bg-white sm:-bottom-8"
+                  />
+                )}
+                <div className="flex items-start gap-4 text-left">
+                  <span
+                    aria-hidden="true"
+                    className="relative z-10 flex size-11 shrink-0 items-center justify-center rounded-full border-[3px] border-primary bg-surface text-primary shadow-[0_0_24px_-6px_var(--color-primary)] dark:border-white dark:text-white dark:shadow-[0_0_24px_-6px_rgba(255,255,255,0.35)]"
+                  >
+                    <Icon
+                      className="size-4 transition-transform duration-200 ease-out motion-reduce:transition-none motion-reduce:transform-none group-hover:scale-125"
+                      aria-hidden="true"
+                    />
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <h3 className="font-display text-base font-extrabold tracking-tight text-foreground sm:text-lg">
+                      <span className="mr-2 font-mono text-sm font-bold text-primary">
+                        {n}
+                      </span>
+                      {title}
+                    </h3>
+                    <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
+                      {text}
+                    </p>
+                    <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground">
+                      <span
+                        aria-hidden="true"
+                        className="size-1 shrink-0 rounded-full bg-primary"
+                      />
+                      {detail}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </Reveal>
-          ))}
-        </ol>
-      </div>
-    </section>
-  );
-}
-
-/* ---------- Section 9 — Final CTA ---------- */
-
-export function FinalCTA() {
-  return (
-    <section aria-labelledby="landing-cta-heading" className="mx-auto w-full max-w-4xl px-4 py-20 text-center sm:px-6 lg:py-24">
-      <Reveal>
-        <div>
-          <img
-            src="/icon/icon.png"
-            alt=""
-            aria-hidden="true"
-            width={64}
-            height={64}
-            loading="lazy"
-            className="mx-auto size-16 rounded-2xl object-cover shadow-card"
-          />
-          <h2
-            id="landing-cta-heading"
-            className="font-display mx-auto mt-6 max-w-xl text-3xl font-extrabold tracking-tight text-foreground sm:text-5xl"
-          >
-            Your CSIT library starts here.
-          </h2>
-          <p className="mx-auto mt-4 max-w-md text-base font-medium leading-relaxed text-muted-foreground">
-            Organize your resources. Find what you need. Study your way.
-          </p>
-          <Link
-            to="/register"
-            className="mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-8 text-base font-bold text-primary-foreground shadow-sm transition-all hover:-translate-y-0.5 hover:bg-primary-hover hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transform-none"
-          >
-            Get Started
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
-          <p className="mt-4 text-xs font-medium text-muted-foreground">
-            Already have an account?{" "}
-            <Link to="/login" className="font-bold text-primary hover:underline">
-              Log in
-            </Link>
-          </p>
+                <span className="sr-only">
+                  Step {i + 1} of {JOURNEY_STEPS.length}
+                </span>
+              </Reveal>
+            ))}
+          </ol>
         </div>
-      </Reveal>
+      </div>
     </section>
   );
 }
 
 /* ---------- Footer ---------- */
 
-interface FooterLink {
+/** Explore links navigate to the corresponding landing-page sections. */
+interface ExploreLink {
   label: string;
-  /** In-page anchor for section links. */
-  href?: string;
-  /** Router path for app links. Set when `href` is absent. */
+  /** Router destination (Home only). */
   to?: string;
+  /** Landing section anchor. */
+  sectionId?: string;
 }
 
-const FOOTER_LINKS: FooterLink[] = [
-  { label: "Library", href: "#library" },
-  { label: "Features", href: "#features" },
-  { label: "How It Works", href: "#how-it-works" },
-  { label: "Login", to: "/login" },
-  { label: "Get Started", to: "/register" },
+const EXPLORE_LINKS: ExploreLink[] = [
+  { label: "Home", to: "/" },
+  { label: "Library", sectionId: LANDING_SECTION_IDS.library },
+  { label: "Study", sectionId: LANDING_SECTION_IDS.study },
+  { label: "How It Works", sectionId: LANDING_SECTION_IDS.howItWorks },
 ];
 
-export function LandingFooter() {
+/** Protected study resources — every destination sits behind `RequireAuth`. */
+const STUDY_LINKS: Array<{ label: string; destination: string }> = [
+  { label: "Semesters", destination: STUDY_DESTINATIONS.semesters },
+  { label: "Subjects", destination: STUDY_DESTINATIONS.subjects },
+  { label: "Resources", destination: STUDY_DESTINATIONS.resources },
+  { label: "Books", destination: STUDY_DESTINATIONS.books },
+  { label: "Questions", destination: STUDY_DESTINATIONS.questions },
+  { label: "Past Papers", destination: STUDY_DESTINATIONS.pastPapers },
+];
+
+const ACCOUNT_LINKS: Array<{ label: string; to: string }> = [
+  { label: "Login", to: "/login" },
+  { label: "Get Started", to: "/register" },
+  // Protected by the existing auth gate: guests are sent through /login
+  // with `?next=/dashboard` preserved by RequireAuth — no duplicate logic.
+  { label: "Dashboard", to: "/dashboard" },
+];
+
+const FOOTER_LINK_CLASS =
+  "rounded text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+
+function FooterBrand() {
   return (
-    <footer className="border-t border-border bg-surface py-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-5 px-4 sm:px-6 md:flex-row md:justify-between">
-        <div className="flex items-center gap-2.5">
-          <img
-            src="/icon/icon.png"
-            alt="Mero Note"
-            width={32}
-            height={32}
-            loading="lazy"
-            className="size-8 shrink-0 rounded-lg object-cover"
-          />
-          <div className="leading-tight">
-            <p className="text-sm font-extrabold text-foreground">Mero Note</p>
-            <p className="text-xs font-medium text-muted-foreground">CSIT Study Library</p>
-          </div>
-        </div>
-        <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
-          {FOOTER_LINKS.map((link) =>
-            link.to ? (
-              <Link
-                key={link.label}
-                to={link.to}
-                className="text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
-              >
+    <div>
+      <Link
+        to="/"
+        aria-label="Mero Note home"
+        className="inline-flex items-center gap-2.5 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
+        <img
+          src="/icon/icon.png"
+          alt="Mero Note"
+          width={36}
+          height={36}
+          loading="lazy"
+          className="size-9 shrink-0 rounded-xl object-cover"
+        />
+        <span className="leading-tight">
+          <span className="block text-[15px] font-extrabold tracking-tight text-foreground">
+            Mero Note
+          </span>
+          <span className="block text-xs font-medium text-muted-foreground">
+            CSIT Study Library
+          </span>
+        </span>
+      </Link>
+      <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-muted-foreground">
+        Built for focused CSIT study.
+      </p>
+      <p className="mt-1 max-w-xs text-[13px] leading-relaxed text-muted-foreground">
+        Designed &amp; Developed by Kismat Dahal
+      </p>
+    </div>
+  );
+}
+
+function FooterHeading({ children }: { children: string }) {
+  return (
+    <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-foreground">
+      {children}
+    </p>
+  );
+}
+
+/** Explore group: smooth in-page section navigation, no new pages. */
+function FooterExplore() {
+  const { pathname } = useLocation();
+
+  const handleSection = (sectionId: string) => (e: MouseEvent) => {
+    e.preventDefault();
+    scrollToLandingSection(sectionId);
+    window.history.replaceState(null, "", `#${sectionId}`);
+  };
+
+  const handleHome = () => {
+    if (pathname === "/") {
+      scrollToLandingSection(LANDING_SECTION_IDS.top);
+      window.history.replaceState(null, "", "/");
+    }
+  };
+
+  return (
+    <div>
+      <FooterHeading>Explore</FooterHeading>
+      <ul className="mt-3 space-y-2">
+        {EXPLORE_LINKS.map((link) => (
+          <li key={link.label}>
+            {link.to ? (
+              <Link to={link.to} onClick={handleHome} className={FOOTER_LINK_CLASS}>
                 {link.label}
               </Link>
             ) : (
               <a
-                key={link.label}
-                href={link.href}
-                className="text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                href={`#${link.sectionId}`}
+                onClick={handleSection(link.sectionId!)}
+                className={FOOTER_LINK_CLASS}
               >
                 {link.label}
               </a>
-            ),
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Study group: protected resources reusing the existing auth system.
+ * Guests go through `/login?next=<destination>` (Login honors `next`);
+ * authenticated users open the destination directly. No duplicate
+ * auth logic — destinations stay behind `RequireAuth` regardless.
+ */
+function FooterStudy() {
+  const { status } = useUser();
+  const authed = status === "authed";
+
+  return (
+    <div>
+      <FooterHeading>Study</FooterHeading>
+      <ul className="mt-3 space-y-2">
+        {STUDY_LINKS.map((link) => (
+          <li key={link.label}>
+            <Link
+              to={authed ? link.destination : loginWithNext(link.destination)}
+              className={FOOTER_LINK_CLASS}
+            >
+              {link.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function FooterAccount() {
+  return (
+    <div>
+      <FooterHeading>Account</FooterHeading>
+      <ul className="mt-3 space-y-2">
+        {ACCOUNT_LINKS.map((link) => (
+          <li key={link.label}>
+            <Link to={link.to} className={FOOTER_LINK_CLASS}>
+              {link.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Real Instagram glyph (lucide-react ships no brand icons).
+ * Inherits text color via `currentColor`; decorative only.
+ */
+function InstagramIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      className={className}
+    >
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+    </svg>
+  );
+}
+
+/**
+ * Contact group: Instagram only, opened as an external link.
+ * The URL comes from `VITE_INSTAGRAM_URL` — never invented here.
+ */
+function FooterContact() {
+  return (
+    <div>
+      <FooterHeading>Contact</FooterHeading>
+      <ul className="mt-3 space-y-2">
+        <li>
+          {INSTAGRAM_URL ? (
+            <a
+              href={INSTAGRAM_URL}
+              target="_blank"
+              rel="noreferrer"
+              className={`inline-flex items-center gap-1.5 ${FOOTER_LINK_CLASS}`}
+            >
+              <InstagramIcon className="size-3.5" />
+              Instagram
+            </a>
+          ) : (
+            <span
+              className={`inline-flex items-center gap-1.5 ${FOOTER_LINK_CLASS}`}
+              title="Set VITE_INSTAGRAM_URL to configure the Instagram link"
+            >
+              <InstagramIcon className="size-3.5" />
+              Instagram
+            </span>
           )}
-        </nav>
-        <p className="text-xs font-medium text-muted-foreground">
-          © 2026 Mero Note. Designed for CSIT students.
-        </p>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+export function LandingFooter() {
+  return (
+    <footer className="border-t border-border bg-surface">
+      <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] lg:gap-12">
+          <FooterBrand />
+          <nav
+            aria-label="Footer"
+            className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4"
+          >
+            <FooterExplore />
+            <FooterStudy />
+            <FooterAccount />
+            <FooterContact />
+          </nav>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="mt-10 flex flex-col gap-1 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs font-semibold text-muted-foreground">
+            © 2026 Mero Note
+          </p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Built for focused CSIT study.
+          </p>
+        </div>
       </div>
     </footer>
   );

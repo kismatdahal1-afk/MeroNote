@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "../components/common/PageHeader";
 import { ResourceCard } from "../components/cards/ResourceCard";
@@ -7,6 +7,7 @@ import { Select } from "../components/common/Field";
 import { SearchBar } from "../components/common/SearchBar";
 import { FilterChips } from "../components/resources/FilterChips";
 import { fetchResources, fetchSemesters, fetchSubjects } from "../lib/contentApi";
+import { ALL_RESOURCE_TYPES } from "../lib/resourceType";
 import { useApiQuery } from "../hooks/useApiQuery";
 import { ResourcesSkeleton } from "../components/skeletons/pages";
 import type { ResourceType } from "../types";
@@ -17,8 +18,19 @@ export default function Resources() {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const [subjectId, setSubjectId] = useState("");
-  const [type, setType] = useState<ResourceType | "all">("all");
+  // Deep-linkable initial filter for footer links (e.g. ?type=book).
+  // Synced only when the param is present, so in-page chip/semester
+  // selection is never clobbered.
+  const [type, setType] = useState<ResourceType | "all">(() => queryTypeParam(params));
   const [sort, setSort] = useState<SortKey>("recent");
+
+  const typeParam = params.get("type") ?? "";
+  useEffect(() => {
+    if (!typeParam) return;
+    if ((ALL_RESOURCE_TYPES as string[]).includes(typeParam)) {
+      setType(typeParam as ResourceType);
+    }
+  }, [typeParam]);
 
   const semesterId = querySemesterParam(params);
 
@@ -167,4 +179,11 @@ export default function Resources() {
 
 function querySemesterParam(params: URLSearchParams): string {
   return params.get("sem") ?? "";
+}
+
+function queryTypeParam(params: URLSearchParams): ResourceType | "all" {
+  const t = params.get("type");
+  return t && (ALL_RESOURCE_TYPES as string[]).includes(t)
+    ? (t as ResourceType)
+    : "all";
 }
