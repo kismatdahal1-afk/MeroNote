@@ -343,6 +343,35 @@ export function UniverseSection() {
     return () => window.clearTimeout(t);
   }, [selected, front]);
 
+  // One-time discovery spin: when the wheel first scrolls into view after a
+  // page refresh, rotate a full 360° so visitors see it is interactive. Runs
+  // once per page load (ends exactly aligned); user clicks naturally override
+  // it mid-flight through the regular rotation path.
+  const demoRef = useRef<HTMLDivElement | null>(null);
+  const demoPlayed = useRef(false);
+  useEffect(() => {
+    const el = demoRef.current;
+    if (!el || demoPlayed.current) return;
+    if (typeof IntersectionObserver === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            demoPlayed.current = true;
+            io.disconnect();
+            rotationRef.current += 360;
+            setSpinMs(1800);
+            setRotation(rotationRef.current);
+          }
+        }
+      },
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   // Glide the current selection onto the new alignment point when the
   // breakpoint flips (east <-> south). No-op when already aligned.
   const wasDesktop = useRef(isDesktop);
@@ -389,7 +418,8 @@ export function UniverseSection() {
         {/* ------ LEFT-DOCKED: resource network ------ */}
         <Reveal className="flex flex-col items-center lg:-mt-12 lg:items-start">
           <div
-            className="relative aspect-square w-full max-w-[340px] sm:max-w-[460px] md:max-w-[520px] lg:max-w-[560px]"
+            ref={demoRef}
+            className="relative aspect-square w-full max-w-[300px] sm:max-w-[460px] md:max-w-[520px] lg:max-w-[560px]"
             role="group"
             aria-label="Resource type wheel. Select a resource branch to rotate the wheel."
           >
@@ -590,70 +620,6 @@ export function UniverseSection() {
           </div>
         </Reveal>
         </div>
-      </div>
-    </section>
-  );
-}
-
-/* ---------- Section 4 — Find it. Open it. Study. ---------- */
-
-const WORKFLOW = [
-  {
-    n: "01",
-    title: "Find",
-    text: "Choose your semester, subject or topic and quickly discover what you need.",
-  },
-  {
-    n: "02",
-    title: "Open",
-    text: "Open the resource directly without digging through folders or scattered files.",
-  },
-  {
-    n: "03",
-    title: "Study",
-    text: "Read, bookmark and continue your study from where you left off.",
-  },
-];
-
-export function WorkflowSection() {
-  return (
-    <section
-      aria-labelledby="landing-workflow-heading"
-      className="border-y border-border bg-surface-muted/50 py-20 lg:py-24"
-    >
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        <Reveal>
-          <SectionHeading
-            id="landing-workflow-heading"
-            eyebrow="Workflow"
-            title="Find it. Open it. Study."
-            copy="Mero Note keeps the journey from searching for a resource to actually studying it simple."
-          />
-        </Reveal>
-        <ol className="relative mx-auto mt-14 grid max-w-5xl gap-10 md:grid-cols-3 md:gap-6">
-          <span
-            aria-hidden="true"
-            className="absolute left-[16%] right-[16%] top-5 hidden h-px bg-border-strong md:block"
-          />
-          {WORKFLOW.map(({ n, title, text }, i) => (
-            <Reveal as="li" key={n} delay={i * 110}>
-              <div className="relative text-center md:text-left">
-                <span
-                  aria-hidden="true"
-                  className="font-display relative z-10 mx-auto flex size-10 items-center justify-center rounded-full border border-border-strong bg-surface text-sm font-extrabold text-primary shadow-card md:mx-0"
-                >
-                  {n}
-                </span>
-                <h3 className="font-display mt-4 text-xl font-extrabold tracking-tight text-foreground">
-                  {title}
-                </h3>
-                <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground md:mx-0">
-                  {text}
-                </p>
-              </div>
-            </Reveal>
-          ))}
-        </ol>
       </div>
     </section>
   );

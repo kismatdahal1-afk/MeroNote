@@ -47,11 +47,24 @@ const DEFAULT_SLOT: Record<ImageId, Slot> = {
   note: "right",
 };
 
-/** Slot geometry — shared by every state, never edited per interaction. */
+/** Slot geometry — shared by every state, never edited per interaction.
+    Sized to fit the desktop container (aspect-[2.75/1]): the 64%-wide
+    front shot (1704×923) fills ~0.347 of container height, sides sit
+    above the bottom edge. */
 const SLOT_STYLES: Record<Slot, string> = {
   front: "left-[18%] top-0 z-10 w-[64%] rotate-0 scale-100 cursor-default",
   left: "bottom-[8%] -left-[1%] z-0 w-[33%] -rotate-[5deg] scale-[0.97] cursor-pointer",
   right: "bottom-[8%] -right-[1%] z-0 w-[33%] rotate-[5deg] scale-[0.97] cursor-pointer",
+};
+
+/** Mobile-only slot geometry: same front/side arrangement, scaled for
+    narrow screens (front ~70% centered, sides ~36% tucked behind).
+    Container aspect-[2.64/1] fits the 70%-wide front shot (1704×923)
+    with the 36% sides (1688×932) anchored at bottom-[6%]. */
+const MOBILE_SLOT_STYLES: Record<Slot, string> = {
+  front: "left-[15%] top-0 z-10 w-[70%] rotate-0 scale-100 cursor-default",
+  left: "bottom-[6%] -left-[2%] z-0 w-[36%] -rotate-[5deg] scale-[0.97] cursor-pointer",
+  right: "bottom-[6%] -right-[2%] z-0 w-[36%] rotate-[5deg] scale-[0.97] cursor-pointer",
 };
 
 /** Strong shadow for the hover-promoted image (border untouched).
@@ -88,7 +101,7 @@ function prefersReducedMotion(): boolean {
 
 function ShotFigure({ image, shadowClass = "" }: { image: HeroImage; shadowClass?: string }) {
   return (
-    <figure className={`relative overflow-hidden rounded-xl border border-border-strong bg-surface ring-1 ring-black/5 ${shadowClass}`}>
+    <figure className={`relative overflow-hidden rounded-xl bg-surface ${shadowClass}`}>
       <img
         src={image.src}
         alt={image.alt}
@@ -160,6 +173,37 @@ export function ProductComposition() {
     promote(id);
   }
 
+  /** One interactive shot; desktop and mobile share all behavior and differ
+      only in slot geometry. */
+  function renderShot(image: HeroImage, styles: Record<Slot, string>) {
+    const slot = slotFor(image.id, hoveredId);
+    const isFront = slot === "front";
+    const isPromoted = hoveredId === image.id;
+    const shadow = isPromoted ? GLOW_SHADOW : REST_SHADOW;
+    return (
+      <div
+        key={image.id}
+        tabIndex={isFront ? undefined : 0}
+        aria-label={isFront ? undefined : `Preview ${image.label} in front`}
+        onMouseEnter={isFront ? undefined : () => handleEnter(image.id)}
+        onFocus={isFront ? undefined : () => handleEnter(image.id)}
+        onBlur={isFront ? undefined : restore}
+        // Touch fallback: taps promote via emulated mouseenter, but the
+        // container mouseleave may never fire on touch — tapping the
+        // promoted image restores default. Default dashboard front
+        // stays click-free.
+        onClick={isPromoted ? restore : undefined}
+        style={{ animationDelay: `${ENTRANCE_DELAY[image.id]}ms` }}
+        className={
+          `animate-fade-up absolute rounded-xl motion-reduce:animate-none ${SWAP_TRANSITION} ${FOCUS_RING} ` +
+          `${styles[slot]} ${shadow}`
+        }
+      >
+        <ShotFigure image={image} />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
       {/* Desktop / tablet: temporary hover swap. Container-level leave is
@@ -168,47 +212,16 @@ export function ProductComposition() {
         className="relative mx-auto hidden aspect-[2.75/1] w-full max-w-6xl md:block"
         onMouseLeave={restore}
       >
-        {IMAGES.map((image) => {
-          const slot = slotFor(image.id, hoveredId);
-          const isFront = slot === "front";
-          const isPromoted = hoveredId === image.id;
-          const shadow = isPromoted ? GLOW_SHADOW : REST_SHADOW;
-          return (
-            <div
-              key={image.id}
-              tabIndex={isFront ? undefined : 0}
-              aria-label={isFront ? undefined : `Preview ${image.label} in front`}
-              onMouseEnter={isFront ? undefined : () => handleEnter(image.id)}
-              onFocus={isFront ? undefined : () => handleEnter(image.id)}
-              onBlur={isFront ? undefined : restore}
-              // Touch fallback: taps promote via emulated mouseenter, but the
-              // container mouseleave may never fire on touch — tapping the
-              // promoted image restores default. Default dashboard front
-              // stays click-free.
-              onClick={isPromoted ? restore : undefined}
-              style={{ animationDelay: `${ENTRANCE_DELAY[image.id]}ms` }}
-              className={
-                `animate-fade-up absolute rounded-xl motion-reduce:animate-none ${SWAP_TRANSITION} ${FOCUS_RING} ` +
-                `${SLOT_STYLES[slot]} ${shadow}`
-              }
-            >
-              <ShotFigure image={image} />
-            </div>
-          );
-        })}
+        {IMAGES.map((image) => renderShot(image, SLOT_STYLES))}
       </div>
 
-      {/* Mobile / touch: static vertical stack, default composition */}
-      <div className="mx-auto flex w-full max-w-md flex-col gap-5 md:hidden">
-        {IMAGES.map((image) => (
-          <div
-            key={image.id}
-            className={`animate-fade-up motion-reduce:animate-none ${image.id === "dashboard" ? "" : "mx-6"}`}
-            style={{ animationDelay: `${ENTRANCE_DELAY[image.id]}ms` }}
-          >
-            <ShotFigure image={image} shadowClass={REST_SHADOW} />
-          </div>
-        ))}
+      {/* Mobile: same front/side arrangement, scaled for narrow screens.
+          Tap a side preview to bring it forward, tap it again to restore. */}
+      <div
+        className="relative mx-auto aspect-[2.64/1] w-full max-w-md md:hidden"
+        onMouseLeave={restore}
+      >
+        {IMAGES.map((image) => renderShot(image, MOBILE_SLOT_STYLES))}
       </div>
     </div>
   );

@@ -12,7 +12,6 @@ import {
   PillarsSection,
   ReadingSection,
   UniverseSection,
-  WorkflowSection,
 } from "./components/Sections";
 
 /**
@@ -55,7 +54,6 @@ export default function LandingPage() {
         <HeroSection />
         <HierarchySection />
         <UniverseSection />
-        <WorkflowSection />
         <ReadingSection />
         <MobileSection />
         <PillarsSection />
