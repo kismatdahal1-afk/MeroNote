@@ -21,3 +21,9 @@ function authLimiter(message: string) {
 /** Login + registration share the same budget rationale (credential abuse). */
 export const loginLimiter = authLimiter("Too many attempts. Please try again in a minute.");
 export const registerLimiter = authLimiter("Too many attempts. Please try again in a minute.");
+/**
+ * F4 refresh endpoint: separate instance (own budget) so token-guessing abuse
+ * never eats the login brute-force budget. Legitimate clients refresh a few
+ * times per hour; 20/min is generous headroom including mass-expiry bursts.
+ */
+export const refreshLimiter = authLimiter("Too many attempts. Please try again in a minute.");

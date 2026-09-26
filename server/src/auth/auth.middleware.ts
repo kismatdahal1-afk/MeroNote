@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { User } from "../models";
-import { sessionCookieName, verifySessionToken } from "./tokens";
+import { sessionCookieName, verifySessionToken, type SessionClaims } from "./tokens";
 
 /** Authenticated identity attached by requireAuth. Minimal by design. */
 export interface AuthIdentity {
@@ -20,6 +20,8 @@ declare global {
 /**
  * requireAuth: valid session cookie → req.user, else 401.
  * Role is always re-read from the database (never trusts token claims alone).
+ * F1: the JWT session version must still match users.sessionVersion —
+ * logout bumps the epoch, so replayed pre-logout tokens fail here with 401.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -28,7 +30,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(401).json({ status: "error", message: "Authentication required." });
       return;
     }
-    let claims;
+    let claims: SessionClaims;
     try {
       claims = verifySessionToken(token);
     } catch {
@@ -37,6 +39,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
     const user = await User.findById(claims.sub).exec();
     if (!user) {
+      res.status(401).json({ status: "error", message: "Authentication required." });
+      return;
+    }
+    // F1: reject tokens from a superseded session epoch (e.g. logged out
+    // elsewhere). Generic 401 — never populated into req.user.
+    const dbVersion = user.sessionVersion ?? 0;
+    if (claims.v !== dbVersion) {
       res.status(401).json({ status: "error", message: "Authentication required." });
       return;
     }

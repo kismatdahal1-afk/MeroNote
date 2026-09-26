@@ -26,6 +26,7 @@
     "verify:admin-cms": "tsx scripts/verify-admin-cms.ts",
     "verify:db": "tsx scripts/verify-db.ts",
     "verify:auth": "tsx scripts/verify-auth.ts",
+    "verify:csrf": "tsx scripts/verify-csrf.ts",
     "verify:b2": "tsx scripts/verify-b2.ts",
     "verify:phase14": "tsx scripts/smoke-phase14.ts",
     "promote-admin": "tsx scripts/promote-admin.ts"

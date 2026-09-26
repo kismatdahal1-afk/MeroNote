@@ -65,10 +65,15 @@ async function main(): Promise<void> {
   });
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
-  const post = async (path: string, body: unknown, cookie?: string): Promise<{ status: number; json: any; setCookie: string | null }> => {
+  const post = async (
+    path: string,
+    body: unknown,
+    cookie?: string,
+    extraHeaders?: Record<string, string>,
+  ): Promise<{ status: number; json: any; setCookie: string | null }> => {
     const res = await fetch(`${base}${path}`, {
       method: "POST",
-      headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+      headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}), ...(extraHeaders ?? {}) },
       body: JSON.stringify(body),
     });
     return { status: res.status, json: await res.json(), setCookie: res.headers.get("set-cookie") };
@@ -78,6 +83,22 @@ async function main(): Promise<void> {
     return { status: res.status, json: await res.json() };
   };
   const sessionCookie = (setCookie: string | null): string => (setCookie ? setCookie.split(";")[0] : "");
+  // Combined set-cookie headers join entries with ", " (Expires dates contain
+  // commas), so extract by name instead of splitting.
+  const cookieValue = (setCookie: string | null, name: string): string => {
+    const m = (setCookie ?? "").match(new RegExp(`${name}=([^;]+)`));
+    return m ? m[1] : "";
+  };
+  // Browser-equivalent headers for an authenticated mutation: both cookies +
+  // the double-submit CSRF proof, as issued by the login/register response.
+  const authedHeaders = (setCookie: string | null): Record<string, string> => {
+    const session = cookieValue(setCookie, "meronote_session");
+    const csrf = cookieValue(setCookie, "meronote_csrf");
+    return {
+      cookie: `meronote_session=${session}; meronote_csrf=${csrf}`,
+      "x-csrf-token": csrf,
+    };
+  };
 
   // 1. Register succeeds.
   const reg = await post("/api/auth/register", {
@@ -121,26 +142,27 @@ async function main(): Promise<void> {
     wrong.status === 401 && unknown.status === 401 && wrong.json.message === unknown.json.message,
   );
 
-  // 6. me + logout.
-  const meAuthed = await get("/api/auth/me", sessionCookie(login.setCookie));
-  check("me returns current user", meAuthed.status === 200 && meAuthed.json.data?.email === "student@example.com");
-  const meAnon = await get("/api/auth/me");
-  check("me without cookie → 401", meAnon.status === 401);
-  const logout = await post("/api/auth/logout", {}, sessionCookie(login.setCookie));
-  check("logout 200 and clears cookie", logout.status === 200 && (logout.setCookie ?? "").includes("Expires="));
-  const meAfter = await get("/api/auth/me", "");
-  check("me after logout → 401", meAfter.status === 401);
+   // 6. Authorization matrix on the admin probe (before logout invalidates the cookie).
+   const anonAdmin = await get("/api/auth/admin/ping");
+   const userAdmin = await get("/api/auth/admin/ping", studentCookie);
 
-  // 7. Authorization matrix on the admin probe.
-  const anonAdmin = await get("/api/auth/admin/ping");
-  const userAdmin = await get("/api/auth/admin/ping", studentCookie);
-  await User.findOneAndUpdate({ email: "student@example.com" }, { $set: { role: "ADMIN" } }).exec();
-  const adminLogin = await post("/api/auth/login", { email: "student@example.com", password: "study-hard-123" });
-  const adminCookie = sessionCookie(adminLogin.setCookie);
-  const adminAdmin = await get("/api/auth/admin/ping", adminCookie);
-  check("anonymous → admin route 401", anonAdmin.status === 401);
-  check("USER → admin route 403", userAdmin.status === 403);
-  check("ADMIN → admin route 200", adminAdmin.status === 200 && adminLogin.json.data?.role === "ADMIN");
+   // 6b. me + logout.
+   const meAuthed = await get("/api/auth/me", sessionCookie(login.setCookie));
+   check("me returns current user", meAuthed.status === 200 && meAuthed.json.data?.email === "student@example.com");
+   const meAnon = await get("/api/auth/me");
+   check("me without cookie → 401", meAnon.status === 401);
+    const logout = await post("/api/auth/logout", {}, undefined, authedHeaders(login.setCookie));
+   check("logout 200 and clears cookie", logout.status === 200 && (logout.setCookie ?? "").includes("Expires="));
+   const meAfter = await get("/api/auth/me", "");
+   check("me after logout → 401", meAfter.status === 401);
+
+   // 7. Admin promotion + admin access with new login.
+   await User.findOneAndUpdate({ email: "student@example.com" }, { $set: { role: "ADMIN" } }).exec();
+   const adminLogin = await post("/api/auth/login", { email: "student@example.com", password: "study-hard-123" });
+   const adminCookie = sessionCookie(adminLogin.setCookie);
+   const adminAdmin = await get("/api/auth/admin/ping", adminCookie);
+   check("USER → admin route 403", userAdmin.status === 403);
+   check("ADMIN → admin route 200", adminAdmin.status === 200 && adminLogin.json.data?.role === "ADMIN");
 
   // 8. Health untouched.
   const health = await get("/api/health");

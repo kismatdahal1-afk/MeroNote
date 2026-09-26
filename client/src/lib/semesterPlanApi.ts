@@ -14,6 +14,7 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 export type SemesterPlanStatus = "upcoming" | "ongoing" | "passed";
 
 import { isObjectIdLike } from "./studyApi";
+import { csrfHeaders } from "./csrf";
 
 /** Shared ObjectId guard (re-exported so callers import from one place). */
 export { isObjectIdLike };
@@ -137,7 +138,8 @@ export async function updateSemesterPlan(
     res = await fetch(`${API_URL}/api/me/semester-plan/${semesterId}`, {
       method: "PATCH",
       credentials: "include",
-      headers: { "content-type": "application/json" },
+      // F3 double-submit proof.
+      headers: { "content-type": "application/json", ...(await csrfHeaders("PATCH")) },
       body: JSON.stringify(payload),
     });
   } catch {

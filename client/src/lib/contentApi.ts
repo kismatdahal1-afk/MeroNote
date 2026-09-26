@@ -13,6 +13,7 @@ import type {
   Subject,
   Topic,
 } from "../types";
+import { csrfHeaders } from "./csrf";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
@@ -71,7 +72,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<{ data: T; 
   try {
     res = await fetch(`${API_URL}${path}`, {
       credentials: "include",
-      headers: { "content-type": "application/json" },
+      // F3 double-submit proof on mutating methods (no-op for reads).
+      headers: { "content-type": "application/json", ...(await csrfHeaders(init?.method)) },
       ...init,
       signal: init?.signal ?? null,
     });

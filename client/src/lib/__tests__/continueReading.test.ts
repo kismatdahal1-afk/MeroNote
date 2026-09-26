@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PreferencesError,
   deleteContinueReading,
@@ -12,6 +12,13 @@ import {
  */
 
 const A = "aaaaaaaaaaaaaaaaaaaaaaaa";
+
+// Mutating calls attach the double-submit CSRF proof (F3). In production the
+// readable cookie always exists post-login; mirror that here so no bootstrap
+// request pollutes the mocked fetch observations below.
+beforeEach(() => {
+  vi.stubGlobal("document", { cookie: `meronote_csrf=${"b".repeat(64)}` });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();

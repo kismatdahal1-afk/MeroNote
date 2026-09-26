@@ -1,5 +1,6 @@
 /**
- * Barrel export for the 10 Phase 1 collections + Phase 16 semester plans.
+ * Barrel export for the 10 Phase 1 collections + Phase 16 semester plans
+ * + F4 refresh-token records.
  * Importing this module has no side effects (no connection is opened).
  */
 export * from "./enums";
@@ -16,3 +17,4 @@ export * from "./readingProgress.model";
 export * from "./userSemesterPlan.model";
 export * from "./downloadHistory.model";
 export * from "./userPreferences.model";
+export * from "./refreshToken.model";

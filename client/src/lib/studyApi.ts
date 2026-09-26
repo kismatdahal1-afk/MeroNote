@@ -8,6 +8,8 @@
  * - Nothing here is ever thrown to the user; no toasts, no alerts.
  */
 
+import { csrfHeaders } from "./csrf";
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
 export type StudyTargetType = "resource" | "subject";
@@ -45,7 +47,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T | null> {
   try {
     const res = await fetch(`${API_URL}${path}`, {
       credentials: "include",
-      headers: { "content-type": "application/json" },
+      // F3 double-submit proof on mutating methods (no-op for reads).
+      headers: { "content-type": "application/json", ...(await csrfHeaders(init?.method)) },
       ...init,
     });
     if (!res.ok) return null;

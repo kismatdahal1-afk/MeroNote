@@ -5,6 +5,7 @@
  */
 
 import { ApiError, Pagination } from "./contentApi";
+import { csrfHeaders } from "./csrf";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
@@ -35,11 +36,16 @@ export interface AdminFileMeta {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const _t0 = Date.now();
   console.log(`[TIMING] adminApi request START ${init?.method ?? "GET"} ${path} at ${_t0}`);
+  // F3: CSRF proof for mutating methods ({} for reads); computed up-front so the
+  // headers object below keeps its exact original override semantics.
+  const csrf = await csrfHeaders(init?.method);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       credentials: "include",
-      ...(init?.body instanceof FormData ? {} : { headers: { "content-type": "application/json" } }),
+      ...(init?.body instanceof FormData
+        ? { headers: { ...csrf } }
+        : { headers: { "content-type": "application/json", ...csrf } }),
       ...init,
       signal: init?.signal ?? null,
     });
@@ -70,11 +76,15 @@ function queryString(params: AdminListParams): string {
 
 /** Envelope-preserving fetch for list endpoints (keeps `data` + `pagination`). */
 async function listEnvelope<T>(path: string, init?: RequestInit): Promise<{ data: T; pagination: Pagination | null }> {
+  // F3: CSRF proof for mutating methods ({} for reads); see request() above.
+  const csrf = await csrfHeaders(init?.method);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       credentials: "include",
-      ...(init?.body instanceof FormData ? {} : { headers: { "content-type": "application/json" } }),
+      ...(init?.body instanceof FormData
+        ? { headers: { ...csrf } }
+        : { headers: { "content-type": "application/json", ...csrf } }),
       ...init,
       signal: init?.signal ?? null,
     });

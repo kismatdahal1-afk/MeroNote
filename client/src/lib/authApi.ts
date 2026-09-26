@@ -2,7 +2,13 @@
  * Minimal typed client for the Phase 3 session API.
  * Cookies carry the session (HttpOnly) — every request uses
  * credentials:"include" and no token is ever stored client-side.
+ *
+ * CSRF (F3): login/register are pre-session bootstrap calls and stay
+ * exempt; the authenticated calls (logout, profile edit) attach the
+ * double-submit proof via `csrf: true`.
  */
+
+import { csrfHeaders } from "./csrf";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
@@ -23,12 +29,12 @@ export class AuthError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, csrf = false): Promise<T> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       credentials: "include",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...(csrf ? await csrfHeaders(init?.method) : {}) },
       ...init,
     });
   } catch {
@@ -60,12 +66,16 @@ export function registerRequest(email: string, password: string, confirmPassword
 }
 
 export function logoutRequest(): Promise<void> {
-  return request<void>("/api/auth/logout", { method: "POST" });
+  return request<void>("/api/auth/logout", { method: "POST" }, true);
 }
 
 export function updateProfileRequest(name: string): Promise<AuthUser> {
-  return request<AuthUser>("/api/auth/me", {
-    method: "PATCH",
-    body: JSON.stringify({ name }),
-  });
+  return request<AuthUser>(
+    "/api/auth/me",
+    {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    },
+    true,
+  );
 }

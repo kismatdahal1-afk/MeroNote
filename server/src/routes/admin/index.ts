@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { requireAuth, requireAdmin } from "../../auth/auth.middleware";
+import { requireCsrf } from "../../auth/csrf";
 import { asyncHandler } from "../../lib/api";
 import { uploadSinglePdf } from "../../middleware/upload.middleware";
 import {
@@ -56,7 +57,8 @@ import {
 const router = Router();
 
 // Every CMS route is ADMIN-only. Student reads stay on the public routers.
-router.use(requireAuth, requireAdmin);
+// F3 chain: authentication → CSRF (mutations) → authorization.
+router.use(requireAuth, requireCsrf, requireAdmin);
 
 type AdminHandler = (req: Request, res: Response) => Promise<void>;
 

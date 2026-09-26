@@ -11,6 +11,7 @@
  */
 
 import { fetchAllPages } from "./studyApi";
+import { csrfHeaders } from "./csrf";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
@@ -65,7 +66,8 @@ export async function registerDownloadHistory(resourceId: string, fileSize: numb
     res = await fetch(`${API_URL}/api/me/downloads/${resourceId}`, {
       method: "PUT",
       credentials: "include",
-      headers: { "content-type": "application/json" },
+      // F3 double-submit proof.
+      headers: { "content-type": "application/json", ...(await csrfHeaders("PUT")) },
       body: JSON.stringify({ fileSize }),
     });
   } catch {
@@ -93,6 +95,8 @@ export async function deleteDownloadHistory(resourceId: string): Promise<boolean
     res = await fetch(`${API_URL}/api/me/downloads/${resourceId}`, {
       method: "DELETE",
       credentials: "include",
+      // F3 double-submit proof.
+      headers: await csrfHeaders("DELETE"),
     });
   } catch {
     throw new DownloadHistoryError(0, "Cannot reach the server. Check your connection and try again.");
@@ -126,7 +130,8 @@ export async function verifyDownloadHistory(
     res = await fetch(`${API_URL}/api/me/downloads/${resourceId}`, {
       method: "PATCH",
       credentials: "include",
-      headers: { "content-type": "application/json" },
+      // F3 double-submit proof.
+      headers: { "content-type": "application/json", ...(await csrfHeaders("PATCH")) },
       body: JSON.stringify(input),
     });
   } catch {

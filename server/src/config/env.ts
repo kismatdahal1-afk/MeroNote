@@ -12,7 +12,10 @@ export const env = {
   // HMAC secret for session JWTs. Required in every environment that serves
   // auth traffic — the server refuses to sign/verify without it.
   jwtSecret: process.env.JWT_SECRET || "",
-  // Default session lifetime (days) when "Remember me" is unchecked.
+  // F4: long-lived login duration belongs to the rotating refresh token.
+  // This knob is the default refresh lifetime (days) for logins without
+  // "Remember me" (remembered logins use 30 days). The access JWT itself is
+  // always short-lived (see accessTokenMinutes in auth/tokens.ts).
   jwtExpiresDays: Number(process.env.JWT_EXPIRES_DAYS) || 7,
   // Backblaze B2 object storage (S3-compatible). Credentials are
   // environment-only and validated lazily by the storage layer, so MongoDB

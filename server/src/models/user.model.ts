@@ -13,6 +13,8 @@ export interface IUser extends Document {
   passwordHash: string;
   role: (typeof USER_ROLES)[number];
   semesterPrefs: ISemesterPref[];
+  /** F1 session epoch: bumped atomically on logout; JWT.v must match it. */
+  sessionVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,6 +51,8 @@ const userSchema = new Schema<IUser>(
         message: "semesterPrefs holds at most one entry per semester (max 8).",
       },
     },
+    // F1 logout-invalidation epoch (default 0; no index needed).
+    sessionVersion: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { requireAuth } from "../auth/auth.middleware";
+import { requireCsrf } from "../auth/csrf";
 import { asyncHandler } from "../lib/api";
 import { deleteFavorite, listFavorites, putFavorite } from "../controllers/favorites.controller";
 import { createBookmark, deleteBookmark, listBookmarks, updateBookmark } from "../controllers/bookmarks.controller";
@@ -16,8 +17,10 @@ import {
 const router = Router();
 
 // All personal study data requires authentication; ownership always derives
-// from req.user (never from client-supplied userId).
-router.use(requireAuth);
+// from req.user (never from client-supplied userId). F3: state-changing
+// methods additionally require a CSRF proof (checked after auth, GETs pass
+// through).
+router.use(requireAuth, requireCsrf);
 
 router.get("/favorites", asyncHandler(listFavorites));
 router.put("/favorites/:targetType/:targetId", asyncHandler(putFavorite));

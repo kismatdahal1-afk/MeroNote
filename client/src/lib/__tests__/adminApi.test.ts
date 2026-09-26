@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
 import { adminCreate, adminGet, adminList, adminUpdate, adminUploadFile } from "../adminApi";
 
 /**
@@ -32,6 +32,13 @@ function mockFetchOnce(body: unknown, ok = true, status = 200): void {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+// Mutating calls attach the double-submit CSRF proof (F3). In production the
+// readable cookie always exists post-login; mirror that here so no bootstrap
+// request consumes the mocked response sequences below.
+beforeEach(() => {
+  vi.stubGlobal("document", { cookie: `meronote_csrf=${"b".repeat(64)}` });
 });
 
 describe("adminApi id normalization", () => {

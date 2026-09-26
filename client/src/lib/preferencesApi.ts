@@ -8,6 +8,8 @@
  * device-local, and the Settings reading toggles gate no behavior yet.
  */
 
+import { csrfHeaders } from "./csrf";
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
 export interface RecentResourceEntry {
@@ -61,6 +63,8 @@ export async function putContinueReading(resourceId: string): Promise<boolean> {
     res = await fetch(`${API_URL}/api/me/preferences/continue-reading/${resourceId}`, {
       method: "PUT",
       credentials: "include",
+      // F3 double-submit proof.
+      headers: await csrfHeaders("PUT"),
     });
   } catch {
     throw new PreferencesError(0, "Cannot reach the server. Check your connection and try again.");
@@ -86,6 +90,8 @@ export async function deleteContinueReading(resourceId: string): Promise<boolean
     res = await fetch(`${API_URL}/api/me/preferences/continue-reading/${resourceId}`, {
       method: "DELETE",
       credentials: "include",
+      // F3 double-submit proof.
+      headers: await csrfHeaders("DELETE"),
     });
   } catch {
     throw new PreferencesError(0, "Cannot reach the server. Check your connection and try again.");
@@ -110,7 +116,8 @@ export async function recordRecentOpened(resourceId: string): Promise<void> {
     await fetch(`${API_URL}/api/me/preferences/recent`, {
       method: "POST",
       credentials: "include",
-      headers: { "content-type": "application/json" },
+      // F3 double-submit proof.
+      headers: { "content-type": "application/json", ...(await csrfHeaders("POST")) },
       body: JSON.stringify({ resourceId }),
     });
   } catch {
