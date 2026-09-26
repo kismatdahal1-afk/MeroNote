@@ -23,7 +23,7 @@ export function LandingNavbar() {
     <header className="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur-md">
       <nav
         aria-label="Mero Note public site"
-        className="mx-auto flex h-16 w-full max-w-6xl items-center gap-3 px-4 sm:px-6"
+        className="mx-auto flex h-20 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8"
       >
         <Link
           to="/"

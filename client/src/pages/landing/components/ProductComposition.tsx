@@ -1,111 +1,214 @@
+import { useEffect, useRef, useState } from "react";
+
 /**
- * The signature three-image product composition.
+ * Three-image hero composition with a TEMPORARY hover swap.
  *
- * Uses the REAL Mero Note screenshots, byte-identical — only the CSS
- * container (rounded corners, border, shadow, positioning) presents them:
- * - Dashboard.png  — hero, largest, centered, dominant
- * - Semester.png   — secondary, offset behind/beside the dashboard
- * - Resource_iPhone.png — vertical mobile companion on the side
+ * Real screenshots, CSS-only presentation. Fixed default:
+ * Dashboard front/center, Semester back-left, note back-right.
+ * Hovering a back image glides it to front while the front recedes to
+ * that side; leaving restores default. No carousel, no click.
  *
- * Desktop: one intentional editorial composition with controlled overlap.
- * Mobile browser: recomposed vertical stack (Dashboard → Semester → phone)
- * so every screenshot stays readable instead of shrunken.
+ * Flicker-proofing: mid-flight the receding image slides under the
+ * stationary cursor, firing a fresh mouseenter that would re-promote it
+ * into a blink loop. While a transition is in flight, enter events are
+ * discarded except from the one stationary image, which can only mean a
+ * genuine cursor move. Single state (`hoveredId`), one timer.
  */
 
 const DASHBOARD_SRC = "/images/Dashboard.png";
 const SEMESTER_SRC = "/images/Semester.png";
-const IPHONE_SRC = "/images/Resource_iPhone.png";
+const NOTE_SRC = "/images/note.png";
 
-function DashboardFrame({ eager }: { eager: boolean }) {
+type ImageId = "dashboard" | "semester" | "note";
+type Slot = "front" | "left" | "right";
+
+interface HeroImage {
+  id: ImageId;
+  label: string;
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  caption: string;
+  eager: boolean;
+}
+
+const IMAGES: HeroImage[] = [
+  { id: "dashboard", label: "Dashboard", src: DASHBOARD_SRC, alt: "Mero Note dashboard", width: 1704, height: 923, caption: "Mero Note dashboard preview", eager: true },
+  { id: "semester", label: "Semester view", src: SEMESTER_SRC, alt: "Mero Note semester view", width: 1688, height: 932, caption: "Mero Note semester view preview", eager: false },
+  { id: "note", label: "Notes view", src: NOTE_SRC, alt: "Mero Note resource and notes view", width: 1688, height: 932, caption: "Mero Note resource and notes view preview", eager: false },
+];
+
+const IMAGE_IDS: ImageId[] = ["dashboard", "semester", "note"];
+
+const DEFAULT_SLOT: Record<ImageId, Slot> = {
+  dashboard: "front",
+  semester: "left",
+  note: "right",
+};
+
+/** Slot geometry — shared by every state, never edited per interaction. */
+const SLOT_STYLES: Record<Slot, string> = {
+  front: "left-[18%] top-0 z-10 w-[64%] rotate-0 scale-100 cursor-default",
+  left: "bottom-[8%] -left-[1%] z-0 w-[33%] -rotate-[5deg] scale-[0.97] cursor-pointer",
+  right: "bottom-[8%] -right-[1%] z-0 w-[33%] rotate-[5deg] scale-[0.97] cursor-pointer",
+};
+
+/** Strong shadow for the hover-promoted image (border untouched).
+    Theme-aware token: black in light mode, soft light in dark mode. */
+const GLOW_SHADOW = "shadow-hero-glow";
+
+/** Elevated resting shadow every hero image carries at all times. */
+const REST_SHADOW = "shadow-hero-rest";
+
+/** Staggered entrance delays (run once on mount). */
+const ENTRANCE_DELAY: Record<ImageId, number> = {
+  dashboard: 120,
+  semester: 320,
+  note: 480,
+};
+
+/** Smooth travel: layout + transform + shadow on a soft ease-out curve. */
+const TRAVEL_MS = 650;
+const SWAP_TRANSITION =
+  `transition-[left,top,width,scale,rotate,box-shadow] duration-[650ms] ` +
+  `ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none`;
+/** Covers the travel so travel-induced enters land inside the lock. */
+const FLIGHT_LOCK_MS = TRAVEL_MS + 50;
+const FOCUS_RING =
+  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary";
+
+function prefersReducedMotion(): boolean {
   return (
-    <figure className="relative overflow-hidden rounded-2xl border border-border-strong bg-surface shadow-card-hover ring-1 ring-black/5">
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+function ShotFigure({ image, shadowClass = "" }: { image: HeroImage; shadowClass?: string }) {
+  return (
+    <figure className={`relative overflow-hidden rounded-xl border border-border-strong bg-surface ring-1 ring-black/5 ${shadowClass}`}>
       <img
-        src={DASHBOARD_SRC}
-        alt="Mero Note dashboard"
-        width={1280}
-        height={800}
-        loading={eager ? "eager" : "lazy"}
+        src={image.src}
+        alt={image.alt}
+        width={image.width}
+        height={image.height}
+        loading={image.eager ? "eager" : "lazy"}
         decoding="async"
         className="block h-auto w-full object-contain"
       />
-      <figcaption className="sr-only">Mero Note student dashboard preview</figcaption>
+      <figcaption className="sr-only">{image.caption}</figcaption>
     </figure>
   );
 }
 
-function SemesterFrame() {
-  return (
-    <figure className="overflow-hidden rounded-2xl border border-border-strong bg-surface shadow-card-hover ring-1 ring-black/5">
-      <img
-        src={SEMESTER_SRC}
-        alt="Mero Note semester and subject library"
-        width={1280}
-        height={800}
-        loading="lazy"
-        decoding="async"
-        className="block h-auto w-full object-contain"
-      />
-      <figcaption className="sr-only">Mero Note semester and subject library preview</figcaption>
-    </figure>
-  );
-}
-
-function IphoneFrame() {
-  return (
-    <figure className="overflow-hidden rounded-[1.75rem] border border-border-strong bg-surface shadow-card-hover ring-1 ring-black/5">
-      <img
-        src={IPHONE_SRC}
-        alt="Mero Note mobile resource library"
-        width={420}
-        height={880}
-        loading="lazy"
-        decoding="async"
-        className="block h-auto w-full object-contain"
-      />
-      <figcaption className="sr-only">Mero Note mobile resource library preview</figcaption>
-    </figure>
-  );
+function slotFor(id: ImageId, hoveredId: ImageId | null): Slot {
+  if (hoveredId === null) return DEFAULT_SLOT[id];
+  if (id === hoveredId) return "front";
+  if (id === "dashboard") return DEFAULT_SLOT[hoveredId];
+  return DEFAULT_SLOT[id];
 }
 
 export function ProductComposition() {
+  /** Single source of truth: hovered BACK image, or null for default. */
+  const [hoveredId, setHoveredId] = useState<ImageId | null>(null);
+  // Ref mirror so rapid-fire events never read a stale closure value.
+  const hoveredRef = useRef<ImageId | null>(null);
+  const lockTimer = useRef<number | null>(null);
+  const lockedRef = useRef(false);
+  const stableRef = useRef<ImageId | null>(null);
+
+  useEffect(() => () => {
+    if (lockTimer.current !== null) window.clearTimeout(lockTimer.current);
+  }, []);
+
+  function setHovered(id: ImageId | null) {
+    hoveredRef.current = id;
+    setHoveredId(id);
+  }
+
+  function clearFlight() {
+    if (lockTimer.current !== null) {
+      window.clearTimeout(lockTimer.current);
+      lockTimer.current = null;
+    }
+    lockedRef.current = false;
+    stableRef.current = null;
+  }
+
+  function promote(id: ImageId) {
+    clearFlight();
+    const front: ImageId = hoveredRef.current ?? "dashboard";
+    stableRef.current = IMAGE_IDS.find((key) => key !== id && key !== front) ?? null;
+    setHovered(id);
+    if (!prefersReducedMotion()) {
+      lockedRef.current = true;
+      lockTimer.current = window.setTimeout(clearFlight, FLIGHT_LOCK_MS);
+    }
+  }
+
+  function restore() {
+    if (hoveredRef.current === null) return;
+    clearFlight();
+    setHovered(null);
+  }
+
+  function handleEnter(id: ImageId) {
+    if (id === (hoveredRef.current ?? "dashboard")) return;
+    if (lockedRef.current && id !== stableRef.current) return;
+    promote(id);
+  }
+
   return (
     <div className="w-full">
-      {/* Desktop / tablet editorial composition */}
-      <div className="relative mx-auto hidden w-full max-w-5xl md:block">
-        <div
-          className="animate-fade-up relative z-10 mx-auto w-[68%] motion-reduce:animate-none"
-          style={{ animationDelay: "120ms" }}
-        >
-          <DashboardFrame eager />
-        </div>
-        <div
-          className="animate-fade-up absolute -left-[1%] bottom-[6%] z-0 w-[31%] -rotate-[2deg] motion-reduce:animate-none"
-          style={{ animationDelay: "320ms" }}
-        >
-          <SemesterFrame />
-        </div>
-        <div
-          className="animate-fade-up absolute -right-[1%] bottom-0 z-20 w-[15%] min-w-[124px] rotate-[2deg] motion-reduce:animate-none"
-          style={{ animationDelay: "480ms" }}
-        >
-          <IphoneFrame />
-        </div>
+      {/* Desktop / tablet: temporary hover swap. Container-level leave is
+          the single restore path for every slot arrangement. */}
+      <div
+        className="relative mx-auto hidden aspect-[2.75/1] w-full max-w-6xl md:block"
+        onMouseLeave={restore}
+      >
+        {IMAGES.map((image) => {
+          const slot = slotFor(image.id, hoveredId);
+          const isFront = slot === "front";
+          const isPromoted = hoveredId === image.id;
+          const shadow = isPromoted ? GLOW_SHADOW : REST_SHADOW;
+          return (
+            <div
+              key={image.id}
+              tabIndex={isFront ? undefined : 0}
+              aria-label={isFront ? undefined : `Preview ${image.label} in front`}
+              onMouseEnter={isFront ? undefined : () => handleEnter(image.id)}
+              onFocus={isFront ? undefined : () => handleEnter(image.id)}
+              onBlur={isFront ? undefined : restore}
+              // Touch fallback: taps promote via emulated mouseenter, but the
+              // container mouseleave may never fire on touch — tapping the
+              // promoted image restores default. Default dashboard front
+              // stays click-free.
+              onClick={isPromoted ? restore : undefined}
+              style={{ animationDelay: `${ENTRANCE_DELAY[image.id]}ms` }}
+              className={
+                `animate-fade-up absolute rounded-xl motion-reduce:animate-none ${SWAP_TRANSITION} ${FOCUS_RING} ` +
+                `${SLOT_STYLES[slot]} ${shadow}`
+              }
+            >
+              <ShotFigure image={image} />
+            </div>
+          );
+        })}
       </div>
 
-      {/* Mobile browser: vertical recomposition, full readability */}
+      {/* Mobile / touch: static vertical stack, default composition */}
       <div className="mx-auto flex w-full max-w-md flex-col gap-5 md:hidden">
-        <div className="animate-fade-up motion-reduce:animate-none" style={{ animationDelay: "120ms" }}>
-          <DashboardFrame eager />
-        </div>
-        <div className="animate-fade-up mx-6 motion-reduce:animate-none" style={{ animationDelay: "280ms" }}>
-          <SemesterFrame />
-        </div>
-        <div
-          className="animate-fade-up mx-auto w-44 motion-reduce:animate-none"
-          style={{ animationDelay: "420ms" }}
-        >
-          <IphoneFrame />
-        </div>
+        {IMAGES.map((image) => (
+          <div
+            key={image.id}
+            className={`animate-fade-up motion-reduce:animate-none ${image.id === "dashboard" ? "" : "mx-6"}`}
+            style={{ animationDelay: `${ENTRANCE_DELAY[image.id]}ms` }}
+          >
+            <ShotFigure image={image} shadowClass={REST_SHADOW} />
+          </div>
+        ))}
       </div>
     </div>
   );

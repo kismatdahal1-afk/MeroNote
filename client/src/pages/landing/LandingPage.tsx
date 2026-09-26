@@ -4,13 +4,15 @@ import { useStandalone } from "./hooks/useStandalone";
 import { LandingNavbar } from "./components/LandingNavbar";
 import { HeroSection } from "./components/HeroSection";
 import {
-  FeatureGrid,
   FinalCTA,
-  HowItWorks,
+  HierarchySection,
+  JourneySection,
   LandingFooter,
-  MobileShowcase,
-  OrgHierarchy,
-  ResourceLibrary,
+  MobileSection,
+  PillarsSection,
+  ReadingSection,
+  UniverseSection,
+  WorkflowSection,
 } from "./components/Sections";
 
 /**
@@ -49,13 +51,15 @@ export default function LandingPage() {
   return (
     <div className="landing-page bg-hero-gradient flex min-h-screen flex-col">
       <LandingNavbar />
-      <main className="flex-1 pb-4">
+      <main className="flex-1">
         <HeroSection />
-        <OrgHierarchy />
-        <ResourceLibrary />
-        <MobileShowcase />
-        <HowItWorks />
-        <FeatureGrid />
+        <HierarchySection />
+        <UniverseSection />
+        <WorkflowSection />
+        <ReadingSection />
+        <MobileSection />
+        <PillarsSection />
+        <JourneySection />
         <FinalCTA />
       </main>
       <LandingFooter />

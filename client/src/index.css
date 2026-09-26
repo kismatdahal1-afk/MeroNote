@@ -62,6 +62,8 @@
   --color-scrim: rgba(15, 23, 42, 0.45);
   --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.05);
+  --shadow-hero-rest: 0 24px 70px -12px rgba(0, 0, 0, 0.45);
+  --shadow-hero-glow: 0 40px 110px -12px rgba(0, 0, 0, 0.65);
 }
 
 .dark {
@@ -117,6 +119,8 @@
   --color-scrim: rgba(0, 0, 0, 0.75);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-hero-rest: 0 24px 70px -12px rgba(255, 255, 255, 0.18);
+  --shadow-hero-glow: 0 40px 110px -12px rgba(255, 255, 255, 0.3);
 }
 
 /* Reader chrome — follows the app theme: warm cream in light mode,
@@ -201,6 +205,8 @@
 
   --shadow-card: var(--shadow-card);
   --shadow-card-hover: var(--shadow-card-hover);
+  --shadow-hero-rest: var(--shadow-hero-rest);
+  --shadow-hero-glow: var(--shadow-hero-glow);
 
   --animate-toast-in: toast-in 0.2s ease-out;
   --animate-page-forward: page-forward 0.22s cubic-bezier(0.2, 0, 0, 1);
@@ -751,4 +757,29 @@ body {
    (0,1,1); placed later so it wins within the landing subtree only. */
 .landing-page main {
   padding-bottom: 1rem;
+}
+
+/* Public landing hero ONLY — dense white graph grid across the
+   ENTIRE hero background, behind all content. Scoped to
+   .landing-hero-grid (rendered solely in the landing HeroSection), so
+   no other page — including the authenticated Dashboard — is affected.
+   Thin vertical + horizontal lines intersect into continuous squares;
+   low opacity keeps it subtle while clearly visible. */
+.landing-hero-grid {
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  background-size:
+    36px 36px,
+    36px 36px;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.55) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.55) 1px, transparent 1px);
+}
+
+.dark .landing-hero-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.09) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.09) 1px, transparent 1px);
 }
