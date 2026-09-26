@@ -347,7 +347,7 @@ export default function Settings() {
         <Card className="p-5 sm:p-6">
           <SectionTitle icon={Info}>About</SectionTitle>
           <div className="mt-4 divide-y divide-border">
-            <DataRow label="Version" value="Mero Note v0.2.5" />
+            <DataRow label="Version" value="Mero Note · v1.0.0" />
             <DataRow
               label="API status"
               value={<ApiHealth />}
