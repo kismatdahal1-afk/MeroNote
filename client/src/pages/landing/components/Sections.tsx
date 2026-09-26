@@ -1,9 +1,9 @@
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowDown,
   ArrowRight,
   BookOpen,
+  Check,
   FileArchive,
   FileText,
   FlaskConical,
@@ -13,7 +13,9 @@ import {
   PenLine,
   Sparkles,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Reveal } from "./Reveal";
+import { ALL_RESOURCE_TYPES } from "../../../lib/resourceType";
 
 /* ---------- shared section heading ---------- */
 
@@ -43,20 +45,126 @@ function SectionHeading({
   );
 }
 
-/* ---------- Section 2 — Everything has a place ---------- */
+/* ---------- Section 2 — Everything has a place (timeline) ---------- */
 
-const HIERARCHY = [
-  { eyebrow: "Semester", title: "Semester 01" },
-  { eyebrow: "Subject", title: "Computer Science" },
-  { eyebrow: "Topic", title: "Programming" },
-  { eyebrow: "Resource", title: "Short Notes" },
+interface HierarchyStep {
+  step: string;
+  eyebrow: string;
+  title: string;
+  text: string;
+  icon: LucideIcon;
+  meta: string[];
+}
+
+const HIERARCHY: HierarchyStep[] = [
+  {
+    step: "01",
+    eyebrow: "Semester",
+    title: "Semester 01",
+    text: "Start with your semester and keep your entire study library organized.",
+    icon: GraduationCap,
+    meta: ["Sem 1 – Sem 8", "BSc CSIT"],
+  },
+  {
+    step: "02",
+    eyebrow: "Subject",
+    title: "Computer Science",
+    text: "Find everything related to a specific subject in one place.",
+    icon: BookOpen,
+    meta: ["CSC101 · CSC102", "Core & electives"],
+  },
+  {
+    step: "03",
+    eyebrow: "Topic",
+    title: "Programming",
+    text: "Go deeper into individual topics without losing your place.",
+    icon: Layers,
+    meta: ["Pointers · K-maps", "Hot topics"],
+  },
+  {
+    step: "04",
+    eyebrow: "Resource",
+    title: "Short Notes",
+    text: "Access the exact material you need to study, revise, or practice.",
+    icon: FileText,
+    meta: [`${ALL_RESOURCE_TYPES.length} types`, "Books · Past Papers"],
+  },
 ];
+
+/* Desktop rail: three gap segments running edge-to-edge between
+   consecutive node circumferences — the line never enters any circle
+   interior. Offsets derive from the 4-col grid math (equal columns,
+   20px gaps, centered 44px nodes). */
+const RAIL_SEGMENTS = [
+  "md:left-[calc(12.5%_+_14.5px)] md:right-[calc(62.5%_+_24.5px)]",
+  "md:left-[calc(37.5%_+_19.5px)] md:right-[calc(37.5%_+_19.5px)]",
+  "md:left-[calc(62.5%_+_24.5px)] md:right-[calc(12.5%_+_14.5px)]",
+];
+
+const NODE_CHIP_TONES = {
+  highlight: "border-primary/30 bg-primary-muted text-primary",
+  muted: "border-border bg-surface-muted text-muted-foreground",
+} as const;
+
+function TimelineStep({
+  item,
+  isLast,
+  index,
+}: {
+  item: HierarchyStep;
+  isLast: boolean;
+  index: number;
+}) {
+  const { step, eyebrow, title, text, icon: Icon, meta } = item;
+  const chipTone = isLast ? NODE_CHIP_TONES.highlight : NODE_CHIP_TONES.muted;
+  return (
+    <Reveal as="li" key={title} delay={index * 120} className="relative">
+      {/* Mobile rail segment: node bottom edge to next node */}
+      {!isLast && (
+        <span
+          aria-hidden="true"
+          className="absolute -bottom-8 left-[22px] top-[44px] w-0.5 -translate-x-1/2 bg-primary dark:bg-white md:hidden"
+        />
+      )}
+      <div className="flex items-start gap-4 text-left md:flex-col md:items-center md:text-center">
+        {/* Stroke-only circular node — transparent fill */}
+        <span
+          aria-hidden="true"
+          className="relative z-10 flex size-11 shrink-0 items-center justify-center rounded-full border-2 border-primary bg-transparent text-primary shadow-card transition-transform dark:border-white"
+        >
+          <Icon className="size-4" />
+        </span>
+        <div className="pt-0.5 md:pt-0">
+          <p className="text-[11px] font-extrabold uppercase tracking-widest text-primary">
+            {step} — {eyebrow}
+          </p>
+          <p className="font-display mt-1 text-base font-extrabold tracking-tight text-foreground md:mt-3">
+            {title}
+          </p>
+          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+            {text}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5 md:justify-center" aria-label={`${title} highlights`}>
+            {meta.map((chip) => (
+              <span
+                key={chip}
+                className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${chipTone}`}
+              >
+                {chip}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Reveal>
+  );
+}
 
 export function HierarchySection() {
   return (
     <section
       aria-labelledby="landing-place-heading"
-      className="border-b border-border bg-surface py-20 lg:py-24"
+      className="border-b border-border bg-surface py-12 lg:py-16"
     >
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
         <Reveal>
@@ -64,31 +172,28 @@ export function HierarchySection() {
             id="landing-place-heading"
             eyebrow="Organization"
             title="Everything has a place."
-            copy="From semester to subject, topic to resource, Mero Note keeps your CSIT library structured so you can spend less time searching and more time studying."
+            copy="Semester → Subject → Topic → Resource — connected, organized, easy to find."
           />
         </Reveal>
-        <ol className="mx-auto mt-14 flex max-w-4xl flex-col items-stretch gap-2 md:flex-row md:items-center md:gap-0">
-          {HIERARCHY.map(({ eyebrow, title }, i) => (
-            <li key={title} className="flex flex-1 flex-col items-stretch md:flex-row md:items-center">
-              <Reveal className="flex-1" delay={i * 100}>
-                <div className="card-glow rounded-2xl border border-border bg-surface px-6 py-5 text-center shadow-card">
-                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-primary">
-                    {eyebrow}
-                  </p>
-                  <p className="font-display mt-1.5 text-lg font-extrabold tracking-tight text-foreground">
-                    {title}
-                  </p>
-                </div>
-              </Reveal>
-              {i < HIERARCHY.length - 1 && (
-                <span aria-hidden="true" className="flex justify-center py-1 md:px-3 md:py-0">
-                  <ArrowDown className="size-5 text-primary md:hidden" />
-                  <ArrowRight className="hidden size-5 shrink-0 text-primary md:block" />
-                </span>
-              )}
-            </li>
-          ))}
-        </ol>
+        <Reveal delay={120}>
+          <ol className="relative mx-auto mt-10 grid max-w-5xl gap-8 md:grid-cols-4 md:gap-5">
+            {RAIL_SEGMENTS.map((pos) => (
+              <span
+                key={pos}
+                aria-hidden="true"
+                className={`absolute top-[22px] hidden h-0.5 bg-primary dark:bg-white md:block md:w-auto md:-translate-y-1/2 ${pos}`}
+              />
+            ))}
+            {HIERARCHY.map((item, i) => (
+              <TimelineStep
+                key={item.title}
+                item={item}
+                index={i}
+                isLast={i === HIERARCHY.length - 1}
+              />
+            ))}
+          </ol>
+        </Reveal>
       </div>
     </section>
   );
@@ -97,14 +202,54 @@ export function HierarchySection() {
 /* ---------- Section 3 — Resource type radial wheel (interactive navigation) ---------- */
 
 const WHEEL_TYPES = [
-  { icon: BookOpen, label: "Book", description: "Full-length study material for detailed subject learning." },
-  { icon: FileText, label: "Short Notes", description: "Quick and focused notes for fast revision." },
-  { icon: PenLine, label: "Handwritten Notes", description: "Personal-style handwritten material for easier understanding and review." },
-  { icon: Layers, label: "Extra Notes", description: "Additional study material beyond the main resources." },
-  { icon: HelpCircle, label: "Question", description: "Practice questions to test your understanding." },
-  { icon: Sparkles, label: "Important Question", description: "Important questions to prioritize during preparation." },
-  { icon: FileArchive, label: "Past Paper", description: "Previous exam papers for understanding exam patterns and practice." },
-  { icon: FlaskConical, label: "Practical Lab", description: "Practical-focused resources for lab work and implementation." },
+  {
+    icon: BookOpen,
+    label: "Book",
+    description: "Complete, chapter-wise study material that builds deep conceptual clarity for every subject.",
+    points: ["Chapter-wise complete coverage", "Concept-first explanations", "Ideal for first-time learning"],
+  },
+  {
+    icon: FileText,
+    label: "Short Notes",
+    description: "Crisp, exam-focused notes that compress each chapter into minutes of fast revision.",
+    points: ["One-page chapter summaries", "Key formulas and definitions", "Perfect for last-day revision"],
+  },
+  {
+    icon: PenLine,
+    label: "Handwritten Notes",
+    description: "Neat, personal-style handwritten material that makes tough topics easier to grasp and recall.",
+    points: ["Simple student-friendly writing", "Easy diagrams and memory tricks", "Built for quicker recall"],
+  },
+  {
+    icon: Layers,
+    label: "Extra Notes",
+    description: "Curated supplementary material that goes beyond the syllabus for stronger preparation.",
+    points: ["Beyond-the-syllabus insights", "Reference-style deep dives", "Made for deeper mastery"],
+  },
+  {
+    icon: HelpCircle,
+    label: "Question",
+    description: "Topic-wise practice questions designed to test understanding and sharpen problem-solving.",
+    points: ["Topic-wise practice sets", "Mixed difficulty levels", "Ready for self-testing"],
+  },
+  {
+    icon: Sparkles,
+    label: "Important Question",
+    description: "High-probability questions prioritized so revision time goes exactly where it matters most.",
+    points: ["Exam-focused shortlist", "Priority-marked topics", "Revise what matters first"],
+  },
+  {
+    icon: FileArchive,
+    label: "Past Paper",
+    description: "Previous exam papers that reveal question patterns, marking trends, and real exam practice.",
+    points: ["Year-wise previous papers", "Pattern and trend insight", "Real timed-paper experience"],
+  },
+  {
+    icon: FlaskConical,
+    label: "Practical Lab",
+    description: "Step-by-step practical and lab resources that connect classroom theory to hands-on implementation.",
+    points: ["Step-by-step lab procedures", "Viva and experiment guidance", "Implementation-first examples"],
+  },
 ];
 
 /** Base angle (deg) for each branch — evenly spaced, starting at top. */
@@ -136,8 +281,9 @@ const WHEEL_SPOKES = Array.from({ length: 8 }, (_, i) => {
   return { x2, y2 };
 });
 
-/** Fixed alignment point: east (0deg), facing the information card. */
+/** Fixed alignment point: east (0deg) on desktop, south (90deg) on mobile. */
 const WHEEL_ACTIVE_ANGLE = 0;
+const WHEEL_ACTIVE_ANGLE_MOBILE = 90;
 
 /** Spin time scales with travel distance: near hops are snappy, far spins
  *  get more time but a higher angular speed — same smooth curve throughout. */
@@ -146,24 +292,77 @@ const SPIN_MS_FOR = (deltaDeg: number) => {
   return Math.round(Math.min(1000, Math.max(380, 320 + d * 2.8)));
 };
 
+/** True on desktop widths (wheel aligns east); otherwise mobile (south). */
+function useDesktop(breakpoint = 1024) {
+  const [desktop, setDesktop] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(`(min-width: ${breakpoint}px)`).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${breakpoint}px)`);
+    const onChange = (event: MediaQueryListEvent) => setDesktop(event.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [breakpoint]);
+  return desktop;
+}
+
+/** Cumulative-free rotation landing branch `index` on `activeAngle`. */
+const rotationFor = (index: number, activeAngle: number) =>
+  (((activeAngle - WHEEL_BASE_ANGLE(index)) % 360) + 360) % 360;
+
+/**
+ * Shortest-path delta taking branch `index` from `fromRotation` to `angle.
+ * Positive = clockwise, negative = anticlockwise; exact 180° ties go clockwise.
+ */
+const deltaFor = (index: number, fromRotation: number, angle: number) => {
+  const current = (((WHEEL_BASE_ANGLE(index) + fromRotation) % 360) + 360) % 360;
+  const clockwise = (((angle - current) % 360) + 360) % 360;
+  return clockwise <= 180 ? clockwise : clockwise - 360;
+};
+
 export function UniverseSection() {
-  // Single source of truth: selected branch + cumulative clockwise rotation.
+  const isDesktop = useDesktop();
+  // Alignment point follows the layout: east toward the cards on desktop,
+  // straight down toward the stacked cards on mobile.
+  const activeAngle = isDesktop ? WHEEL_ACTIVE_ANGLE : WHEEL_ACTIVE_ANGLE_MOBILE;
+  // Single source of truth: selected branch + cumulative rotation.
   const [selected, setSelected] = useState(0);
-  // Book (base 270°) starts aligned to the east alignment point (0°).
-  const [rotation, setRotation] = useState(90);
+  // Book starts pre-aligned (east on desktop, south on mobile).
+  const [rotation, setRotation] = useState(() => rotationFor(0, activeAngle));
   const [spinMs, setSpinMs] = useState(700);
   // Synchronous mirror of `rotation` so rapid successive clicks always
   // compute from the latest angle instead of a stale render closure.
-  const rotationRef = useRef(90);
-  const Active = WHEEL_TYPES[selected];
+  const rotationRef = useRef(rotation);
+  // Open card of the stage — trails `selected` so the card opens exactly as
+  // the spin lands at the alignment point.
+  const [front, setFront] = useState(0);
+
+  useEffect(() => {
+    if (selected === front) return;
+    const t = window.setTimeout(() => setFront(selected), 650);
+    return () => window.clearTimeout(t);
+  }, [selected, front]);
+
+  // Glide the current selection onto the new alignment point when the
+  // breakpoint flips (east <-> south). No-op when already aligned.
+  const wasDesktop = useRef(isDesktop);
+  useEffect(() => {
+    if (wasDesktop.current === isDesktop) return;
+    wasDesktop.current = isDesktop;
+    const delta = deltaFor(selected, rotationRef.current, activeAngle);
+    if (delta === 0) return;
+    rotationRef.current += delta;
+    setSpinMs(SPIN_MS_FOR(delta));
+    setRotation(rotationRef.current);
+  }, [isDesktop, selected, activeAngle]);
+
+  const Active = WHEEL_TYPES[front];
+  // Stable behind-order for the deck (front card excluded, original order kept).
+  const behindOrder = WHEEL_TYPES.map((_, i) => i).filter((i) => i !== front);
 
   const select = (i: number) => {
     if (i === selected) return;
-    const current = (((WHEEL_BASE_ANGLE(i) + rotationRef.current) % 360) + 360) % 360;
-    // Shortest path: clockwise when within 180°, otherwise anticlockwise
-    // (negative delta). Exact 180° ties go clockwise.
-    const clockwise = (((WHEEL_ACTIVE_ANGLE - current) % 360) + 360) % 360;
-    const delta = clockwise <= 180 ? clockwise : clockwise - 360;
+    const delta = deltaFor(i, rotationRef.current, activeAngle);
     rotationRef.current += delta;
     setSpinMs(SPIN_MS_FOR(delta));
     setRotation(rotationRef.current);
@@ -174,7 +373,7 @@ export function UniverseSection() {
     <section
       aria-labelledby="landing-universe-heading"
       id="library"
-      className="scroll-mt-24 border-y border-border bg-surface py-20 lg:py-24"
+      className="scroll-mt-24 border-y border-border bg-surface pb-12 pt-8 lg:pb-16 lg:pt-10"
     >
       <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal>
@@ -186,17 +385,18 @@ export function UniverseSection() {
           />
         </Reveal>
 
-        <div className="mt-12 lg:mt-14">
-        {/* ------ CENTER: resource network ------ */}
-        <Reveal className="flex flex-col items-center">
+        <div className="mt-10 grid items-center gap-8 sm:mt-12 lg:mt-14 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8">
+        {/* ------ LEFT-DOCKED: resource network ------ */}
+        <Reveal className="flex flex-col items-center lg:-mt-12 lg:items-start">
           <div
-            className="relative aspect-square w-full max-w-[320px] sm:max-w-[440px] md:max-w-[500px] lg:max-w-[520px]"
+            className="relative aspect-square w-full max-w-[340px] sm:max-w-[460px] md:max-w-[520px] lg:max-w-[560px]"
             role="group"
             aria-label="Resource type wheel. Select a resource branch to rotate the wheel."
           >
-            {/* fixed east alignment marker (never rotates) */}
+            {/* fixed alignment markers (never rotate): east on desktop, south on mobile */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-8 sm:inset-10">
-              <span className="absolute left-[94%] top-1/2 size-3.5 -translate-y-1/2 translate-x-[48px] rounded-full bg-primary ring-4 ring-primary/20" />
+              <span className="absolute left-[94%] top-1/2 hidden size-3.5 -translate-y-1/2 translate-x-[56px] rounded-full bg-primary ring-4 ring-primary/20 lg:block" />
+              <span className="absolute left-1/2 top-[94%] size-3.5 -translate-x-1/2 translate-y-[36px] rounded-full bg-primary ring-4 ring-primary/20 sm:translate-y-[44px] lg:hidden" />
             </div>
 
             {/* rotating system: branches + nodes move as one */}
@@ -218,7 +418,7 @@ export function UniverseSection() {
                   stroke="currentColor"
                   strokeWidth={0.7}
                   opacity={0.4}
-                  className="text-border-strong"
+                  className="text-border-strong dark:text-white/50 dark:opacity-60"
                 />
                 {WHEEL_SPOKES.map(({ x2, y2 }, i) => {
                   const active = i === selected;
@@ -272,19 +472,19 @@ export function UniverseSection() {
                           aria-label={`Select ${label}`}
                           className={
                             active
-                              ? "flex size-20 scale-110 flex-col items-center justify-center gap-1 rounded-full border-[3px] border-primary bg-primary p-2 text-center text-primary-foreground shadow-card-hover ring-4 ring-primary/20 transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary motion-reduce:transform-none sm:size-24"
-                              : "flex size-20 flex-col items-center justify-center gap-1 rounded-full border-[3px] border-border-strong bg-surface p-2 text-center shadow-card transition-all duration-300 hover:scale-105 hover:border-primary/50 hover:shadow-card-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary motion-reduce:transform-none sm:size-24"
+                              ? "flex size-16 scale-110 flex-col items-center justify-center gap-1 rounded-full border-[3px] border-primary bg-primary p-2 text-center text-primary-foreground shadow-card-hover ring-4 ring-primary/20 transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary motion-reduce:transform-none sm:size-20 lg:size-24"
+                              : "flex size-16 flex-col items-center justify-center gap-1 rounded-full border-[3px] border-border-strong bg-surface p-2 text-center shadow-card transition-all duration-300 hover:scale-105 hover:border-primary/50 hover:shadow-card-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary motion-reduce:transform-none dark:border-white/70 dark:hover:border-white sm:size-20 lg:size-24"
                           }
                         >
                           <Icon
-                            className={active ? "size-4 shrink-0 sm:size-5" : "size-4 shrink-0 text-primary sm:size-5"}
+                            className={active ? "size-3.5 shrink-0 sm:size-4 lg:size-5" : "size-3.5 shrink-0 text-primary sm:size-4 lg:size-5"}
                             aria-hidden="true"
                           />
                           <span
                             className={
                               active
-                                ? "text-[8px] font-extrabold leading-tight sm:text-[9px]"
-                                : "text-[8px] font-bold leading-tight text-foreground sm:text-[9px]"
+                                ? "text-[7px] font-extrabold leading-tight sm:text-[8px] lg:text-[9px]"
+                                : "text-[7px] font-bold leading-tight text-foreground sm:text-[8px] lg:text-[9px]"
                             }
                           >
                             {label}
@@ -298,39 +498,98 @@ export function UniverseSection() {
             </div>
 
             {/* static center — never rotates */}
-            <div className="absolute left-1/2 top-1/2 flex size-36 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-primary px-6 text-center text-primary-foreground shadow-card-hover ring-8 ring-primary-muted/60 sm:size-44">
-              <p className="font-display text-lg font-extrabold leading-none tracking-tight sm:text-2xl">
+            <div className="absolute left-1/2 top-1/2 flex size-28 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-primary px-6 text-center text-primary-foreground shadow-card-hover ring-8 ring-primary-muted/60 sm:size-36 lg:size-44">
+              <p className="font-display text-base font-extrabold leading-none tracking-tight sm:text-xl lg:text-2xl">
                 Resource
                 <br />
                 Library
               </p>
-              <p className="mt-2 text-[10px] font-medium text-primary-foreground/85 sm:text-xs">
+              <p className="mt-2 text-[9px] font-medium text-primary-foreground/85 sm:text-[10px] lg:text-xs">
                 Choose a resource type
               </p>
             </div>
           </div>
         </Reveal>
 
-        {/* ------ selected resource caption + entry link ------ */}
-        <div className="mt-8 flex flex-col items-center px-4 text-center">
-          <p key={selected} className="animate-fade-up motion-reduce:animate-none">
-            <span className="text-sm font-extrabold text-primary">{Active.label}</span>
-            <span className="mt-1 block max-w-md text-sm font-medium leading-relaxed text-muted-foreground">
-              {Active.description}
-            </span>
-          </p>
-          <Link
-            to="/login?next=/resources"
-            className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transform-none"
-          >
-            Explore Library
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
-          <p aria-live="polite" className="sr-only">
-            {Active.label}: {Active.description}
-          </p>
+        {/* ------ RIGHT: playing-card stage ------ */}
+        <Reveal delay={120} className="justify-self-stretch lg:mt-12 lg:justify-self-end">
+          <div className="flex w-full flex-col items-center">
+            <style>{`
+              @keyframes wl-card-open {
+                from { opacity: 0.5; transform: translateY(24px) scale(0.95) rotateY(-10deg); }
+                to { opacity: 1; transform: translateY(0) scale(1) rotateY(0deg); }
+              }
+              .wl-card-open { animation: wl-card-open 600ms cubic-bezier(0.22, 1, 0.36, 1); transform-style: preserve-3d; }
+              @media (prefers-reduced-motion: reduce) { .wl-card-open { animation: none; } }
+            `}</style>
+            <div
+              className="relative mx-2 h-[394px] w-[calc(100%-1rem)] max-w-[420px] [perspective:1200px] sm:mx-0 sm:h-[464px] sm:w-full sm:max-w-[640px] md:max-w-[680px] lg:w-[360px] lg:max-w-none"
+              role="group"
+              aria-label="Resource cards. The aligned resource type opens on top."
+            >
+              {WHEEL_TYPES.map(({ icon: Icon, label, description, points }, i) => {
+                const isOpen = i === front;
+                const depth = isOpen ? 0 : behindOrder.indexOf(i) + 1; // 1..7
+                return (
+                    <article
+                      key={label}
+                      aria-label={`${label} card`}
+                      aria-hidden={!isOpen}
+                      style={{
+                        transform: `translateY(${depth * 10 + (isOpen ? 0 : 12)}px) scale(${1 - depth * 0.012})`,
+                        zIndex: 30 - depth,
+                        opacity: isOpen ? 1 : 0.5,
+                      }}
+                      className={
+                        isOpen
+                          ? "wl-card-open pointer-events-auto absolute inset-x-0 top-0 flex h-[310px] w-full flex-col overflow-hidden rounded-2xl border border-primary/40 bg-surface p-4 shadow-card-hover ring-2 ring-primary/20 transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:h-[380px] sm:p-6 lg:w-[360px]"
+                          : "pointer-events-none absolute inset-x-0 top-0 flex h-[310px] w-full flex-col overflow-hidden rounded-2xl border border-border bg-surface p-4 shadow-card transition-all duration-500 ease-out motion-reduce:transition-none sm:h-[380px] sm:p-6 lg:w-[360px]"
+                      }
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -bottom-6 -right-6 text-primary/[0.07]"
+                      >
+                        <Icon className="size-32 sm:size-40" />
+                      </span>
+                      <span className="flex size-10 items-center justify-center rounded-2xl bg-primary-muted text-primary sm:size-11">
+                        <Icon className="size-4 sm:size-5" aria-hidden="true" />
+                      </span>
+                      <span className="font-display mt-3 block text-lg font-extrabold tracking-tight text-foreground sm:text-xl">
+                        {label}
+                      </span>
+                      <span className="mt-1.5 block text-[12px] font-medium leading-relaxed text-muted-foreground sm:text-[13px]">
+                        {description}
+                      </span>
+                      <span aria-hidden="true" className="my-3 block h-px w-full bg-border" />
+                      <ul className="space-y-1.5">
+                        {points.map((point) => (
+                          <li
+                            key={point}
+                            className="flex items-start gap-2 text-[12px] font-medium leading-snug text-muted-foreground sm:text-[13px]"
+                          >
+                            <Check className="mt-0.5 size-3.5 shrink-0 text-success" aria-hidden="true" />
+                            {point}
+                          </li>
+                        ))}
+                      </ul>
+                    </article>
+                  );
+                })}
+            </div>
+            <Link
+              to="/login?next=/resources"
+              className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transform-none"
+            >
+              Explore Library
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
+            <p aria-live="polite" className="sr-only">
+              {Active.label}: {Active.description}
+            </p>
+          </div>
+        </Reveal>
         </div>
-      </div>
       </div>
     </section>
   );
