@@ -106,6 +106,7 @@ async function main(): Promise<void> {
     };
     const registerUser = async (email: string): Promise<Jar> => {
       const r = await req("POST", "/api/auth/register", { "content-type": "application/json" }, {
+        name: "Refresh User",
         email,
         password: "study-hard-123",
         confirmPassword: "study-hard-123",
@@ -125,6 +126,7 @@ async function main(): Promise<void> {
 
     // ── Test 1: login issues both credentials, SafeUser-compatible body ──
     const reg = await req("POST", "/api/auth/register", { "content-type": "application/json" }, {
+      name: "Refresh User",
       email: "refresh@example.com",
       password: "study-hard-123",
       confirmPassword: "study-hard-123",

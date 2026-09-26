@@ -27,7 +27,7 @@ interface UserContextValue {
   /** Persist display-name change to the users record + sync user state. */
   setName: (name: string) => Promise<AuthUser>;
   login: (email: string, password: string, remember: boolean) => Promise<AuthUser>;
-  register: (email: string, password: string, confirmPassword: string) => Promise<AuthUser>;
+  register: (name: string, email: string, password: string, confirmPassword: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   /**
@@ -148,9 +148,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return authed;
   }, []);
 
-  const register = useCallback(async (email: string, password: string, confirmPassword: string) => {
+  const register = useCallback(async (name: string, email: string, password: string, confirmPassword: string) => {
     const seq = gateRef.current.begin();
-    const authed = await registerRequest(email, password, confirmPassword);
+    const authed = await registerRequest(name, email, password, confirmPassword);
     if (!gateRef.current.isCurrent(seq)) return authed;
     setUser(authed);
     setStatus("authed");

@@ -92,6 +92,7 @@ async function main(): Promise<void> {
 
     // ── Bootstrap: register issues a CSRF cookie alongside the session ──
     const reg = await req("POST", "/api/auth/register", { "content-type": "application/json" }, {
+      name: "CSRF User",
       email: "csrf@example.com",
       password: "study-hard-123",
       confirmPassword: "study-hard-123",
@@ -217,6 +218,7 @@ async function main(): Promise<void> {
 
     // ── Test 9: admin mutations ──
     await req("POST", "/api/auth/register", { "content-type": "application/json" }, {
+      name: "CSRF Admin",
       email: "csrf-admin@example.com",
       password: "study-hard-123",
       confirmPassword: "study-hard-123",

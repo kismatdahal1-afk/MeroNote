@@ -78,6 +78,7 @@ async function main(): Promise<void> {
   // Fixtures: two users (A, B) + admin, one semester/subject, live + hidden + draft resources.
   const mkUser = async (email: string): Promise<string> => {
     const res = await authed("POST", "/api/auth/register", null, {
+      name: "Study User",
       email,
       password: "study-password-123",
       confirmPassword: "study-password-123",

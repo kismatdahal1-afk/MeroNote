@@ -79,6 +79,7 @@ async function main(): Promise<void> {
   };
   const register = async (email: string): Promise<void> => {
     const res = await call("POST", "/api/auth/register", null, {
+      name: "CMS Admin",
       email,
       password: "admin-test-123",
       confirmPassword: "admin-test-123",

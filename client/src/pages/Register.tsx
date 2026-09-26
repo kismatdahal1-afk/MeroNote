@@ -6,6 +6,7 @@ import { useUser } from "../state/UserProvider";
 import { AuthError } from "../lib/authApi";
 
 export default function Register() {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,8 +23,17 @@ export default function Register() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setError("Please enter your name.");
+      return;
+    }
+    if (trimmedName.length > 80) {
+      setError("Name must be at most 80 characters.");
+      return;
+    }
     if (!email.trim() || !password || !confirmPassword) {
-      setError("Please fill in email, password, and confirmation.");
+      setError("Please fill in name, email, password, and confirmation.");
       return;
     }
     if (password !== confirmPassword) {
@@ -37,7 +47,7 @@ export default function Register() {
     setError("");
     setBusy(true);
     try {
-      const authed = await register(email.trim(), password, confirmPassword);
+      const authed = await register(trimmedName, email.trim(), password, confirmPassword);
       toast(`Welcome to Mero Note, ${authed.name}`);
       navigate("/dashboard");
     } catch (err) {
@@ -71,6 +81,21 @@ export default function Register() {
           noValidate
           className="card-glow space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-card"
         >
+          <div className="space-y-1.5">
+            <label htmlFor="register-name" className="block text-sm font-semibold text-foreground">
+              Name
+            </label>
+            <input
+              id="register-name"
+              type="text"
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              className="h-10 w-full rounded-lg border border-border-strong bg-surface-muted px-3.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
+            />
+          </div>
+
           <div className="space-y-1.5">
             <label htmlFor="register-email" className="block text-sm font-semibold text-foreground">
               Email

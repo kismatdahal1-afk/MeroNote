@@ -101,10 +101,22 @@ function readString(body: unknown, field: string): string {
 }
 
 export async function register(req: Request, res: Response): Promise<void> {
+  const name = readString(req.body, "name");
   const email = readString(req.body, "email").toLowerCase();
   const password = readString(req.body, "password");
   const confirmPassword = readString(req.body, "confirmPassword");
 
+  // Display name is client-supplied and required (same limits as the user
+  // model and profile edit). readString already trims and rejects
+  // non-strings, so missing/empty/whitespace-only values land here as "".
+  if (!name) {
+    res.status(400).json({ status: "error", message: "Name cannot be empty." });
+    return;
+  }
+  if (name.length > 80) {
+    res.status(400).json({ status: "error", message: "Name must be at most 80 characters." });
+    return;
+  }
   if (!EMAIL_PATTERN.test(email) || email.length > 254) {
     res.status(400).json({ status: "error", message: "Enter a valid email address." });
     return;
@@ -124,8 +136,6 @@ export async function register(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // Display name defaults to the email local-part; editable in Settings.
-  const name = email.split("@")[0].slice(0, 80) || "Student";
   let user;
   try {
     user = await User.create({ name, email, passwordHash: await hashPassword(password), role: "USER" });

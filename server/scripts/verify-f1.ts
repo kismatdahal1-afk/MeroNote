@@ -87,6 +87,7 @@ async function main(): Promise<void> {
   // Helper: register a fresh user
   async function registerUser(email: string): Promise<Jar> {
     const r = await post("/api/auth/register", {
+      name: "F1 User",
       email,
       password: "study-hard-123",
       confirmPassword: "study-hard-123",

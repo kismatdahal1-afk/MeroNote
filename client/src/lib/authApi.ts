@@ -58,10 +58,10 @@ export function loginRequest(email: string, password: string, remember: boolean)
   });
 }
 
-export function registerRequest(email: string, password: string, confirmPassword: string): Promise<AuthUser> {
+export function registerRequest(name: string, email: string, password: string, confirmPassword: string): Promise<AuthUser> {
   return request<AuthUser>("/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password, confirmPassword }),
+    body: JSON.stringify({ name, email, password, confirmPassword }),
   });
 }
 

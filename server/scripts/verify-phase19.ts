@@ -73,6 +73,7 @@ async function main(): Promise<void> {
 
   const mkUser = async (email: string): Promise<string> => {
     const res = await authed("POST", "/api/auth/register", null, {
+      name: "Phase19 User",
       email,
       password: "phase19-password-123",
       confirmPassword: "phase19-password-123",

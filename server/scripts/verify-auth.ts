@@ -102,6 +102,7 @@ async function main(): Promise<void> {
 
   // 1. Register succeeds.
   const reg = await post("/api/auth/register", {
+    name: "Test Student",
     email: "student@example.com",
     password: "study-hard-123",
     confirmPassword: "study-hard-123",
@@ -112,6 +113,7 @@ async function main(): Promise<void> {
 
   // 2. Duplicate email rejected.
   const dup = await post("/api/auth/register", {
+    name: "Test Student",
     email: "student@example.com",
     password: "study-hard-123",
     confirmPassword: "study-hard-123",
@@ -119,19 +121,43 @@ async function main(): Promise<void> {
   check("duplicate email 409", dup.status === 409);
 
   // 3. Invalid input rejected.
-  const badEmail = await post("/api/auth/register", { email: "not-an-email", password: "study-hard-123", confirmPassword: "study-hard-123" });
-  const weak = await post("/api/auth/register", { email: "weak@example.com", password: "short", confirmPassword: "short" });
-  const mismatch = await post("/api/auth/register", { email: "mm@example.com", password: "study-hard-123", confirmPassword: "different-123" });
+  const badEmail = await post("/api/auth/register", { name: "Test Student", email: "not-an-email", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  const weak = await post("/api/auth/register", { name: "Test Student", email: "weak@example.com", password: "short", confirmPassword: "short" });
+  const mismatch = await post("/api/auth/register", { name: "Test Student", email: "mm@example.com", password: "study-hard-123", confirmPassword: "different-123" });
   check("invalid email/weak password/mismatch → 400", badEmail.status === 400 && weak.status === 400 && mismatch.status === 400);
 
-  // 4. Password stored only as hash; never returned.
+  // 4. Signup name: stored verbatim in MongoDB and returned in SafeUser.
+  const named = await User.findOne({ email: "student@example.com" }).lean().exec();
+  check("users.name stores the signup name", (named as { name?: string } | null)?.name === "Test Student");
+  check("register response contains the name", reg.json.data?.name === "Test Student");
+
+  // 5. Signup name validation matrix.
+  const emptyName = await post("/api/auth/register", { name: "", email: "empty@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  const blankName = await post("/api/auth/register", { name: "   ", email: "blank@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  const missingName = await post("/api/auth/register", { email: "missing@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  const numericName = await post("/api/auth/register", { name: 42, email: "numeric@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  const longName = await post("/api/auth/register", { name: "n".repeat(81), email: "long@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  check(
+    "empty/whitespace/missing/non-string/overlong name → 400",
+    [emptyName, blankName, missingName, numericName, longName].every((r) => r.status === 400),
+    `statuses=${[emptyName, blankName, missingName, numericName, longName].map((r) => r.status).join(",")}`,
+  );
+  const padded = await post("/api/auth/register", { name: "  Padded Name  ", email: "padded@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  const paddedStored = await User.findOne({ email: "padded@example.com" }).lean().exec();
+  check(
+    "name is trimmed before storage",
+    padded.status === 201 && (paddedStored as { name?: string } | null)?.name === "Padded Name",
+    `status=${padded.status}`,
+  );
+
+  // 6. Password stored only as hash; never returned.
   const stored = await User.findOne({ email: "student@example.com" }).select("+passwordHash").lean().exec();
   const hash = (stored as { passwordHash?: string } | null)?.passwordHash ?? "";
   check("passwordHash is bcrypt hash, not plain text", hash.startsWith("$2") && hash !== "study-hard-123");
   const bodies = JSON.stringify([reg.json, dup.json, badEmail.json]);
   check("passwordHash never in responses", !bodies.includes("passwordHash") && !bodies.includes("$2"));
 
-  // 5. Login ok / ko.
+  // 7. Login ok / ko.
   const login = await post("/api/auth/login", { email: "student@example.com", password: "study-hard-123", remember: true });
   check("login 200 + sets cookie", login.status === 200 && Boolean(sessionCookie(login.setCookie)));
   check("remember-me cookie is persistent", (login.setCookie ?? "").includes("Expires=") || (login.setCookie ?? "").includes("Max-Age"));
@@ -142,13 +168,15 @@ async function main(): Promise<void> {
     wrong.status === 401 && unknown.status === 401 && wrong.json.message === unknown.json.message,
   );
 
-   // 6. Authorization matrix on the admin probe (before logout invalidates the cookie).
+   // 8. Authorization matrix on the admin probe (before logout invalidates the cookie).
    const anonAdmin = await get("/api/auth/admin/ping");
    const userAdmin = await get("/api/auth/admin/ping", studentCookie);
 
-   // 6b. me + logout.
+   // 8b. me + logout.
    const meAuthed = await get("/api/auth/me", sessionCookie(login.setCookie));
    check("me returns current user", meAuthed.status === 200 && meAuthed.json.data?.email === "student@example.com");
+   check("me returns the stored signup name", meAuthed.json.data?.name === "Test Student");
+   check("login response carries the stored name", login.json.data?.name === "Test Student");
    const meAnon = await get("/api/auth/me");
    check("me without cookie → 401", meAnon.status === 401);
     const logout = await post("/api/auth/logout", {}, undefined, authedHeaders(login.setCookie));
@@ -156,7 +184,7 @@ async function main(): Promise<void> {
    const meAfter = await get("/api/auth/me", "");
    check("me after logout → 401", meAfter.status === 401);
 
-   // 7. Admin promotion + admin access with new login.
+   // 9. Admin promotion + admin access with new login.
    await User.findOneAndUpdate({ email: "student@example.com" }, { $set: { role: "ADMIN" } }).exec();
    const adminLogin = await post("/api/auth/login", { email: "student@example.com", password: "study-hard-123" });
    const adminCookie = sessionCookie(adminLogin.setCookie);
@@ -164,7 +192,7 @@ async function main(): Promise<void> {
    check("USER → admin route 403", userAdmin.status === 403);
    check("ADMIN → admin route 200", adminAdmin.status === 200 && adminLogin.json.data?.role === "ADMIN");
 
-  // 8. Health untouched.
+  // 10. Health untouched.
   const health = await get("/api/health");
   check("GET /api/health still ok", health.status === 200 && health.json.status === "ok");
 

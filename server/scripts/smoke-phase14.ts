@@ -123,9 +123,9 @@ async function main(): Promise<void> {
 
     // 4. Fixtures: USER + ADMIN sessions (4 auth POSTs total — far below the bucket).
     const pw = { password: "phase14-test-123", confirmPassword: "phase14-test-123" };
-    const regA = await call("POST", "/api/auth/register", null, { email: "p14a@example.com", ...pw });
-    const regB = await call("POST", "/api/auth/register", null, { email: "p14b@example.com", ...pw });
-    const dup = await call("POST", "/api/auth/register", null, { email: "p14a@example.com", ...pw });
+    const regA = await call("POST", "/api/auth/register", null, { name: "P14 A", email: "p14a@example.com", ...pw });
+    const regB = await call("POST", "/api/auth/register", null, { name: "P14 B", email: "p14b@example.com", ...pw });
+    const dup = await call("POST", "/api/auth/register", null, { name: "P14 Dup", email: "p14a@example.com", ...pw });
     await User.findOneAndUpdate({ email: "p14a@example.com" }, { $set: { role: "ADMIN" } }).exec();
     const login = async (email: string): Promise<string> => {
       const res = await fetch(`${base}/api/auth/login`, {
