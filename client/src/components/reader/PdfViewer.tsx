@@ -212,7 +212,7 @@ export function PdfViewer({
             )}
           >
             {breadcrumbs && isPage && (
-              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-0.5 border-b border-border bg-background/95 px-3 pb-0.5 pt-0 text-[10px] md:text-xs font-medium text-muted-foreground/80 backdrop-blur-sm whitespace-nowrap overflow-hidden">
+              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-0.5 border-b border-border bg-background/95 px-3 py-1.5 text-[10px] md:text-xs font-medium text-muted-foreground/80 backdrop-blur-sm whitespace-nowrap overflow-hidden">
                 {breadcrumbs}
               </div>
             )}
@@ -220,7 +220,7 @@ export function PdfViewer({
             <div
               className={cx(
                 "hidden items-center gap-2 border-b border-border px-3 lg:px-4",
-                "h-12",
+                "h-16",
                 "md:flex",
               )}
             >
@@ -291,7 +291,7 @@ export function PdfViewer({
               />
             </div>
 
-            <div className="flex md:hidden items-center gap-2 border-b border-border px-3 py-0.5">
+            <div className="flex md:hidden items-center gap-2 border-b border-border px-3 py-2">
               {toolbarLeading}
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
@@ -302,7 +302,7 @@ export function PdfViewer({
               </div>
             </div>
 
-            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
+            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
               <div className="flex items-center gap-1 rounded-md bg-surface-muted px-1.5">
                 <IconButton icon={ChevronLeft} label="Previous page" variant="bar" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
                 <div className="flex h-7 items-center gap-0.5">
