@@ -164,44 +164,18 @@ defaults to `http://localhost:5000`).
 
 ## Documentation
 
-**Architecture**
-[![System](https://img.shields.io/badge/System-docs-5B3DF5?style=flat-square&logo=readthedocs&logoColor=white)](docs/architecture/system.md)
-[![Backend](https://img.shields.io/badge/Backend-docs-0F172A?style=flat-square&logo=express&logoColor=white)](docs/architecture/backend.md)
-[![Database](https://img.shields.io/badge/Database-docs-47A248?style=flat-square&logo=mongodb&logoColor=white)](docs/architecture/database.md)
-[![Authentication](https://img.shields.io/badge/Authentication-docs-CA4245?style=flat-square&logo=jsonwebtokens&logoColor=white)](docs/architecture/authentication.md)
-[![Storage](https://img.shields.io/badge/Storage-docs-06B6D4?style=flat-square&logo=amazonaws&logoColor=white)](docs/architecture/storage.md)
-
-**Features**
-[![PDF Reader](https://img.shields.io/badge/PDF_Reader-docs-FF6F00?style=flat-square&logo=mozilla&logoColor=white)](docs/features/pdf-reader.md)
-[![Offline & Cache](https://img.shields.io/badge/Offline_&_Cache-docs-06B6D4?style=flat-square&logo=readthedocs&logoColor=white)](docs/features/offline-cache.md)
-[![Downloads](https://img.shields.io/badge/Downloads-docs-47A248?style=flat-square&logo=readthedocs&logoColor=white)](docs/features/downloads.md)
-[![Personalization](https://img.shields.io/badge/Personalization-docs-5B3DF5?style=flat-square&logo=readthedocs&logoColor=white)](docs/features/personalization.md)
-[![Search](https://img.shields.io/badge/Search-docs-0F172A?style=flat-square&logo=readthedocs&logoColor=white)](docs/features/search-discovery.md)
-[![Admin Portal](https://img.shields.io/badge/Admin_Portal-docs-CA4245?style=flat-square&logo=readthedocs&logoColor=white)](docs/features/admin-portal.md)
-[![Landing Page](https://img.shields.io/badge/Landing_Page-docs-646CFF?style=flat-square&logo=readthedocs&logoColor=white)](docs/features/landing-page.md)
-
-**Operations & Project**
-[![Deployment](https://img.shields.io/badge/Deployment-docs-646CFF?style=flat-square&logo=vercel&logoColor=white)](docs/operations/deployment.md)
-[![Known Issues](https://img.shields.io/badge/Known_Issues-docs-FF6F00?style=flat-square&logo=readthedocs&logoColor=white)](docs/operations/known-issues.md)
-[![Agent Rules](https://img.shields.io/badge/Agent_Rules-docs-0F172A?style=flat-square&logo=readthedocs&logoColor=white)](docs/project/agent.md)
-[![Product](https://img.shields.io/badge/Product-docs-5B3DF5?style=flat-square&logo=readthedocs&logoColor=white)](docs/project/product.md)
-
-> Full index: [`docs/README.md`](docs/README.md)
+Start at [`docs/README.md`](docs/README.md) — system, backend, database,
+authentication, storage, features, and operations.
 
 ## Live Demo
 
-**Deployed on Vercel**
-
-<p align="center">
-  <a href="https://meronote.vercel.app/"><img src="https://img.shields.io/badge/Live_Demo-meronote.vercel.app-5B3DF5?style=for-the-badge&logo=vercel&logoColor=white" alt="Open live demo" /></a>
-</p>
+**https://meronote.vercel.app/**
 
 ## Creator
 
-**Designed & Developed by**
+Designed & Developed by **KISMAT DAHAL**
 
-<p align="center">
-  <img src="https://img.shields.io/badge/KISMAT_DAHAL-Creator-0F172A?style=for-the-badge&logo=github&logoColor=white" alt="Created by Kismat Dahal" />
+<p>
   <a href="https://www.instagram.com/kisma_tt07/"><img src="https://img.shields.io/badge/Instagram-kisma_tt07-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
 </p>
 
