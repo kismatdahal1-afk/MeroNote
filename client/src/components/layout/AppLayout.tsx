@@ -76,14 +76,19 @@ export function AppLayout() {
         {/* pb-28 on mobile clears the fixed bottom nav (74px + safe-area);
             desktop keeps its own spacing (nav is hidden on lg). Reader
             routes are full-bleed at every breakpoint (no gutter, no
-            centered column); the viewer fits the viewport exactly and the
-            PDF scroll area carries its own bottom-nav clearance. */}
+            centered column) and attach flush under the app header: -mt-px
+            tucks the viewer over the app header's 1px bottom border so no
+            seam shows between the two headers. The inline paddingBottom
+            holds pb-0 below lg, where a global bottom-nav clearance rule
+            would otherwise override the class and reintroduce window
+            scroll on reader routes. */}
         <main
           className={
             isReaderRoute
-              ? "mx-auto w-full max-w-none px-0 pb-0 pt-0"
+              ? "mx-auto w-full max-w-none px-0 pb-0 pt-0 -mt-px"
               : "mx-auto w-full max-w-7xl px-4 pb-28 pt-6 lg:px-8 lg:pb-12"
           }
+          style={isReaderRoute ? { paddingBottom: 0 } : undefined}
         >
           <PageTransition>
             <Outlet />
