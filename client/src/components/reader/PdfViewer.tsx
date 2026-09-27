@@ -212,7 +212,7 @@ export function PdfViewer({
             )}
           >
             {breadcrumbs && isPage && (
-              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-0.5 border-b border-border bg-background/95 px-3 pb-0.5 pt-0 text-[10px] md:text-xs font-medium text-muted-foreground/80 backdrop-blur-sm whitespace-nowrap overflow-hidden">
+              <div className="mt-0 hidden min-h-0 flex-wrap items-center gap-0.5 border-b border-border bg-background/95 px-3 pb-0.5 pt-0 text-[10px] md:text-xs font-medium text-muted-foreground/80 backdrop-blur-sm whitespace-nowrap overflow-hidden md:flex lg:hidden">
                 {breadcrumbs}
               </div>
             )}
@@ -225,6 +225,11 @@ export function PdfViewer({
               )}
             >
               {toolbarLeading}
+              {breadcrumbs && isPage && (
+                <nav aria-label="Breadcrumb" className="hidden min-w-0 max-w-44 items-center gap-0.5 overflow-hidden text-[10px] font-medium text-muted-foreground/80 lg:flex [&_a]:whitespace-nowrap [&_span]:whitespace-nowrap [&>*]:min-w-0">
+                  {breadcrumbs}
+                </nav>
+              )}
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
                 {subtitle && <p className="truncate text-xs font-medium text-muted-foreground">{subtitle}</p>}
@@ -291,19 +296,16 @@ export function PdfViewer({
               />
             </div>
 
-            <div className="flex md:hidden items-center gap-2 border-b border-border px-3 py-0.5">
-              {toolbarLeading}
-              <div className="min-w-0 flex-1">
+            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>button]:shrink-0">
+              <div className="shrink-0">{toolbarLeading}</div>
+              <div className="min-w-24 flex-1">
                 <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
                 {subtitle && <p className="truncate text-[11px] font-medium text-muted-foreground">{subtitle}</p>}
                 {sourceLabel && (
                   <p className="truncate text-[10px] font-bold text-success">{sourceLabel}</p>
                 )}
               </div>
-            </div>
-
-            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
-              <div className="flex items-center gap-1 rounded-md bg-surface-muted px-1.5">
+              <div className="flex shrink-0 items-center gap-1 rounded-md bg-surface-muted px-1.5">
                 <IconButton icon={ChevronLeft} label="Previous page" variant="bar" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
                 <div className="flex h-7 items-center gap-0.5">
                   <span className="text-xs font-bold text-foreground">{page}</span>
@@ -311,7 +313,7 @@ export function PdfViewer({
                 </div>
                 <IconButton icon={ChevronRight} label="Next page" variant="bar" size="sm" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
               </div>
-              <div className="flex items-center gap-0.5 rounded-md bg-surface-muted px-1" role="group" aria-label="PDF zoom">
+              <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-surface-muted px-1" role="group" aria-label="PDF zoom">
                 <IconButton icon={Minus} label="Zoom out PDF" variant="bar" size="sm" onClick={zoomOut} disabled={pdfZoom <= ZOOM_LEVELS[0]} />
                 <span className="min-w-10 text-center text-[11px] font-bold tabular-nums text-foreground" aria-live="polite">{zoomLabel}</span>
                 <IconButton icon={Plus} label="Zoom in PDF" variant="bar" size="sm" onClick={zoomIn} disabled={pdfZoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]} />
