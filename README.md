@@ -156,9 +156,9 @@ defaults to `http://localhost:5000`).
 ## Product Preview
 
 <div align="center">
-  <table>
+  <table cellpadding="0" cellspacing="0">
     <tr>
-      <td align="center">
+      <td align="center" valign="bottom">
         <a
           href="https://meronote.vercel.app/"
           target="_blank"
@@ -171,7 +171,7 @@ defaults to `http://localhost:5000`).
           />
         </a>
       </td>
-      <td align="center">
+      <td align="center" valign="bottom">
         <a
           href="https://meronote.vercel.app/"
           target="_blank"
@@ -184,7 +184,7 @@ defaults to `http://localhost:5000`).
           />
         </a>
       </td>
-      <td align="center">
+      <td align="center" valign="bottom">
         <a
           href="https://meronote.vercel.app/"
           target="_blank"
@@ -199,9 +199,9 @@ defaults to `http://localhost:5000`).
       </td>
     </tr>
     <tr>
-      <td align="center"><b>Dashboard</b></td>
-      <td align="center"><b>Resource</b></td>
-      <td align="center"><b>PDF Viewer</b></td>
+      <td align="center" valign="bottom"><b>Dashboard</b></td>
+      <td align="center" valign="bottom"><b>Resource</b></td>
+      <td align="center" valign="bottom"><b>PDF Viewer</b></td>
     </tr>
   </table>
 </div>
@@ -223,6 +223,8 @@ authentication, storage, features, and operations.
 
 ## Creator
 
+<div align="center">
+
 Designed & Developed by **KISMAT DAHAL**
 
 <a
@@ -235,5 +237,7 @@ Designed & Developed by **KISMAT DAHAL**
     alt="Instagram"
   />
 </a>
+
+</div>
 
 <p align="center"><a href="#mero-note">Back to top</a></p>
