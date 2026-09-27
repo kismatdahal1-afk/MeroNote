@@ -49,6 +49,14 @@ function getDpr(): number {
   return Math.min(window.devicePixelRatio || 1, MAX_DPR);
 }
 
+function isMobileViewport(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(max-width: 767px)").matches
+  );
+}
+
 interface PageInfo {
   aspectRatio: number;
 }
@@ -137,6 +145,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth, 
 export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1, onZoomChange, uiZoom = zoom, minZoom = 0.6, maxZoom = 2.5 }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const contentWrapperRef = useRef<HTMLDivElement>(null);
   const destroyedRef = useRef(false);
   const isInitialMount = useRef(true);
   const onStateChangeRef = useRef(onStateChange);
@@ -150,13 +159,14 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   const onZoomChangeRef = useRef(onZoomChange);
   const pinchRef = useRef<{
     active: boolean;
+    smooth: boolean;
     startDist: number;
     startZoom: number;
     raf: number | null;
     pending: number | null;
     lastSent: number;
     skipAnchorOnce: boolean;
-  }>({ active: false, startDist: 0, startZoom: 1, raf: null, pending: null, lastSent: uiZoom, skipAnchorOnce: false });
+  }>({ active: false, smooth: false, startDist: 0, startZoom: 1, raf: null, pending: null, lastSent: uiZoom, skipAnchorOnce: false });
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
@@ -380,9 +390,12 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   // One-finger touches are never preventDefaulted: native vertical scroll
   // is fully preserved. Only while exactly two fingers are down do we
   // preventDefault (scoped, via { passive: false }) so the browser does
-  // not zoom or scroll the page, and feed the finger-distance ratio into
-  // the shared pdfZoom state. Updates are rAF-throttled and rounded to
-  // avoid excessive re-renders during the gesture.
+  // not zoom or scroll the page. On mobile viewports the active gesture
+  // applies a compositor-level CSS scale to the already-rendered pages
+  // (no PDF.js re-render, no renderWidth change mid-gesture) and commits
+  // exactly once on release through the shared pdfZoom state, which snaps
+  // to the existing steps like a button press. Desktop keeps the previous
+  // direct-commit path unchanged.
   useEffect(() => {
     const sc = scrollContainerRef.current;
     if (!sc || !doc) return;
@@ -399,12 +412,36 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       }
     };
 
+    const clearVisualScale = () => {
+      const wrap = contentWrapperRef.current;
+      if (wrap) {
+        wrap.style.transform = "";
+        wrap.style.willChange = "";
+      }
+    };
+
+    const applyVisualScale = (target: number, startZoom: number) => {
+      const wrap = contentWrapperRef.current;
+      if (!wrap) return;
+      const base = startZoom > 0 ? startZoom : 1;
+      const factor = target / base;
+      wrap.style.transformOrigin = "top center";
+      wrap.style.willChange = "transform";
+      wrap.style.transform = `scale(${factor})`;
+    };
+
     const flushPending = () => {
       const p = pinchRef.current;
       p.raf = null;
       if (p.pending === null) return;
       const value = p.pending;
       p.pending = null;
+      // Mobile smooth path: visual scale only — never touch shared zoom
+      // state mid-gesture, so no discrete re-render can fire.
+      if (p.smooth) {
+        applyVisualScale(value, p.startZoom);
+        return;
+      }
       emitZoom(value);
     };
 
@@ -420,10 +457,12 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       if (e.touches.length === 2) {
         const p = pinchRef.current;
         p.active = true;
+        p.smooth = isMobileViewport();
         p.startDist = Math.max(1, fingerDist(e.touches[0], e.touches[1]));
         p.startZoom = uiZoomRef.current;
         p.lastSent = uiZoomRef.current;
         p.pending = null;
+        if (p.smooth) clearVisualScale();
         // Take over this two-finger gesture only. Single-finger taps
         // (including Retry buttons) never enter this branch.
         if (e.cancelable) e.preventDefault();
@@ -446,6 +485,22 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       if (p.raf !== null) {
         cancelAnimationFrame(p.raf);
         p.raf = null;
+      }
+      // Mobile smooth path: drop the transient visual scale, then settle
+      // the exact final value synchronously with one shared-state commit.
+      // The release commit must not yank the scroll position either (flag
+      // consumed by the zoom effect); it only applies when a value is
+      // actually emitted.
+      if (p.smooth) {
+        p.smooth = false;
+        clearVisualScale();
+        if (p.pending !== null) {
+          const value = p.pending;
+          p.pending = null;
+          p.skipAnchorOnce = true;
+          emitZoom(value);
+        }
+        return;
       }
       // Settle the exact final value synchronously on release. The release
       // commit must not yank the scroll position either (flag consumed by
@@ -480,8 +535,10 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
         p.raf = null;
       }
       p.active = false;
+      p.smooth = false;
       p.pending = null;
       p.skipAnchorOnce = false;
+      clearVisualScale();
     };
   }, [doc, minZoom, maxZoom]);
 
@@ -689,6 +746,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
           style={{ touchAction: "pan-x pan-y" }}
         >
         <div
+          ref={contentWrapperRef}
           className="relative mx-auto"
           style={{
             height: virtualData.totalHeight || undefined,
