@@ -187,7 +187,12 @@ export function PdfViewer({
         <div className="flex flex-col h-full">
           <header
             className={cx(
-              "sticky top-0 z-30 flex-shrink-0 flex flex-col",
+              // Stick below the sticky app header (h-16): if the window
+              // itself ever scrolls (e.g. mobile URL-bar viewport shifts),
+              // the PDF header docks attached under the app header instead
+              // of sliding beneath it. Has no effect while the window is
+              // unscrolled — the PDF area scrolls internally.
+              "sticky top-16 z-30 flex-shrink-0 flex flex-col",
               isPage
                 ? "bg-surface/95 backdrop-blur-md"
                 : "bg-surface-muted/50",
