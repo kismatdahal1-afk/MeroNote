@@ -87,7 +87,7 @@ export function AppLayout() {
               ? "mx-auto w-full max-w-none px-0 pb-0 pt-0"
               : "mx-auto w-full max-w-7xl px-4 pb-28 pt-6 lg:px-8 lg:pb-12"
           }
-          style={isReaderRoute ? { paddingBottom: 0 } : undefined}
+          style={isReaderRoute ? { paddingTop: 0, paddingBottom: 0 } : undefined}
         >
           <PageTransition>
             <Outlet />

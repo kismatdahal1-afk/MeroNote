@@ -168,7 +168,7 @@ export function PdfViewer({
     <div
       aria-label="PDF viewer"
       className={cx(
-        "reader-bar flex flex-col overflow-hidden",
+        "reader-bar mt-0 flex flex-col overflow-hidden pt-0",
         isPage
           // Fill exactly the viewport below the sticky app header (h-16)
           // so the window never scrolls on reader routes: the PDF header
@@ -192,14 +192,14 @@ export function PdfViewer({
               // the PDF header docks attached under the app header instead
               // of sliding beneath it. Has no effect while the window is
               // unscrolled — the PDF area scrolls internally.
-              "sticky top-16 z-30 flex-shrink-0 flex flex-col",
+              "sticky top-16 z-30 flex-shrink-0 mt-0 flex flex-col",
               isPage
                 ? "bg-surface/95 backdrop-blur-md"
                 : "bg-surface-muted/50",
             )}
           >
             {breadcrumbs && isPage && (
-              <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background/95 px-3 py-0.5 text-[10px] md:text-xs font-medium text-muted-foreground/80 backdrop-blur-sm whitespace-nowrap overflow-hidden">
+              <div className="mt-0 flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background/95 px-3 py-0.5 text-[10px] md:text-xs font-medium text-muted-foreground/80 backdrop-blur-sm whitespace-nowrap overflow-hidden">
                 {breadcrumbs}
               </div>
             )}
@@ -396,7 +396,7 @@ export function PdfViewer({
                 </p>
               </div>
             ) : (
-              <div className="mx-auto w-full max-w-[850px] px-3 py-2 h-full md:px-2">
+              <div className="mx-auto w-full px-3 py-2 h-full md:px-2">
                 <PdfCanvas
                   url={fileUrl}
                   page={page}
