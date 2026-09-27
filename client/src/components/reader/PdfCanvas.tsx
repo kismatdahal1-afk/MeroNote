@@ -162,11 +162,12 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     smooth: boolean;
     startDist: number;
     startZoom: number;
+    liveZoom: number;
     raf: number | null;
     pending: number | null;
     lastSent: number;
     skipAnchorOnce: boolean;
-  }>({ active: false, smooth: false, startDist: 0, startZoom: 1, raf: null, pending: null, lastSent: uiZoom, skipAnchorOnce: false });
+  }>({ active: false, smooth: false, startDist: 0, startZoom: 1, liveZoom: 1, raf: null, pending: null, lastSent: uiZoom, skipAnchorOnce: false });
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
@@ -393,9 +394,9 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   // not zoom or scroll the page. On mobile viewports the active gesture
   // applies a compositor-level CSS scale to the already-rendered pages
   // (no PDF.js re-render, no renderWidth change mid-gesture) and commits
-  // exactly once on release through the shared pdfZoom state, which snaps
-  // to the existing steps like a button press. Desktop keeps the previous
-  // direct-commit path unchanged.
+  // the exact live zoom once on release through the shared pdfZoom state
+  // (continuous value, clamped to min/max — never snapped to button
+  // steps). Desktop keeps the previous direct-commit path unchanged.
   useEffect(() => {
     const sc = scrollContainerRef.current;
     if (!sc || !doc) return;
@@ -460,6 +461,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
         p.smooth = isMobileViewport();
         p.startDist = Math.max(1, fingerDist(e.touches[0], e.touches[1]));
         p.startZoom = uiZoomRef.current;
+        p.liveZoom = uiZoomRef.current;
         p.lastSent = uiZoomRef.current;
         p.pending = null;
         if (p.smooth) clearVisualScale();
@@ -475,7 +477,9 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       if (e.cancelable) e.preventDefault();
       const d = Math.max(1, fingerDist(e.touches[0], e.touches[1]));
       const target = (p.startZoom * d) / p.startDist;
-      scheduleZoom(Math.min(maxZoom, Math.max(minZoom, target)));
+      const clamped = Math.min(maxZoom, Math.max(minZoom, target));
+      if (p.smooth) p.liveZoom = clamped;
+      scheduleZoom(clamped);
     };
 
     const endPinch = () => {
@@ -486,17 +490,21 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
         cancelAnimationFrame(p.raf);
         p.raf = null;
       }
-      // Mobile smooth path: drop the transient visual scale, then settle
-      // the exact final value synchronously with one shared-state commit.
-      // The release commit must not yank the scroll position either (flag
+      // Mobile smooth path: drop the transient visual scale, then commit
+      // the exact live zoom synchronously as the new stable state. The
+      // commit uses liveZoom (updated on every touchmove), NOT pending —
+      // pending is usually null here because the last rAF already consumed
+      // it into the visual scale. Committing liveZoom guarantees the final
+      // rendered size equals the exact size the user released at. The
+      // release commit must not yank the scroll position either (flag
       // consumed by the zoom effect); it only applies when a value is
       // actually emitted.
       if (p.smooth) {
         p.smooth = false;
         clearVisualScale();
-        if (p.pending !== null) {
-          const value = p.pending;
-          p.pending = null;
+        const value = p.liveZoom;
+        p.pending = null;
+        if (Math.round(value * 1000) / 1000 !== Math.round(p.lastSent * 1000) / 1000) {
           p.skipAnchorOnce = true;
           emitZoom(value);
         }

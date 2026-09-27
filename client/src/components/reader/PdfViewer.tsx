@@ -119,12 +119,17 @@ export function PdfViewer({
   }, []);
   const zoomIn = useCallback(() => stepZoom(1), [stepZoom]);
   const zoomOut = useCallback(() => stepZoom(-1), [stepZoom]);
-  // Pinch delivers continuous values; snap them to the supported steps so
-  // every gesture commit settles exactly like a button press (one render,
-  // no teardown churn, no canvas flash). Unchanged values bail out of
-  // rendering entirely. Button steps pass through untouched — exact steps
-  // snap to themselves — so there is still exactly one zoom source of truth.
+  // Mobile pinch commits the exact continuous release value (clamped to
+  // the existing 60%–250% bounds) so the PDF stays at precisely the size
+  // the user left it — never snapped to button steps. Desktop pinch keeps
+  // the previous nearest-step commit unchanged. The [-] % [+] buttons use
+  // stepZoom above and are untouched. One stable pdfZoom source of truth.
   const handlePinchZoom = useCallback((z: number) => {
+    if (isMobileViewport()) {
+      const clamped = clamp(z, ZOOM_LEVELS[0], ZOOM_LEVELS[ZOOM_LEVELS.length - 1]);
+      setPdfZoom((prev) => (prev === clamped ? prev : clamped));
+      return;
+    }
     setPdfZoom(() => {
       let best = 0;
       for (let i = 0; i < ZOOM_LEVELS.length; i++) {
