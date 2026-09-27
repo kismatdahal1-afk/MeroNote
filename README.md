@@ -7,26 +7,32 @@
 <p align="center">Personal-first CSIT study library for desktop and mobile.</p>
 
 <p align="center">
-  <a href="https://meronote.vercel.app/"><img src="https://img.shields.io/badge/Live_Demo-meronote.vercel.app-5B3DF5?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-  <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 18" />
-  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB" />
+  <a href="https://meronote.vercel.app/"><img src="https://img.shields.io/badge/Live_Demo-Visit_App-5B3DF5?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
+  <a href="docs/README.md"><img src="https://img.shields.io/badge/Docs-Start_Here-0F172A?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
 </p>
 
-## ✨ Features
+<p align="center">
+  <a href="#-features">Features</a> ·
+  <a href="#-tech-stack">Tech Stack</a> ·
+  <a href="#-getting-started">Getting Started</a> ·
+  <a href="#-product-preview">Preview</a> ·
+  <a href="#-live-demo">Live Demo</a>
+</p>
 
-- 📚 Semester → Subject → Topic → Resource library organization
-- 🔍 Unified search across semesters, subjects, topics, resources, books, and notices
-- 📖 PDF reader with zoom, page navigation, bookmarks, and reading progress
-- ⭐ Favorites, bookmarks, continue reading, and recent resources
-- 📥 Offline downloads for studying without internet
-- 🗓️ Semester planning with progress tracking
-- 📢 Notices board for announcements and deadlines
-- 🛠️ Admin CMS for managing semesters, subjects, topics, resources, books, and notices
-- 🌗 Light / dark / system theme
-- 📱 PWA support with mobile-friendly navigation
+## Features
 
-## 🛠️ Tech Stack
+- Semester → Subject → Topic → Resource library organization
+- Unified search across semesters, subjects, topics, resources, books, and notices
+- PDF reader with zoom, page navigation, bookmarks, and reading progress
+- Favorites, bookmarks, continue reading, and recent resources
+- Offline downloads for studying without internet
+- Semester planning with progress tracking
+- Notices board for announcements and deadlines
+- Admin CMS for managing semesters, subjects, topics, resources, books, and notices
+- Light / dark / system theme
+- PWA support with mobile-friendly navigation
+
+## Tech Stack
 
 **Frontend**
 ![React](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black)
@@ -42,13 +48,13 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![Mongoose](https://img.shields.io/badge/Mongoose-880000?style=flat-square&logo=mongoose&logoColor=white)
 ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
-![B2 SDK](https://img.shields.io/badge/AWS_SDK-232F3E?style=flat-square&logo=amazonaws&logoColor=white)
+![AWS SDK](https://img.shields.io/badge/AWS_SDK-232F3E?style=flat-square&logo=amazonaws&logoColor=white)
 
 **Storage**
 ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![Backblaze B2](https://img.shields.io/badge/Backblaze_B2-E21E25?style=flat-square&logo=backblaze&logoColor=white)
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 MeroNote/
@@ -58,7 +64,7 @@ MeroNote/
 └── README.md
 ```
 
-## 🚀 Getting Started
+## Getting Started
 
 Install dependencies for both apps:
 
@@ -91,7 +97,7 @@ npm run dev
 Opens at `http://localhost:5173` backed by the API above.
 
 <details>
-<summary><b>🌱 Seed & admin (development)</b></summary>
+<summary><b>Seed & admin (development)</b></summary>
 
 ```bash
 cd server
@@ -101,13 +107,16 @@ npm run promote-admin -- you@email  # grant ADMIN (refuses production)
 
 </details>
 
-## ✅ Requirements
+## Requirements
 
 - Node.js >= 20 < 28
 - npm
 - MongoDB Atlas (or local MongoDB) for the backend
 
-## 🔑 Environment Variables
+## Environment Variables
+
+<details>
+<summary><b>Show variables</b></summary>
 
 Create `server/.env` (variable names come from `server/src/config/env.ts`):
 
@@ -124,27 +133,48 @@ B2_BUCKET_NAME=...
 The client needs no env file for local development (`VITE_API_URL`
 defaults to `http://localhost:5000`).
 
-## 👀 Product Preview
+</details>
 
-<p align="center">
-  <img src="client/public/images/Dashboard.png" alt="Mero Note dashboard" width="800" />
-</p>
-<p align="center">
-  <img src="client/public/images/Semester.png" alt="Mero Note semester view" width="390" />
-  <img src="client/public/images/note.png" alt="Mero Note notes view" width="390" />
-</p>
+## Product Preview
 
-## 📚 Documentation
+<table align="center">
+  <tr>
+    <td align="center">
+      <a href="https://meronote.vercel.app/">
+        <img src="client/public/images/Dashboard.png" alt="Dashboard — click to open live demo" width="260" />
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://meronote.vercel.app/">
+        <img src="client/public/images/Semester.png" alt="Resource — click to open live demo" width="260" />
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://meronote.vercel.app/">
+        <img src="client/public/images/note.png" alt="PDF Viewer — click to open live demo" width="260" />
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><b>Dashboard</b></td>
+    <td align="center"><b>Resource</b></td>
+    <td align="center"><b>PDF Viewer</b></td>
+  </tr>
+</table>
+
+## Documentation
 
 Start at [`docs/README.md`](docs/README.md) — system, backend, database,
 authentication, storage, features, and operations.
 
-## 🌐 Live Demo
+## Live Demo
 
 **https://meronote.vercel.app/**
 
-## 👤 Creator
+## Creator
 
 Designed & Developed by **KISMAT DAHAL**
 
 https://www.instagram.com/kisma_tt07/
+
+<p align="center"><a href="#mero-note">Back to top</a></p>
