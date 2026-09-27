@@ -1,16 +1,39 @@
 # Mero Note
 
-Full-stack note-taking platform for CSIT students.
+Personal-first CSIT study library for desktop and mobile.
 
-- **client/** — React + Vite + TypeScript + Tailwind CSS
-- **server/** — Node.js + Express + TypeScript API
+## Features
 
-## Requirements
+- Semester → Subject → Topic → Resource library organization
+- Unified search across semesters, subjects, topics, resources, books, and notices
+- PDF reader with zoom, page navigation, bookmarks, and reading progress
+- Favorites, bookmarks, continue reading, and recent resources
+- Offline downloads for studying without internet
+- Semester planning with progress tracking
+- Notices board for announcements and deadlines
+- Admin CMS for managing semesters, subjects, topics, resources, books, and notices
+- Light / dark / system theme
+- PWA support with mobile-friendly navigation
 
-- Node.js 20+
-- npm
+## Tech Stack
 
-## Getting started
+**Frontend:** React 18, Vite 6, TypeScript, Tailwind CSS v4, PDF.js, React Router
+
+**Backend:** Node.js, Express 4, TypeScript, Mongoose, JWT, bcryptjs, B2 SDK
+
+**Storage:** MongoDB Atlas, Backblaze B2 (private bucket)
+
+## Project Structure
+
+```
+MeroNote/
+├── client/   # React + Vite + TS + Tailwind frontend
+├── server/   # Express + TS API
+├── docs/     # project documentation
+└── README.md
+```
+
+## Getting Started
 
 Install dependencies for both apps:
 
@@ -24,68 +47,74 @@ cd ../client
 npm install
 ```
 
-## Environment
-
-Copy the example env files and adjust if needed (defaults work for local development):
-
-```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
-```
-
-## Run the backend
+Run the backend:
 
 ```bash
 cd server
 npm run dev
 ```
 
-API runs at `http://localhost:5000` (configurable via `PORT`).
+API runs at `http://localhost:5000`.
 
-Verify it is running:
-
-```bash
-curl http://localhost:5000/api/health
-```
-
-Expected response:
-
-```json
-{
-  "status": "ok",
-  "message": "Mero Note API is running",
-  "timestamp": "..."
-}
-```
-
-## Run the frontend
+Run the frontend:
 
 ```bash
 cd client
 npm run dev
 ```
 
-Opens at `http://localhost:5173`. It pings the backend health endpoint and shows the result.
+Opens at `http://localhost:5173` backed by the API above.
 
-## Scripts
+Optional — seed development data and grant admin access:
 
-| Location  | Script              | Purpose                          |
-| --------- | ------------------- | -------------------------------- |
-| server    | `npm run dev`       | Start API in watch mode (tsx)    |
-| server    | `npm run build`     | Compile TypeScript to `dist/`    |
-| server    | `npm run start`     | Run compiled build               |
-| server    | `npm run typecheck` | Type-check only                  |
-| client    | `npm run dev`       | Start Vite dev server            |
-| client    | `npm run build`     | Type-check + production build    |
-| client    | `npm run preview`   | Preview production build         |
-| client    | `npm run typecheck` | Type-check only                  |
-
-## Project structure
-
+```bash
+cd server
+npm run seed:dev                    # dev data (refuses production)
+npm run promote-admin -- you@email  # grant ADMIN (refuses production)
 ```
-MeroNote/
-├── client/   # React + Vite + TS + Tailwind frontend
-├── server/   # Express + TS API
-├── docs/     # project documentation
-└── README.md
+
+## Requirements
+
+- Node.js >= 20 < 28
+- npm
+- MongoDB Atlas (or local MongoDB) for the backend
+
+## Environment Variables
+
+Create `server/.env` (variable names come from `server/src/config/env.ts`):
+
+```bash
+MONGODB_URI=mongodb+srv://...
+JWT_SECRET=your-secret
+CLIENT_URL=http://localhost:5173
+# Storage ops only:
+B2_KEY_ID=...
+B2_APPLICATION_KEY=...
+B2_BUCKET_NAME=...
 ```
+
+The client needs no env file for local development (`VITE_API_URL`
+defaults to `http://localhost:5000`).
+
+## Product Preview
+
+<p align="center">
+  <img src="client/public/images/phone1.jpeg" alt="Mero Note on mobile" width="220" />
+  <img src="client/public/images/phone2.jpeg" alt="Mero Note on mobile" width="220" />
+  <img src="client/public/images/phone3.jpeg" alt="Mero Note on mobile" width="220" />
+</p>
+
+## Documentation
+
+Start at [`docs/README.md`](docs/README.md) — system, backend, database,
+authentication, storage, features, and operations.
+
+## Live Demo
+
+https://meronote.vercel.app/
+
+## Creator
+
+Designed & Developed by **KISMAT DAHAL**
+
+https://www.instagram.com/kisma_tt07/
