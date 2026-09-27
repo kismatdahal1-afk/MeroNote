@@ -601,7 +601,7 @@ body {
   left: 0;
   right: 0;
   top: 28px;
-  bottom: 0;
+  bottom: -2px;
   background: var(--nav-background);
 }
 

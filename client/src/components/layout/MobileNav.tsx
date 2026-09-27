@@ -129,8 +129,10 @@ function LiquidBottomNav({
       `C ${x3} ${depth} ${x3} 0 ${x4} 0`,
       `L ${w - rt} 0`,
       `A ${rt} ${rt} 0 0 1 ${w} ${rt}`,
-      `L ${w} ${h}`,
-      `L 0 ${h}`,
+      // Bleed 2px past the viewport bottom (svg has overflow:visible) so no
+      // hairline seam can appear below the bar — background only, no edge.
+      `L ${w} ${h + 2}`,
+      `L 0 ${h + 2}`,
       `L 0 ${rt}`,
       `A ${rt} ${rt} 0 0 1 ${rt} 0`,
       "Z",
@@ -138,10 +140,12 @@ function LiquidBottomNav({
   }
 
   // Top-edge-only stroke: same notch geometry as buildPath, but an open
-  // subpath tracing just the top boundary (left edge → notch dip → right
-  // edge). No side/bottom segments, so only a single horizontal top stroke
-  // is painted. Geometry constants intentionally mirror buildPath.
+  // subpath tracing just the top boundary with a small curve on the two
+  // upper corners only (mirrors the fill's rt arcs). No side/bottom
+  // segments, so only the top stroke is painted. Geometry constants
+  // intentionally mirror buildPath.
   function buildTopStrokePath(w: number, notchX: number): string {
+    const rt = 10;
     const halfNotch = 44;
     const depth = 28;
     const x0 = notchX - halfNotch;
@@ -151,11 +155,13 @@ function LiquidBottomNav({
     const x4 = notchX + halfNotch;
 
     return [
-      `M 0 0`,
+      `M 0 ${rt}`,
+      `A ${rt} ${rt} 0 0 1 ${rt} 0`,
       `L ${x0} 0`,
       `C ${x1} 0 ${x1} ${depth} ${x2} ${depth}`,
       `C ${x3} ${depth} ${x3} 0 ${x4} 0`,
-      `L ${w} 0`,
+      `L ${w - rt} 0`,
+      `A ${rt} ${rt} 0 0 1 ${w} ${rt}`,
     ].join(" ");
   }
 
