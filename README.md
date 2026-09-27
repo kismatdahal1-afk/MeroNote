@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://meronote.vercel.app/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Live_Demo-Visit_App-5B3DF5?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-  <a href="docs/README.md"><img src="https://img.shields.io/badge/Docs-Start_Here-0F172A?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
+  <a href="docs/README.md" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Docs-Start_Here-0F172A?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
 </p>
 
 <p align="center">
