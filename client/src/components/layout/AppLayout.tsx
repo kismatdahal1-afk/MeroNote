@@ -45,9 +45,12 @@ function PageTransition({ children }: { children: React.ReactNode }) {
 export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { pathname } = useLocation();
-  // Reader routes render the full-bleed PDF viewer: on mobile it must
-  // touch the viewport edges, so the shell's outer gutter is lifted for
-  // these routes only. md/lg classes stay identical to the default shell.
+  // Reader routes render the full-bleed PDF viewer: the shell's outer
+  // gutter and centered column are lifted for these routes only, so the
+  // viewer spans the full content width (sidebar boundary to viewport
+  // edge) and attaches directly under the app header. The viewer itself
+  // fits the viewport exactly (100dvh minus app header), so the window
+  // never scrolls and only the PDF area scrolls internally.
   const isReaderRoute = /\/reader\//.test(pathname);
 
   return (
@@ -72,13 +75,13 @@ export function AppLayout() {
         <Header onMenuClick={() => setDrawerOpen(true)} />
         {/* pb-28 on mobile clears the fixed bottom nav (74px + safe-area);
             desktop keeps its own spacing (nav is hidden on lg). Reader
-            routes go full-bleed on mobile (px-0 pt-0 below md) and fit the
-            viewport exactly (viewer is 100dvh minus app header), so no
-            bottom spacer is needed there on any breakpoint. */}
+            routes are full-bleed at every breakpoint (no gutter, no
+            centered column); the viewer fits the viewport exactly and the
+            PDF scroll area carries its own bottom-nav clearance. */}
         <main
           className={
             isReaderRoute
-              ? "mx-auto w-full max-w-7xl px-0 pb-0 pt-0 md:px-4 md:pt-6 lg:px-8 lg:pb-0"
+              ? "mx-auto w-full max-w-none px-0 pb-0 pt-0"
               : "mx-auto w-full max-w-7xl px-4 pb-28 pt-6 lg:px-8 lg:pb-12"
           }
         >
