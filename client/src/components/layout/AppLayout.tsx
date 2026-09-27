@@ -72,11 +72,13 @@ export function AppLayout() {
         <Header onMenuClick={() => setDrawerOpen(true)} />
         {/* pb-28 on mobile clears the fixed bottom nav (74px + safe-area);
             desktop keeps its own spacing (nav is hidden on lg). Reader
-            routes go full-bleed on mobile (px-0 pt-0 below md). */}
+            routes go full-bleed on mobile (px-0 pt-0 below md) and fit the
+            viewport exactly (viewer is 100dvh minus app header), so no
+            bottom spacer is needed there on any breakpoint. */}
         <main
           className={
             isReaderRoute
-              ? "mx-auto w-full max-w-7xl px-0 pb-28 pt-0 md:px-4 md:pt-6 lg:px-8 lg:pb-12"
+              ? "mx-auto w-full max-w-7xl px-0 pb-0 pt-0 md:px-4 md:pt-6 lg:px-8 lg:pb-0"
               : "mx-auto w-full max-w-7xl px-4 pb-28 pt-6 lg:px-8 lg:pb-12"
           }
         >

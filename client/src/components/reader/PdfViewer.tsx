@@ -170,7 +170,10 @@ export function PdfViewer({
       className={cx(
         "reader-bar flex flex-col overflow-hidden",
         isPage
-          ? "h-screen supports-[height:100dvh]:h-dvh bg-background"
+          // Fill exactly the viewport below the sticky app header (h-16)
+          // so the window never scrolls on reader routes: the PDF header
+          // above stays pinned and only the PDF area scrolls internally.
+          ? "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-background"
           : "card-glow overflow-hidden rounded-xl border border-border bg-surface shadow-card",
         className,
       )}
