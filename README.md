@@ -141,17 +141,17 @@ defaults to `http://localhost:5000`).
   <tr>
     <td align="center">
       <a href="https://meronote.vercel.app/">
-        <img src="client/public/images/Dashboard.png" alt="Dashboard — click to open live demo" width="260" />
+        <img src="client/public/images/Dashboard.png" alt="Dashboard — click to open live demo" width="300" />
       </a>
     </td>
     <td align="center">
       <a href="https://meronote.vercel.app/">
-        <img src="client/public/images/Semester.png" alt="Resource — click to open live demo" width="260" />
+        <img src="client/public/images/Semester.png" alt="Resource — click to open live demo" width="300" />
       </a>
     </td>
     <td align="center">
       <a href="https://meronote.vercel.app/">
-        <img src="client/public/images/note.png" alt="PDF Viewer — click to open live demo" width="260" />
+        <img src="client/public/images/note.png" alt="PDF Viewer — click to open live demo" width="300" />
       </a>
     </td>
   </tr>
@@ -164,17 +164,27 @@ defaults to `http://localhost:5000`).
 
 ## Documentation
 
-Start at [`docs/README.md`](docs/README.md) — system, backend, database,
-authentication, storage, features, and operations.
+<p align="center">
+  <a href="docs/README.md"><img src="https://img.shields.io/badge/Docs-System-5B3DF5?style=for-the-badge&logo=readthedocs&logoColor=white" alt="System docs" /></a>
+  <a href="docs/architecture/backend.md"><img src="https://img.shields.io/badge/Docs-Backend-0F172A?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Backend docs" /></a>
+  <a href="docs/architecture/database.md"><img src="https://img.shields.io/badge/Docs-Database-47A248?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Database docs" /></a>
+  <a href="docs/architecture/authentication.md"><img src="https://img.shields.io/badge/Docs-Authentication-CA4245?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Authentication docs" /></a>
+  <a href="docs/architecture/storage.md"><img src="https://img.shields.io/badge/Docs-Storage-06B6D4?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Storage docs" /></a>
+  <a href="docs/features/pdf-reader.md"><img src="https://img.shields.io/badge/Docs-Features-FF6F00?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Feature docs" /></a>
+  <a href="docs/operations/deployment.md"><img src="https://img.shields.io/badge/Docs-Operations-646CFF?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Operations docs" /></a>
+</p>
 
 ## Live Demo
 
-**https://meronote.vercel.app/**
+<p align="center">
+  <a href="https://meronote.vercel.app/"><img src="https://img.shields.io/badge/Live_Demo-meronote.vercel.app-5B3DF5?style=for-the-badge&logo=vercel&logoColor=white" alt="Open live demo" /></a>
+</p>
 
 ## Creator
 
-Designed & Developed by **KISMAT DAHAL**
-
-https://www.instagram.com/kisma_tt07/
+<p align="center">
+  <img src="https://img.shields.io/badge/Designed_&_Developed_by-KISMAT_DAHAL-0F172A?style=for-the-badge&logoColor=white" alt="Designed and developed by Kismat Dahal" />
+  <a href="https://www.instagram.com/kisma_tt07/"><img src="https://img.shields.io/badge/Instagram-kisma_tt07-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
+</p>
 
 <p align="center"><a href="#mero-note">Back to top</a></p>
