@@ -320,23 +320,23 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       breadcrumbs={
         admin ? (
           <>
-            <Link to="/admin" className="rounded px-1 py-0.5 hover:text-primary">Admin</Link>
+            <Link to="/admin" className="rounded px-1 py-0 hover:text-primary">Admin</Link>
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
             {adminEntry === "drafts" ? (
-              <Link to="/admin/drafts" className="rounded px-1 py-0.5 hover:text-primary">Draft</Link>
+              <Link to="/admin/drafts" className="rounded px-1 py-0 hover:text-primary">Draft</Link>
             ) : adminEntry === "semesters" ? (
-              <Link to="/admin/semesters" state={detailState} className="rounded px-1 py-0.5 hover:text-primary">
+              <Link to="/admin/semesters" state={detailState} className="rounded px-1 py-0 hover:text-primary">
                 Semesters
               </Link>
             ) : (
-              <Link to="/admin/resources" className="rounded px-1 py-0.5 hover:text-primary">
+              <Link to="/admin/resources" className="rounded px-1 py-0 hover:text-primary">
                 Resources
               </Link>
             )}
             {adminEntry === "semesters" && semester && (
               <>
                 <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-                <span className="max-w-[10rem] truncate rounded px-1 py-0.5">
+                <span className="max-w-[10rem] truncate rounded px-1 py-0">
                   {semester.name}
                 </span>
               </>
@@ -345,7 +345,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             <Link
               to={`${baseRoute}/${resource.id}`}
               state={detailState}
-              className="max-w-[16rem] truncate rounded px-1 py-0.5 font-semibold text-foreground hover:text-primary"
+              className="max-w-[16rem] truncate rounded px-1 py-0 font-semibold text-foreground hover:text-primary"
             >
               {resource.title}
             </Link>
@@ -354,11 +354,11 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           </>
         ) : entryRoot ? (
           <>
-            <Link to={entryRoot.to} className="shrink-0 rounded px-1 py-0.5 hover:text-primary">{entryRoot.label}</Link>
+            <Link to={entryRoot.to} className="shrink-0 rounded px-1 py-0 hover:text-primary">{entryRoot.label}</Link>
             {showsSubjectInResourceTrail(entry, fromSubject, resource.subjectId) && subject && (
               <span className="inline-flex min-w-0 items-center gap-0.5">
                 <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-                <span className="whitespace-normal rounded px-1 py-0.5">
+                <span className="whitespace-normal rounded px-1 py-0">
                   {subject.name}
                 </span>
               </span>
@@ -368,7 +368,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
               <Link
                 to={`${baseRoute}/${resource.id}`}
                 state={detailNavState}
-                className="whitespace-normal rounded px-1 py-0.5 hover:text-primary"
+                className="whitespace-normal rounded px-1 py-0 hover:text-primary"
               >
                 {resource.title}
               </Link>
@@ -378,13 +378,13 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           </>
         ) : (
           <>
-            <Link to="/semesters" className="shrink-0 rounded px-1 py-0.5 hover:text-primary">Semester</Link>
+            <Link to="/semesters" className="shrink-0 rounded px-1 py-0 hover:text-primary">Semester</Link>
             {semester && (
               <span className="inline-flex min-w-0 items-center gap-0.5">
                 <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
                 <Link
                   to={`/semesters/${semester.id}`}
-                  className="rounded px-1 py-0.5 hover:text-primary"
+                  className="rounded px-1 py-0 hover:text-primary"
                 >
                   {semester.name}
                 </Link>
@@ -395,7 +395,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
                 <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
                 <Link
                   to={`/subjects/${subject.id}`}
-                  className="whitespace-normal rounded px-1 py-0.5 hover:text-primary"
+                  className="whitespace-normal rounded px-1 py-0 hover:text-primary"
                 >
                   {subject.name}
                 </Link>
@@ -404,7 +404,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
             <Link
               to={`${baseRoute}/${resource.id}`}
-              className="min-w-0 whitespace-normal rounded px-1 py-0.5 hover:text-primary"
+              className="min-w-0 whitespace-normal rounded px-1 py-0 hover:text-primary"
             >
               {resource.title}
             </Link>

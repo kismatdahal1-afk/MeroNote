@@ -18,6 +18,12 @@ const DEFAULT_ZOOM_INDEX = 4; // 100%
 // Mobile-only render reference: on a mobile viewport the 100% UI zoom state
 // renders at the existing 40% scale (100% UI -> 0.4 render). Desktop uses 1.
 const MOBILE_RENDER_REFERENCE = 0.4;
+// Mobile-only pinch ceiling (UI units): the 0.4 reference caps the shared
+// 250% bound at exactly the viewport width, so zoomed content could never
+// overflow/pan on mobile. Pinch may continue to 400% UI (1.6x viewport) so
+// the same viewport-expansion behavior engages there. Desktop bound,
+// button steps, and the 60% floor are unchanged.
+const MOBILE_PINCH_MAX_ZOOM = 4.0;
 
 function isMobileViewport(): boolean {
   return (
@@ -110,6 +116,12 @@ export function PdfViewer({
 
   const stepZoom = useCallback((dir: 1 | -1) => {
     setPdfZoom((z) => {
+      const top = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+      // A mobile pinch may leave zoom above the top button step: stepping
+      // out from there lands on the top step instead of skipping past it.
+      // Stepping in stays clamped (the [+] button already disables there).
+      // Desktop zoom never exceeds the top step, so this is a no-op there.
+      if (z > top) return dir === 1 ? z : top;
       let best = 0;
       for (let i = 0; i < ZOOM_LEVELS.length; i++) {
         if (Math.abs(ZOOM_LEVELS[i] - z) < Math.abs(ZOOM_LEVELS[best] - z)) best = i;
@@ -120,13 +132,14 @@ export function PdfViewer({
   const zoomIn = useCallback(() => stepZoom(1), [stepZoom]);
   const zoomOut = useCallback(() => stepZoom(-1), [stepZoom]);
   // Mobile pinch commits the exact continuous release value (clamped to
-  // the existing 60%–250% bounds) so the PDF stays at precisely the size
-  // the user left it — never snapped to button steps. Desktop pinch keeps
-  // the previous nearest-step commit unchanged. The [-] % [+] buttons use
-  // stepZoom above and are untouched. One stable pdfZoom source of truth.
+  // 60% UI and the mobile pinch ceiling) so the PDF stays at precisely
+  // the size the user left it — never snapped to button steps. Desktop
+  // pinch keeps the previous nearest-step commit unchanged. The [-] % [+]
+  // buttons use stepZoom above and are untouched. One stable pdfZoom
+  // source of truth.
   const handlePinchZoom = useCallback((z: number) => {
     if (isMobileViewport()) {
-      const clamped = clamp(z, ZOOM_LEVELS[0], ZOOM_LEVELS[ZOOM_LEVELS.length - 1]);
+      const clamped = clamp(z, ZOOM_LEVELS[0], MOBILE_PINCH_MAX_ZOOM);
       setPdfZoom((prev) => (prev === clamped ? prev : clamped));
       return;
     }
@@ -407,7 +420,7 @@ export function PdfViewer({
                   onZoomChange={handlePinchZoom}
                   uiZoom={pdfZoom}
                   minZoom={ZOOM_LEVELS[0]}
-                  maxZoom={ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
+                  maxZoom={isMobileViewport() ? MOBILE_PINCH_MAX_ZOOM : ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
                 />
               </div>
             )}
