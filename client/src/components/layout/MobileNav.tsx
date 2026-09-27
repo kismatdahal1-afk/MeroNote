@@ -113,7 +113,7 @@ function LiquidBottomNav({
   // Closed shape: bar body fill only (no stroke — see CSS). Side/bottom
   // edges carry no visible boundary so the bar blends into the page.
   function buildPath(w: number, h: number, notchX: number): string {
-    const rt = 10; // small curve on upper corners only; bottom stays square to the viewport edge
+    const rt = 6; // small curve on upper corners only; bottom stays square to the viewport edge
     const halfNotch = 44;
     const depth = 28;
     const x0 = notchX - halfNotch;
@@ -145,7 +145,7 @@ function LiquidBottomNav({
   // segments, so only the top stroke is painted. Geometry constants
   // intentionally mirror buildPath.
   function buildTopStrokePath(w: number, notchX: number): string {
-    const rt = 10;
+    const rt = 6;
     const halfNotch = 44;
     const depth = 28;
     const x0 = notchX - halfNotch;

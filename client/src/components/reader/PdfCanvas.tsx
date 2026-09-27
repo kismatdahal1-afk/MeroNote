@@ -167,7 +167,16 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     pending: number | null;
     lastSent: number;
     skipAnchorOnce: boolean;
-  }>({ active: false, smooth: false, startDist: 0, startZoom: 1, liveZoom: 1, raf: null, pending: null, lastSent: uiZoom, skipAnchorOnce: false });
+    focalInit: boolean;
+    anchorScrollTop: number;
+    anchorScrollLeft: number;
+    focalStartX: number;
+    focalStartY: number;
+    focalLiveX: number;
+    focalLiveY: number;
+    contTop: number;
+    contLeft: number;
+  }>({ active: false, smooth: false, startDist: 0, startZoom: 1, liveZoom: 1, raf: null, pending: null, lastSent: uiZoom, skipAnchorOnce: false, focalInit: false, anchorScrollTop: 0, anchorScrollLeft: 0, focalStartX: 0, focalStartY: 0, focalLiveX: 0, focalLiveY: 0, contTop: 0, contLeft: 0 });
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
@@ -366,6 +375,10 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       scrollRafRef.current = null;
       const sc = scrollContainerRef.current;
       if (!sc || virtualData.numPages === 0) return;
+      // A two-finger pinch owns its gesture: its focal scroll compensation
+      // writes must never echo into page state. One-finger scroll is
+      // unaffected (pinch is inactive then).
+      if (pinchRef.current.active) return;
       const newScrollTop = sc.scrollTop;
       const newViewportHeight = sc.clientHeight;
       viewportHeightRef.current = newViewportHeight;
@@ -392,17 +405,25 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   // is fully preserved. Only while exactly two fingers are down do we
   // preventDefault (scoped, via { passive: false }) so the browser does
   // not zoom or scroll the page. On mobile viewports the active gesture
-  // applies a compositor-level CSS scale to the already-rendered pages
-  // (no PDF.js re-render, no renderWidth change mid-gesture) and commits
-  // the exact live zoom once on release through the shared pdfZoom state
-  // (continuous value, clamped to min/max — never snapped to button
-  // steps). Desktop keeps the previous direct-commit path unchanged.
+  // applies a focal-point compositor-level CSS scale to the
+  // already-rendered pages — scaled around the live two-finger midpoint
+  // in both axes, with focal scroll compensation keeping the content
+  // under the fingers stationary (no PDF.js re-render, no renderWidth
+  // change mid-gesture) — and commits the exact live zoom once on release
+  // through the shared pdfZoom state (continuous value, clamped to
+  // min/max — never snapped to button steps). Desktop keeps the previous
+  // direct-commit path unchanged.
   useEffect(() => {
     const sc = scrollContainerRef.current;
     if (!sc || !doc) return;
 
     const fingerDist = (a: Touch, b: Touch) =>
       Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+    const fingerMid = (a: Touch, b: Touch) => ({
+      x: (a.clientX + b.clientX) / 2,
+      y: (a.clientY + b.clientY) / 2,
+    });
 
     const emitZoom = (value: number) => {
       const rounded = Math.round(value * 1000) / 1000;
@@ -417,18 +438,43 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       const wrap = contentWrapperRef.current;
       if (wrap) {
         wrap.style.transform = "";
+        wrap.style.transformOrigin = "";
         wrap.style.willChange = "";
       }
     };
 
-    const applyVisualScale = (target: number, startZoom: number) => {
+    // Full-2D focal visual: scale around the pinch anchor point (wrapper
+    // layout coords, constant for the gesture). Origin is clamped to the
+    // wrapper bounds so edge pinches stay predictable.
+    const applyVisualScale = (target: number, startZoom: number, originX: number, originY: number) => {
       const wrap = contentWrapperRef.current;
       if (!wrap) return;
       const base = startZoom > 0 ? startZoom : 1;
       const factor = target / base;
-      wrap.style.transformOrigin = "top center";
+      const ox = Math.min(Math.max(originX, 0), Math.max(wrap.offsetWidth, 0));
+      const oy = Math.min(Math.max(originY, 0), Math.max(wrap.offsetHeight, 0));
+      wrap.style.transformOrigin = `${ox}px ${oy}px`;
       wrap.style.willChange = "transform";
       wrap.style.transform = `scale(${factor})`;
+    };
+
+    // Focal scroll compensation: keep the anchored content point under the
+    // live midpoint. This is the ONLY scrollTop/scrollLeft mutation the
+    // pinch path performs, and it exists strictly to preserve the focal
+    // point (layout scales linearly with zoom, so the mapping is exact).
+    // It also cancels any browser pan drift from the same gesture.
+    const applyFocalScroll = (target: number, startZoom: number) => {
+      const p = pinchRef.current;
+      const scEl = scrollContainerRef.current;
+      if (!scEl || !p.focalInit) return;
+      const base = startZoom > 0 ? startZoom : 1;
+      const factor = target / base;
+      const maxTop = Math.max(0, scEl.scrollHeight - scEl.clientHeight);
+      const maxLeft = Math.max(0, scEl.scrollWidth - scEl.clientWidth);
+      const nextTop = (p.anchorScrollTop + p.focalStartY) * factor - p.focalLiveY;
+      const nextLeft = (p.anchorScrollLeft + p.focalStartX) * factor - p.focalLiveX;
+      scEl.scrollTop = Math.min(Math.max(nextTop, 0), maxTop);
+      if (maxLeft > 0) scEl.scrollLeft = Math.min(Math.max(nextLeft, 0), maxLeft);
     };
 
     const flushPending = () => {
@@ -437,10 +483,12 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       if (p.pending === null) return;
       const value = p.pending;
       p.pending = null;
-      // Mobile smooth path: visual scale only — never touch shared zoom
-      // state mid-gesture, so no discrete re-render can fire.
+      // Mobile smooth path: focal visual scale + focal scroll
+      // compensation only — never touch shared zoom state mid-gesture,
+      // so no discrete re-render can fire.
       if (p.smooth) {
-        applyVisualScale(value, p.startZoom);
+        applyVisualScale(value, p.startZoom, p.focalStartX, p.focalStartY);
+        applyFocalScroll(value, p.startZoom);
         return;
       }
       emitZoom(value);
@@ -464,7 +512,33 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
         p.liveZoom = uiZoomRef.current;
         p.lastSent = uiZoomRef.current;
         p.pending = null;
-        if (p.smooth) clearVisualScale();
+        p.focalInit = false;
+        if (p.smooth) {
+          clearVisualScale();
+          // Capture the 2D focal anchor once per gesture: the pinch
+          // midpoint in wrapper-layout coords (transform is at identity
+          // here, so rendered px == layout px) plus the live scroll
+          // offsets. Container rect is cached — the sticky header lives
+          // outside this container, so it cannot move mid-gesture.
+          const wrap = contentWrapperRef.current;
+          if (wrap) {
+            const sr = sc.getBoundingClientRect();
+            const wr = wrap.getBoundingClientRect();
+            const mid = fingerMid(e.touches[0], e.touches[1]);
+            p.contTop = sr.top;
+            p.contLeft = sr.left;
+            p.anchorScrollTop = sc.scrollTop;
+            p.anchorScrollLeft = sc.scrollLeft;
+            p.focalStartX = mid.x - wr.left;
+            p.focalStartY = mid.y - wr.top;
+            p.focalLiveX = mid.x - sr.left;
+            p.focalLiveY = mid.y - sr.top;
+            p.focalInit = true;
+          }
+          // Own the gesture exclusively while two fingers are down.
+          // Restored on every exit path; one-finger scroll never enters.
+          sc.style.touchAction = "none";
+        }
         // Take over this two-finger gesture only. Single-finger taps
         // (including Retry buttons) never enter this branch.
         if (e.cancelable) e.preventDefault();
@@ -478,7 +552,15 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       const d = Math.max(1, fingerDist(e.touches[0], e.touches[1]));
       const target = (p.startZoom * d) / p.startDist;
       const clamped = Math.min(maxZoom, Math.max(minZoom, target));
-      if (p.smooth) p.liveZoom = clamped;
+      if (p.smooth) {
+        p.liveZoom = clamped;
+        // Track the live midpoint every move: fingers translate during
+        // real pinches, and the anchor must follow the current fingers,
+        // not the gesture-start position.
+        const mid = fingerMid(e.touches[0], e.touches[1]);
+        p.focalLiveX = mid.x - p.contLeft;
+        p.focalLiveY = mid.y - p.contTop;
+      }
       scheduleZoom(clamped);
     };
 
@@ -490,20 +572,27 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
         cancelAnimationFrame(p.raf);
         p.raf = null;
       }
-      // Mobile smooth path: drop the transient visual scale, then commit
-      // the exact live zoom synchronously as the new stable state. The
-      // commit uses liveZoom (updated on every touchmove), NOT pending —
-      // pending is usually null here because the last rAF already consumed
-      // it into the visual scale. Committing liveZoom guarantees the final
-      // rendered size equals the exact size the user released at. The
-      // release commit must not yank the scroll position either (flag
+      // Mobile smooth path: seamless focal handoff. The transient visual
+      // scale is cleared and the scroll offsets are set for the committed
+      // layout in the SAME synchronous block: post-commit layout equals
+      // base layout x endFactor exactly (linear zoom mapping), so the
+      // corrected frame is pixel-identical to the last gesture frame —
+      // no jump, blink, or flash, and the transient horizontal overflow
+      // (a pure transform artifact) ceases as the centered fit-width
+      // layout returns by construction. The commit uses liveZoom (updated
+      // on every touchmove), NOT pending — pending is usually null here
+      // because the last rAF already consumed it into the visual scale.
+      // The release commit must not yank the scroll position either (flag
       // consumed by the zoom effect); it only applies when a value is
       // actually emitted.
       if (p.smooth) {
         p.smooth = false;
         clearVisualScale();
+        applyFocalScroll(p.liveZoom, p.startZoom);
+        sc.style.touchAction = "pan-x pan-y";
         const value = p.liveZoom;
         p.pending = null;
+        p.focalInit = false;
         if (Math.round(value * 1000) / 1000 !== Math.round(p.lastSent * 1000) / 1000) {
           p.skipAnchorOnce = true;
           emitZoom(value);
@@ -546,6 +635,8 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       p.smooth = false;
       p.pending = null;
       p.skipAnchorOnce = false;
+      p.focalInit = false;
+      sc.style.touchAction = "pan-x pan-y";
       clearVisualScale();
     };
   }, [doc, minZoom, maxZoom]);
