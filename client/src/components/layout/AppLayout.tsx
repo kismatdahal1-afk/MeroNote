@@ -44,6 +44,11 @@ function PageTransition({ children }: { children: React.ReactNode }) {
 
 export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { pathname } = useLocation();
+  // Reader routes render the full-bleed PDF viewer: on mobile it must
+  // touch the viewport edges, so the shell's outer gutter is lifted for
+  // these routes only. md/lg classes stay identical to the default shell.
+  const isReaderRoute = /\/reader\//.test(pathname);
 
   return (
     <div className="bg-hero-gradient min-h-screen">
@@ -66,8 +71,15 @@ export function AppLayout() {
       <div className="lg:pl-64">
         <Header onMenuClick={() => setDrawerOpen(true)} />
         {/* pb-28 on mobile clears the fixed bottom nav (74px + safe-area);
-            desktop keeps its own spacing (nav is hidden on lg). */}
-        <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-6 lg:px-8 lg:pb-12">
+            desktop keeps its own spacing (nav is hidden on lg). Reader
+            routes go full-bleed on mobile (px-0 pt-0 below md). */}
+        <main
+          className={
+            isReaderRoute
+              ? "mx-auto w-full max-w-7xl px-0 pb-28 pt-0 md:px-4 md:pt-6 lg:px-8 lg:pb-12"
+              : "mx-auto w-full max-w-7xl px-4 pb-28 pt-6 lg:px-8 lg:pb-12"
+          }
+        >
           <PageTransition>
             <Outlet />
           </PageTransition>
