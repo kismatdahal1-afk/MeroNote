@@ -168,15 +168,15 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     lastSent: number;
     skipAnchorOnce: boolean;
     focalInit: boolean;
-    anchorScrollTop: number;
-    anchorScrollLeft: number;
+    focalContentX: number;
+    focalContentY: number;
     focalStartX: number;
     focalStartY: number;
     focalLiveX: number;
     focalLiveY: number;
     contTop: number;
     contLeft: number;
-  }>({ active: false, smooth: false, startDist: 0, startZoom: 1, liveZoom: 1, raf: null, pending: null, lastSent: uiZoom, skipAnchorOnce: false, focalInit: false, anchorScrollTop: 0, anchorScrollLeft: 0, focalStartX: 0, focalStartY: 0, focalLiveX: 0, focalLiveY: 0, contTop: 0, contLeft: 0 });
+  }>({ active: false, smooth: false, startDist: 0, startZoom: 1, liveZoom: 1, raf: null, pending: null, lastSent: uiZoom, skipAnchorOnce: false, focalInit: false, focalContentX: 0, focalContentY: 0, focalStartX: 0, focalStartY: 0, focalLiveX: 0, focalLiveY: 0, contTop: 0, contLeft: 0 });
 
   pageRef.current = page;
   onStateChangeRef.current = onStateChange;
@@ -458,23 +458,39 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       wrap.style.transform = `scale(${factor})`;
     };
 
-    // Focal scroll compensation: keep the anchored content point under the
-    // live midpoint. This is the ONLY scrollTop/scrollLeft mutation the
-    // pinch path performs, and it exists strictly to preserve the focal
-    // point (layout scales linearly with zoom, so the mapping is exact).
-    // It also cancels any browser pan drift from the same gesture.
-    const applyFocalScroll = (target: number, startZoom: number) => {
+    // Focal scroll compensation, mid-gesture phase: the transform origin is
+    // fixed exactly at the anchored content point, so the scale itself
+    // holds that point still on screen (screen(C) = C - s, independent of
+    // the factor). Scroll therefore follows ONLY finger translation:
+    // s = C - mLive. No factor here. This is the ONLY scrollTop/scrollLeft
+    // mutation the pinch path performs mid-gesture, and it exists strictly
+    // to preserve the focal point. It also cancels any browser pan drift
+    // from the same gesture.
+    const applyFocalScrollLive = () => {
       const p = pinchRef.current;
       const scEl = scrollContainerRef.current;
       if (!scEl || !p.focalInit) return;
-      const base = startZoom > 0 ? startZoom : 1;
-      const factor = target / base;
       const maxTop = Math.max(0, scEl.scrollHeight - scEl.clientHeight);
       const maxLeft = Math.max(0, scEl.scrollWidth - scEl.clientWidth);
-      const nextTop = (p.anchorScrollTop + p.focalStartY) * factor - p.focalLiveY;
-      const nextLeft = (p.anchorScrollLeft + p.focalStartX) * factor - p.focalLiveX;
-      scEl.scrollTop = Math.min(Math.max(nextTop, 0), maxTop);
-      if (maxLeft > 0) scEl.scrollLeft = Math.min(Math.max(nextLeft, 0), maxLeft);
+      scEl.scrollTop = Math.min(Math.max(p.focalContentY - p.focalLiveY, 0), maxTop);
+      if (maxLeft > 0) scEl.scrollLeft = Math.min(Math.max(p.focalContentX - p.focalLiveX, 0), maxLeft);
+    };
+
+    // Focal scroll compensation, release phase: the transient transform is
+    // already cleared and the committed re-render lays out scaled by
+    // k = liveZoom / startZoom, so the anchored content identity sits at
+    // C*k in the new layout. s2 = C*k - mLive_end lands it on the exact
+    // screen px the fingers left: pixel-identical handoff, no jump.
+    const applyFocalScrollCommit = () => {
+      const p = pinchRef.current;
+      const scEl = scrollContainerRef.current;
+      if (!scEl || !p.focalInit) return;
+      const base = p.startZoom > 0 ? p.startZoom : 1;
+      const k = p.liveZoom / base;
+      const maxTop = Math.max(0, scEl.scrollHeight - scEl.clientHeight);
+      const maxLeft = Math.max(0, scEl.scrollWidth - scEl.clientWidth);
+      scEl.scrollTop = Math.min(Math.max(p.focalContentY * k - p.focalLiveY, 0), maxTop);
+      if (maxLeft > 0) scEl.scrollLeft = Math.min(Math.max(p.focalContentX * k - p.focalLiveX, 0), maxLeft);
     };
 
     const flushPending = () => {
@@ -488,7 +504,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       // so no discrete re-render can fire.
       if (p.smooth) {
         applyVisualScale(value, p.startZoom, p.focalStartX, p.focalStartY);
-        applyFocalScroll(value, p.startZoom);
+        applyFocalScrollLive();
         return;
       }
       emitZoom(value);
@@ -515,22 +531,22 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
         p.focalInit = false;
         if (p.smooth) {
           clearVisualScale();
-          // Capture the 2D focal anchor once per gesture: the pinch
-          // midpoint in wrapper-layout coords (transform is at identity
-          // here, so rendered px == layout px) plus the live scroll
-          // offsets. Container rect is cached — the sticky header lives
-          // outside this container, so it cannot move mid-gesture.
+          // Capture the 2D focal anchor once per gesture: the exact
+          // document coordinate under the pinch midpoint
+          // (C = scroll + midpoint-rel-container), plus the transform
+          // origin wrapper-local via wrap.offsetLeft/Top read live here.
+          // Container rect is cached — the sticky header lives outside
+          // this container, so it cannot move mid-gesture.
           const wrap = contentWrapperRef.current;
           if (wrap) {
             const sr = sc.getBoundingClientRect();
-            const wr = wrap.getBoundingClientRect();
             const mid = fingerMid(e.touches[0], e.touches[1]);
             p.contTop = sr.top;
             p.contLeft = sr.left;
-            p.anchorScrollTop = sc.scrollTop;
-            p.anchorScrollLeft = sc.scrollLeft;
-            p.focalStartX = mid.x - wr.left;
-            p.focalStartY = mid.y - wr.top;
+            p.focalContentX = sc.scrollLeft + (mid.x - sr.left);
+            p.focalContentY = sc.scrollTop + (mid.y - sr.top);
+            p.focalStartX = p.focalContentX - wrap.offsetLeft;
+            p.focalStartY = p.focalContentY - wrap.offsetTop;
             p.focalLiveX = mid.x - sr.left;
             p.focalLiveY = mid.y - sr.top;
             p.focalInit = true;
@@ -588,7 +604,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       if (p.smooth) {
         p.smooth = false;
         clearVisualScale();
-        applyFocalScroll(p.liveZoom, p.startZoom);
+        applyFocalScrollCommit();
         sc.style.touchAction = "pan-x pan-y";
         const value = p.liveZoom;
         p.pending = null;
