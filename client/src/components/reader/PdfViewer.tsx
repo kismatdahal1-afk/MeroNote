@@ -205,7 +205,12 @@ export function PdfViewer({
               // the PDF header docks attached under the app header instead
               // of sliding beneath it. Has no effect while the window is
               // unscrolled — the PDF area scrolls internally.
+              // -mt-px seals the boundary: the header overlaps the app
+              // header's bottom edge by 1px so device-pixel rounding can
+              // never open a hairline crack between the two headers.
+              // Page variant only; the embedded card keeps its own border.
               "sticky top-16 z-30 flex-shrink-0 mt-0 flex flex-col",
+              isPage ? "-mt-px" : "",
               isPage
                 ? "bg-surface/95 backdrop-blur-md"
                 : "bg-surface-muted/50",
