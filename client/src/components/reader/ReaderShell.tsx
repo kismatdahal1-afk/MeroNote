@@ -39,6 +39,26 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const adminEntry = adminEntryPointFromState(state);
   const adminRoot = adminEntryRootFor(adminEntry);
 
+  // Full-page reader owns the viewport: lock window scroll while mounted
+  // so the app header and PDF header stay glued with zero gap on every
+  // viewport (mobile URL-bar dynamics can otherwise shift the window and
+  // separate them). Only the inner PDF area scrolls. Restored on unmount.
+  useEffect(() => {
+    const body = document.body;
+    const docEl = document.documentElement;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyOverscroll = body.style.overscrollBehavior;
+    const prevDocOverscroll = docEl.style.overscrollBehavior;
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    docEl.style.overscrollBehavior = "none";
+    return () => {
+      body.style.overflow = prevBodyOverflow;
+      body.style.overscrollBehavior = prevBodyOverscroll;
+      docEl.style.overscrollBehavior = prevDocOverscroll;
+    };
+  }, []);
+
   const { data: meta, error: metaError, loading: metaLoading } = useApiQuery(
     `reader-meta-${resourceId ?? ""}`,
     async (signal) => {
