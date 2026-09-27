@@ -704,6 +704,13 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     if (Math.abs(sc.scrollTop - targetTop) > 2) {
       sc.scrollTop = targetTop;
     }
+    // Button-zoom path only (pinch returns early above with its own focal
+    // scrollLeft intact): center any horizontal overflow so the enlarged
+    // page presents centered and pannable instead of left-anchored.
+    const centerLeft = (renderWidth - sc.clientWidth) / 2;
+    if (centerLeft > 0 && Math.abs(sc.scrollLeft - centerLeft) > 2) {
+      sc.scrollLeft = centerLeft;
+    }
   }, [zoom, virtualData, findClosestPage]);
 
   useEffect(() => {
@@ -867,7 +874,13 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
           className="relative mx-auto"
           style={{
             height: virtualData.totalHeight || undefined,
-            maxWidth: renderWidth,
+            // Explicit zoomed width (page children are absolute, so the box
+            // cannot size itself): at/below 100% this matches the old
+            // maxWidth-capped layout exactly and stays mx-auto centered;
+            // beyond 100% the box itself spans the zoomed width so the
+            // enlarged PDF uses the viewport (pannable) instead of
+            // overflowing a container-sized box rightward.
+            width: renderWidth,
           }}
         >
           {pageElements}
