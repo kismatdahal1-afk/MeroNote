@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="client/public/icon/icon.png" alt="Mero Note" width="96" />
+  <img
+    src="client/public/icon/icon.png"
+    alt="Mero Note"
+    width="96"
+  />
 </p>
 
 <h1 align="center">Mero Note</h1>
@@ -7,8 +11,22 @@
 <p align="center">Personal-first CSIT study library for desktop and mobile.</p>
 
 <p align="center">
-  <a href="https://meronote.vercel.app/"><img src="https://img.shields.io/badge/Live_Demo-Visit_App-5B3DF5?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo" /></a>
-  <a href="docs/README.md"><img src="https://img.shields.io/badge/Docs-Start_Here-0F172A?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
+  <a
+    href="https://meronote.vercel.app/"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    <img
+      src="https://img.shields.io/badge/Live_Demo-Visit_App-5B3DF5?style=for-the-badge&logo=vercel&logoColor=white"
+      alt="Live Demo"
+    />
+  </a>
+  <a href="docs/README.md">
+    <img
+      src="https://img.shields.io/badge/Docs-Start_Here-0F172A?style=for-the-badge&logo=readthedocs&logoColor=white"
+      alt="Documentation"
+    />
+  </a>
 </p>
 
 <p align="center">
@@ -137,30 +155,56 @@ defaults to `http://localhost:5000`).
 
 ## Product Preview
 
-<table align="center">
-  <tr>
-    <td align="center">
-      <a href="https://meronote.vercel.app/">
-        <img src="client/public/images/Dashboard.png" alt="Dashboard — click to open live demo" width="300" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://meronote.vercel.app/">
-        <img src="client/public/images/Semester.png" alt="Resource — click to open live demo" width="300" />
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://meronote.vercel.app/">
-        <img src="client/public/images/note.png" alt="PDF Viewer — click to open live demo" width="300" />
-      </a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center"><b>Dashboard</b></td>
-    <td align="center"><b>Resource</b></td>
-    <td align="center"><b>PDF Viewer</b></td>
-  </tr>
-</table>
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <a
+          href="https://meronote.vercel.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            src="client/public/images/Dashboard.png"
+            alt="Dashboard — click to open live demo"
+            width="300"
+          />
+        </a>
+      </td>
+      <td align="center">
+        <a
+          href="https://meronote.vercel.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            src="client/public/images/Semester.png"
+            alt="Resource — click to open live demo"
+            width="300"
+          />
+        </a>
+      </td>
+      <td align="center">
+        <a
+          href="https://meronote.vercel.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            src="client/public/images/note.png"
+            alt="PDF Viewer — click to open live demo"
+            width="300"
+          />
+        </a>
+      </td>
+    </tr>
+    <tr>
+      <td align="center"><b>Dashboard</b></td>
+      <td align="center"><b>Resource</b></td>
+      <td align="center"><b>PDF Viewer</b></td>
+    </tr>
+  </table>
+</div>
 
 ## Documentation
 
@@ -169,14 +213,27 @@ authentication, storage, features, and operations.
 
 ## Live Demo
 
-**https://meronote.vercel.app/**
+<b>
+  <a
+    href="https://meronote.vercel.app/"
+    target="_blank"
+    rel="noopener noreferrer"
+  >https://meronote.vercel.app/</a>
+</b>
 
 ## Creator
 
 Designed & Developed by **KISMAT DAHAL**
 
-<p>
-  <a href="https://www.instagram.com/kisma_tt07/"><img src="https://img.shields.io/badge/Instagram-kisma_tt07-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
-</p>
+<a
+  href="https://www.instagram.com/kisma_tt07/"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  <img
+    src="https://img.shields.io/badge/Instagram-kisma_tt07-E4405F?style=for-the-badge&logo=instagram&logoColor=white"
+    alt="Instagram"
+  />
+</a>
 
 <p align="center"><a href="#mero-note">Back to top</a></p>
