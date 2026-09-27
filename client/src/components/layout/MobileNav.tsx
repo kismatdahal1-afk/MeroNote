@@ -83,6 +83,7 @@ function LiquidBottomNav({
   const navRef = useRef<HTMLElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const pathRef = useRef<SVGPathElement | null>(null);
+  const topStrokeRef = useRef<SVGPathElement | null>(null);
   const btnRef = useRef<HTMLDivElement | null>(null);
   const iconRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const tweenRef = useRef<number | null>(null);
@@ -109,6 +110,8 @@ function LiquidBottomNav({
   const VisibleIcon = items[Math.min(visibleIndex, items.length - 1)].icon;
 
   // ---- Template path builder (verbatim geometry) ----
+  // Closed shape: bar body fill only (no stroke — see CSS). Side/bottom
+  // edges carry no visible boundary so the bar blends into the page.
   function buildPath(w: number, h: number, notchX: number): string {
     const rt = 10; // small curve on upper corners only; bottom stays square to the viewport edge
     const halfNotch = 44;
@@ -134,6 +137,28 @@ function LiquidBottomNav({
     ].join(" ");
   }
 
+  // Top-edge-only stroke: same notch geometry as buildPath, but an open
+  // subpath tracing just the top boundary (left edge → notch dip → right
+  // edge). No side/bottom segments, so only a single horizontal top stroke
+  // is painted. Geometry constants intentionally mirror buildPath.
+  function buildTopStrokePath(w: number, notchX: number): string {
+    const halfNotch = 44;
+    const depth = 28;
+    const x0 = notchX - halfNotch;
+    const x1 = notchX - halfNotch * 0.45;
+    const x2 = notchX;
+    const x3 = notchX + halfNotch * 0.45;
+    const x4 = notchX + halfNotch;
+
+    return [
+      `M 0 0`,
+      `L ${x0} 0`,
+      `C ${x1} 0 ${x1} ${depth} ${x2} ${depth}`,
+      `C ${x3} ${depth} ${x3} 0 ${x4} 0`,
+      `L ${w} 0`,
+    ].join(" ");
+  }
+
   function centerXFor(index: number): number {
     const nav = navRef.current;
     const icon = iconRefs.current[index];
@@ -147,12 +172,16 @@ function LiquidBottomNav({
     const nav = navRef.current;
     const svg = svgRef.current;
     const path = pathRef.current;
+    const topStroke = topStrokeRef.current;
     if (!nav || !svg || !path) return;
     const { width: w, height: h } = nav.getBoundingClientRect();
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     svg.setAttribute("width", `${w}`);
     svg.setAttribute("height", `${h}`);
     path.setAttribute("d", buildPath(w, h, x));
+    // Top-only stroke glides in sync with the notch; guarded so a missing
+    // ref never breaks the bar fill paint.
+    if (topStroke) topStroke.setAttribute("d", buildTopStrokePath(w, x));
   }
 
   function paintAt(index: number): void {
@@ -282,7 +311,8 @@ function LiquidBottomNav({
       <nav ref={navRef} aria-label={ariaLabel} className="liq-bottom-nav">
         <div aria-hidden="true" className="liq-nav-fallback" />
         <svg ref={svgRef} aria-hidden="true" focusable="false" className="liq-nav-bg">
-          <path ref={pathRef} />
+          <path ref={pathRef} className="liq-nav-fill" />
+          <path ref={topStrokeRef} className="liq-nav-top-stroke" />
         </svg>
 
         <div className="liq-nav-items">

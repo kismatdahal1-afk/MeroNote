@@ -605,14 +605,25 @@ body {
   background: var(--nav-background);
 }
 
-.liq-nav-bg path {
+/* Bar body: fill only, no stroke — side/bottom edges carry no visible
+   boundary so the navigation blends into the page background. */
+.liq-nav-bg .liq-nav-fill {
   fill: var(--nav-background);
+  stroke: none;
+}
+
+/* Top-edge-only stroke: single subtle horizontal separation from content
+   above, tracing the notch dip. Reuses the existing theme stroke tones —
+   no new colors. */
+.liq-nav-bg .liq-nav-top-stroke {
+  fill: none;
   stroke: #ea580c;
   stroke-width: 1.5;
+  stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.dark .liq-nav-bg path {
+.dark .liq-nav-bg .liq-nav-top-stroke {
   stroke: #ffffff;
 }
 
