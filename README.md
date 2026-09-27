@@ -154,7 +154,7 @@ defaults to `http://localhost:5000`).
 
 ## Documentation
 
-Start at [`docs/README.md`](docs/README.md) — system, backend, database,
+Start at <a href="docs/README.md" target="_blank" rel="noopener noreferrer"><code>docs/README.md</code></a> — system, backend, database,
 authentication, storage, features, and operations.
 
 ## Live Demo
