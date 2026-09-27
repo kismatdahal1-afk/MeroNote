@@ -163,12 +163,8 @@ authentication, storage, features, and operations.
 
 ## Creator
 
-<div align="center">
-
 Designed & Developed by **KISMAT DAHAL**
 
 <a href="https://www.instagram.com/kisma_tt07/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Instagram-kisma_tt07-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
-
-</div>
 
 <p align="center"><a href="#mero-note">Back to top</a></p>
