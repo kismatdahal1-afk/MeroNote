@@ -143,8 +143,8 @@ export function LegalPageLayout({
   return (
     <div className="bg-hero-gradient flex min-h-screen flex-col">
       <LegalHeader />
-      <main className="flex-1">
-        <div className="w-full px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+      <main className="flex-1 bg-white dark:bg-background">
+        <div className="mx-auto w-full max-w-[210mm] px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
           <article className="relative w-full overflow-hidden rounded-2xl border border-border bg-surface p-6 shadow-card sm:p-10">
             {/* Single decorative watermark — excluded from accessibility tree. */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0">
@@ -170,7 +170,7 @@ export function LegalPageLayout({
                 {intro}
               </p>
               <div aria-hidden="true" className="my-8 h-px w-full bg-border" />
-              <div className="grid w-full grid-cols-1 gap-x-12 gap-y-9 md:grid-cols-2">
+              <div className="w-full space-y-9">
                 {sections.map((section, i) => (
                   <LegalSection key={section.heading} index={i} section={section} />
                 ))}
