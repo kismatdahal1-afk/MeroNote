@@ -27,7 +27,7 @@ function LegalHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-surface/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="flex h-16 w-full items-center gap-3 px-4 sm:px-6 lg:px-8">
         <Link
           to="/"
           aria-label="Mero Note home"
@@ -144,8 +144,8 @@ export function LegalPageLayout({
     <div className="bg-hero-gradient flex min-h-screen flex-col">
       <LegalHeader />
       <main className="flex-1">
-        <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-          <article className="relative overflow-hidden rounded-2xl border border-border bg-surface p-6 shadow-card sm:p-10">
+        <div className="w-full px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+          <article className="relative w-full overflow-hidden rounded-2xl border border-border bg-surface p-6 shadow-card sm:p-10">
             {/* Single decorative watermark — excluded from accessibility tree. */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0">
               <img
@@ -153,7 +153,7 @@ export function LegalPageLayout({
                 alt=""
                 draggable={false}
                 loading="lazy"
-                className="absolute left-1/2 top-10 size-64 -translate-x-1/2 select-none rounded-3xl object-cover opacity-[0.05] dark:opacity-[0.07] sm:size-80"
+                className="absolute left-1/2 top-10 size-64 -translate-x-1/2 select-none rounded-3xl object-cover opacity-[0.05] dark:opacity-[0.07] sm:size-80 lg:size-96"
               />
             </div>
             <div className="relative z-10">
@@ -166,11 +166,11 @@ export function LegalPageLayout({
               <p className="mt-2 text-xs font-semibold text-muted-foreground">
                 Last Updated: {updated}
               </p>
-              <p className="mt-4 text-[15px] font-medium leading-7 text-muted-foreground">
+              <p className="mt-4 w-full text-[15px] font-medium leading-7 text-muted-foreground">
                 {intro}
               </p>
               <div aria-hidden="true" className="my-8 h-px w-full bg-border" />
-              <div className="space-y-9">
+              <div className="grid w-full grid-cols-1 gap-x-12 gap-y-9 md:grid-cols-2">
                 {sections.map((section, i) => (
                   <LegalSection key={section.heading} index={i} section={section} />
                 ))}
