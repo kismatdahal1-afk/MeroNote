@@ -1269,20 +1269,20 @@ function FooterContact() {
 export function LandingFooter() {
   return (
     <footer className="border-x-0 border-b-0 border-t border-border bg-surface">
-      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
-        <div className="grid gap-10 text-left lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2.7fr)] lg:gap-12">
-          <div className="justify-self-start">
+      <div className="w-full px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+        <div className="flex w-full flex-col gap-10 text-left lg:flex-row lg:items-start lg:justify-between lg:gap-12">
+          <div className="shrink-0 justify-self-start">
             <FooterBrand />
           </div>
           <nav
             aria-label="Footer"
-            className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-8"
+            className="grid w-full grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 lg:max-w-5xl lg:flex-1 lg:grid-cols-5 lg:justify-between lg:gap-x-8"
           >
             <FooterExplore />
             <FooterStudy />
             <FooterAccount />
-            <FooterContact />
             <FooterLegal />
+            <FooterContact />
           </nav>
         </div>
 
