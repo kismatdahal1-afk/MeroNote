@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   ArrowRight,
@@ -1053,8 +1053,14 @@ const ACCOUNT_LINKS: Array<{ label: string; to: string }> = [
   { label: "Dashboard", to: "/dashboard" },
 ];
 
+/**
+ * Shared footer link appearance: clean text links, no pills.
+ * Slightly roomier tap targets on touch screens (`py-1`), compact on
+ * desktop (`sm:py-0.5`). `min-w-0` on the rows lets long labels wrap
+ * instead of pushing the grid into horizontal overflow on 320px screens.
+ */
 const FOOTER_LINK_CLASS =
-  "inline-block rounded py-0.5 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "inline-block rounded py-1 text-[13px] font-medium break-words text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:py-0.5";
 
 /** Dedicated legal pages — internal routes rendered by the shared legal layout. */
 const LEGAL_LINKS: Array<{ label: string; to: string }> = [
@@ -1064,20 +1070,32 @@ const LEGAL_LINKS: Array<{ label: string; to: string }> = [
   { label: "Disclaimer", to: "/disclaimer" },
 ];
 
-function FooterLegal() {
+/** Shared column shell: heading + link list. Every footer group renders through this. */
+function FooterColumn({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <FooterHeading>Legal</FooterHeading>
-      <ul className="mt-3 space-y-2">
-        {LEGAL_LINKS.map((link) => (
-          <li key={link.label}>
-            <Link to={link.to} className={FOOTER_LINK_CLASS}>
-              {link.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <FooterHeading>{title}</FooterHeading>
+      <ul className="mt-3 space-y-2">{children}</ul>
     </div>
+  );
+}
+
+/** Shared internal link row. */
+function FooterNavItem({
+  to,
+  onClick,
+  children,
+}: {
+  to: string;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <li className="min-w-0">
+      <Link to={to} onClick={onClick} className={FOOTER_LINK_CLASS}>
+        {children}
+      </Link>
+    </li>
   );
 }
 
@@ -1142,28 +1160,32 @@ function FooterExplore() {
   };
 
   return (
-    <div>
-      <FooterHeading>Explore</FooterHeading>
-      <ul className="mt-3 space-y-2">
-        {EXPLORE_LINKS.map((link) => (
-          <li key={link.label}>
-            {link.to ? (
-              <Link to={link.to} onClick={handleHome} className={FOOTER_LINK_CLASS}>
-                {link.label}
-              </Link>
-            ) : (
+    <FooterColumn title="Explore">
+      {EXPLORE_LINKS.map((link) => {
+        if (link.to) {
+          return (
+            <FooterNavItem key={link.label} to={link.to} onClick={handleHome}>
+              {link.label}
+            </FooterNavItem>
+          );
+        }
+        if (link.sectionId) {
+          const sectionId = link.sectionId;
+          return (
+            <li key={link.label} className="min-w-0">
               <a
-                href={`#${link.sectionId}`}
-                onClick={handleSection(link.sectionId!)}
+                href={`#${sectionId}`}
+                onClick={handleSection(sectionId)}
                 className={FOOTER_LINK_CLASS}
               >
                 {link.label}
               </a>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
+            </li>
+          );
+        }
+        return null;
+      })}
+    </FooterColumn>
   );
 }
 
@@ -1178,38 +1200,40 @@ function FooterStudy() {
   const authed = status === "authed";
 
   return (
-    <div>
-      <FooterHeading>Study</FooterHeading>
-      <ul className="mt-3 space-y-2">
-        {STUDY_LINKS.map((link) => (
-          <li key={link.label}>
-            <Link
-              to={authed ? link.destination : loginWithNext(link.destination)}
-              className={FOOTER_LINK_CLASS}
-            >
-              {link.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <FooterColumn title="Study">
+      {STUDY_LINKS.map((link) => (
+        <FooterNavItem
+          key={link.label}
+          to={authed ? link.destination : loginWithNext(link.destination)}
+        >
+          {link.label}
+        </FooterNavItem>
+      ))}
+    </FooterColumn>
   );
 }
 
 function FooterAccount() {
   return (
-    <div>
-      <FooterHeading>Account</FooterHeading>
-      <ul className="mt-3 space-y-2">
-        {ACCOUNT_LINKS.map((link) => (
-          <li key={link.label}>
-            <Link to={link.to} className={FOOTER_LINK_CLASS}>
-              {link.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <FooterColumn title="Account">
+      {ACCOUNT_LINKS.map((link) => (
+        <FooterNavItem key={link.label} to={link.to}>
+          {link.label}
+        </FooterNavItem>
+      ))}
+    </FooterColumn>
+  );
+}
+
+function FooterLegal() {
+  return (
+    <FooterColumn title="Legal">
+      {LEGAL_LINKS.map((link) => (
+        <FooterNavItem key={link.label} to={link.to}>
+          {link.label}
+        </FooterNavItem>
+      ))}
+    </FooterColumn>
   );
 }
 
@@ -1236,33 +1260,35 @@ function InstagramIcon({ className }: { className?: string }) {
  * The URL comes from `VITE_INSTAGRAM_URL` — never invented here.
  */
 function FooterContact() {
+  const label = (
+    <>
+      <InstagramIcon className="size-3.5 shrink-0" />
+      Instagram
+    </>
+  );
+
   return (
-    <div>
-      <FooterHeading>Contact</FooterHeading>
-      <ul className="mt-3 space-y-2">
-        <li>
-          {INSTAGRAM_URL ? (
-            <a
-              href={INSTAGRAM_URL}
-              target="_blank"
-              rel="noreferrer"
-              className={`inline-flex items-center gap-1.5 ${FOOTER_LINK_CLASS}`}
-            >
-              <InstagramIcon className="size-3.5" />
-              Instagram
-            </a>
-          ) : (
-            <span
-              className={`inline-flex items-center gap-1.5 ${FOOTER_LINK_CLASS}`}
-              title="Set VITE_INSTAGRAM_URL to configure the Instagram link"
-            >
-              <InstagramIcon className="size-3.5" />
-              Instagram
-            </span>
-          )}
-        </li>
-      </ul>
-    </div>
+    <FooterColumn title="Contact">
+      <li className="min-w-0">
+        {INSTAGRAM_URL ? (
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noreferrer"
+            className={`inline-flex items-center gap-1.5 ${FOOTER_LINK_CLASS}`}
+          >
+            {label}
+          </a>
+        ) : (
+          <span
+            className={`inline-flex items-center gap-1.5 ${FOOTER_LINK_CLASS}`}
+            title="Set VITE_INSTAGRAM_URL to configure the Instagram link"
+          >
+            {label}
+          </span>
+        )}
+      </li>
+    </FooterColumn>
   );
 }
 
@@ -1271,12 +1297,12 @@ export function LandingFooter() {
     <footer className="border-x-0 border-b-0 border-t border-border bg-surface">
       <div className="w-full px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
         <div className="flex w-full flex-col gap-10 text-left lg:flex-row lg:items-start lg:justify-between lg:gap-12">
-          <div className="shrink-0 justify-self-start">
+          <div className="shrink-0">
             <FooterBrand />
           </div>
           <nav
             aria-label="Footer"
-            className="grid w-full grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 lg:max-w-5xl lg:flex-1 lg:grid-cols-5 lg:justify-between lg:gap-x-8"
+            className="grid w-full grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 lg:max-w-5xl lg:flex-1 lg:grid-cols-5 lg:gap-x-8"
           >
             <FooterExplore />
             <FooterStudy />
