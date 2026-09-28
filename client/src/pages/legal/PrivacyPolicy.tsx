@@ -1,5 +1,3 @@
-import { Link } from "react-router-dom";
-import { INSTAGRAM_URL } from "../../lib/site";
 import { LegalPageLayout, type LegalSectionData } from "./LegalLayout";
 
 const SECTIONS: LegalSectionData[] = [
@@ -95,23 +93,6 @@ export default function PrivacyPolicy() {
       intro="How Mero Note handles your account and study activity while you use the CSIT study library."
       updated="September 2026"
       sections={SECTIONS}
-    >
-      <div className="mt-10 flex flex-wrap items-center gap-3 border-t border-border pt-6">
-        <a
-          href={INSTAGRAM_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-bold text-foreground transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          Contact on Instagram
-        </a>
-        <Link
-          to="/"
-          className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          Back to Home
-        </Link>
-      </div>
-    </LegalPageLayout>
+    />
   );
 }

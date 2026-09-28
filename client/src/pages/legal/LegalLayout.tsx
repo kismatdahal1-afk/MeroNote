@@ -143,19 +143,22 @@ export function LegalPageLayout({
   return (
     <div className="bg-hero-gradient flex min-h-screen flex-col">
       <LegalHeader />
-      <main className="flex-1 bg-white dark:bg-background">
-        <div className="mx-auto w-full max-w-[210mm] px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-          <article className="relative w-full overflow-hidden rounded-2xl border border-border bg-surface p-6 shadow-card sm:p-10">
-            {/* Single decorative watermark — excluded from accessibility tree. */}
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-              <img
-                src="/icon/icon.png"
-                alt=""
-                draggable={false}
-                loading="lazy"
-                className="absolute left-1/2 top-10 size-64 -translate-x-1/2 select-none rounded-3xl object-cover opacity-[0.05] dark:opacity-[0.07] sm:size-80 lg:size-96"
-              />
-            </div>
+      <main className="relative flex-1 bg-white dark:bg-background">
+        {/* Single decorative watermark, centered on the page — excluded from accessibility tree. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center"
+        >
+          <img
+            src="/icon/icon.png"
+            alt=""
+            draggable={false}
+            loading="lazy"
+            className="size-72 select-none rounded-3xl object-cover opacity-[0.05] dark:opacity-[0.07] sm:size-96"
+          />
+        </div>
+        <div className="relative z-10 mx-auto w-full max-w-[210mm] px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+          <article className="relative w-full p-6 sm:p-10">
             <div className="relative z-10">
               <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
                 Mero Note · Legal
