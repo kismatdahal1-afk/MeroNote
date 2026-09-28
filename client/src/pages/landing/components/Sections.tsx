@@ -1054,11 +1054,36 @@ const ACCOUNT_LINKS: Array<{ label: string; to: string }> = [
 ];
 
 const FOOTER_LINK_CLASS =
-  "rounded text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+  "inline-block rounded py-0.5 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+
+/** Dedicated legal pages — internal routes rendered by the shared legal layout. */
+const LEGAL_LINKS: Array<{ label: string; to: string }> = [
+  { label: "Privacy Policy", to: "/privacy-policy" },
+  { label: "Terms & Conditions", to: "/terms" },
+  { label: "Copyright & Content Policy", to: "/copyright-policy" },
+  { label: "Disclaimer", to: "/disclaimer" },
+];
+
+function FooterLegal() {
+  return (
+    <div className="min-w-0">
+      <FooterHeading>Legal</FooterHeading>
+      <ul className="mt-3 space-y-2">
+        {LEGAL_LINKS.map((link) => (
+          <li key={link.label}>
+            <Link to={link.to} className={FOOTER_LINK_CLASS}>
+              {link.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function FooterBrand() {
   return (
-    <div>
+    <div className="min-w-0 text-left">
       <Link
         to="/"
         aria-label="Mero Note home"
@@ -1244,17 +1269,20 @@ function FooterContact() {
 export function LandingFooter() {
   return (
     <footer className="border-x-0 border-b-0 border-t border-border bg-surface">
-      <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] lg:gap-12">
-          <FooterBrand />
+      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
+        <div className="grid gap-10 text-left lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2.7fr)] lg:gap-12">
+          <div className="justify-self-start">
+            <FooterBrand />
+          </div>
           <nav
             aria-label="Footer"
-            className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4"
+            className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-8"
           >
             <FooterExplore />
             <FooterStudy />
             <FooterAccount />
             <FooterContact />
+            <FooterLegal />
           </nav>
         </div>
 

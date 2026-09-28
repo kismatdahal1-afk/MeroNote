@@ -32,6 +32,10 @@ import {
 const LandingPage = lazy(() => import("./pages/landing/LandingPage"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
+const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
+const Terms = lazy(() => import("./pages/legal/Terms"));
+const CopyrightPolicy = lazy(() => import("./pages/legal/CopyrightPolicy"));
+const Disclaimer = lazy(() => import("./pages/legal/Disclaimer"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Semesters = lazy(() => import("./pages/Semesters"));
 const SemesterSubjects = lazy(() => import("./pages/Semesters").then((m) => ({ default: m.SemesterSubjects })));
@@ -95,6 +99,10 @@ export const appRoutes: RouteObject[] = [
           { index: true, element: withSuspense(<LandingPage />) },
           { path: "login", element: withSuspense(<Login />) },
           { path: "register", element: withSuspense(<Register />) },
+          { path: "privacy-policy", element: withSuspense(<PrivacyPolicy />) },
+          { path: "terms", element: withSuspense(<Terms />) },
+          { path: "copyright-policy", element: withSuspense(<CopyrightPolicy />) },
+          { path: "disclaimer", element: withSuspense(<Disclaimer />) },
           {
             element: (
               <RequireAuth>
