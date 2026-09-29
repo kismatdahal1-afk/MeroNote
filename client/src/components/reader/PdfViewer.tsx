@@ -231,16 +231,16 @@ export function PdfViewer({
             <div
               className={cx(
                 "hidden items-center gap-2 border-b border-border px-3 lg:px-4",
-                "h-16",
+                "min-h-12 py-1",
                 "md:flex",
               )}
             >
               {toolbarLeading}
               <div className="min-w-0 flex-1">
-                <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
-                {subtitle && <p className="truncate text-xs font-medium text-muted-foreground">{subtitle}</p>}
+                <h1 className="truncate text-sm font-bold leading-tight text-foreground">{resource.title}</h1>
+                {subtitle && <p className="truncate text-xs font-medium leading-tight text-muted-foreground">{subtitle}</p>}
                 {sourceLabel && (
-                  <p className="mt-0.5 truncate text-[11px] font-bold text-success">{sourceLabel}</p>
+                  <p className="mt-0 truncate text-[11px] font-bold leading-tight text-success">{sourceLabel}</p>
                 )}
               </div>
 
@@ -302,7 +302,7 @@ export function PdfViewer({
               />
             </div>
 
-            <div className="flex md:hidden items-center gap-2 border-0 px-3 py-2">
+            <div className="flex md:hidden items-center gap-2 border-0 px-3 py-1">
               {toolbarLeading}
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
@@ -313,7 +313,7 @@ export function PdfViewer({
               </div>
             </div>
 
-            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
+            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
               <div className="flex items-center gap-1 rounded-md bg-surface-muted px-1.5">
                 <IconButton icon={ChevronLeft} label="Previous page" variant="bar" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
                 <div className="flex h-7 items-center gap-0.5">
