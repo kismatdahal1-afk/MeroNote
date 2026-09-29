@@ -251,6 +251,34 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     persistProgress(page);
   }, [resource?.id ?? "", totalPages, setReadingProgress, markOpened, persistProgress]);
 
+  // Declared before the early returns below: hooks must run in the same
+  // order on every render. Null-safe until meta loads; the callbacks can
+  // only fire from the loaded view, where resource is non-null.
+  const subject = meta?.subject ?? null;
+  const semester = meta?.semester ?? null;
+  const bookmarked = Boolean(resource && getBookmark(resource.id));
+  const download = resource ? getDownload(resource.id) : undefined;
+
+  const handleBookmark = useCallback((page: number) => {
+    if (!resource) return;
+    if (bookmarked) {
+      toast("Already bookmarked — manage from Bookmarks page", "info");
+      return;
+    }
+    addBookmark(resource, page, "");
+    toast(`Bookmarked page ${page}`);
+  }, [bookmarked, resource, addBookmark, toast]);
+
+  const handleDownload = useCallback(() => {
+    if (!resource) return;
+    if (download?.status === "completed" || download?.status === "downloading") {
+      toast("Download already in progress or completed", "info");
+      return;
+    }
+    startDownload(resource);
+    toast(download ? "Retrying download" : "Download started");
+  }, [download, resource, startDownload, toast]);
+
   if (metaLoading) {
     return (
       <div className="reader-bar flex min-h-screen items-center justify-center bg-background p-6">
@@ -301,29 +329,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       </div>
     );
   }
-
-  const subject = meta?.subject ?? null;
-  const semester = meta?.semester ?? null;
-  const bookmarked = Boolean(getBookmark(resource.id));
-  const download = getDownload(resource.id);
-
-  const handleBookmark = useCallback((page: number) => {
-    if (bookmarked) {
-      toast("Already bookmarked — manage from Bookmarks page", "info");
-      return;
-    }
-    addBookmark(resource, page, "");
-    toast(`Bookmarked page ${page}`);
-  }, [bookmarked, resource, addBookmark, toast]);
-
-  const handleDownload = useCallback(() => {
-    if (download?.status === "completed" || download?.status === "downloading") {
-      toast("Download already in progress or completed", "info");
-      return;
-    }
-    startDownload(resource);
-    toast(download ? "Retrying download" : "Download started");
-  }, [download, resource, startDownload, toast]);
 
   return (
     <PdfViewer
