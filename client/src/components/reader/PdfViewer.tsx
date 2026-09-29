@@ -414,7 +414,7 @@ export function PdfViewer({
                 </p>
               </div>
             ) : (
-              <div className="mx-auto w-full px-3 py-2 h-full md:px-2">
+              <div className="mx-auto w-full px-3 pb-2 pt-0 h-full md:px-2">
                 <PdfCanvas
                   url={fileUrl}
                   page={page}
