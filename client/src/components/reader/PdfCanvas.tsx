@@ -293,6 +293,15 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     const elements: React.ReactNode[] = [];
     if (virtualData.numPages === 0 || !doc) return elements;
 
+    // Page 1 continues the toolbar edge seamlessly: no top border (the
+    // toolbar's bottom border is the single divider) and square top
+    // corners so no background notches appear. All other pages keep the
+    // full card treatment.
+    const pageCardClass = (pageNum: number) =>
+      pageNum === 1
+        ? "absolute left-0 right-0 rounded-b-lg bg-surface border-x border-b border-border"
+        : "absolute left-0 right-0 rounded-lg bg-surface border border-border";
+
     for (let i = 1; i <= virtualData.numPages; i++) {
       const dim = pageInfos[i - 1];
       const aspectRatio = dim ? dim.aspectRatio : 297 / 210;
@@ -306,7 +315,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
           <div
             key={i}
             data-page={i}
-            className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
+            className={pageCardClass(i)}
             style={{ top, left: 0, right: 0, width: renderWidth, aspectRatio: `${aspectRatio} / 1` }}
           >
             <PageRenderer pdf={doc} pageNum={i} containerWidth={renderWidth} onRendered={handlePageRendered} onRenderError={handleRenderError} />
@@ -317,7 +326,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
           <div
             key={i}
             data-page={i}
-            className="absolute left-0 right-0 rounded-lg bg-surface border border-border flex flex-col items-center justify-center gap-2 p-4 text-center"
+            className={`${pageCardClass(i)} flex flex-col items-center justify-center gap-2 p-4 text-center`}
             style={{ top, left: 0, right: 0, width: renderWidth, aspectRatio: `${aspectRatio} / 1` }}
           >
             <p className="text-xs font-semibold text-foreground">Couldn&apos;t render this page</p>
@@ -335,7 +344,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
           <div
             key={i}
             data-page={i}
-            className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
+            className={pageCardClass(i)}
             style={{ top, left: 0, right: 0, width: renderWidth, aspectRatio: `${aspectRatio} / 1` }}
           >
             <PageRenderer pdf={doc} pageNum={i} containerWidth={renderWidth} onRendered={handlePageRendered} onRenderError={handleRenderError} />
@@ -349,7 +358,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
           <div
             key={i}
             data-page={i}
-            className="absolute left-0 right-0 rounded-lg bg-surface border border-border"
+            className={pageCardClass(i)}
             style={{ top, left: 0, right: 0, width: renderWidth, aspectRatio: `${aspectRatio} / 1` }}
           />
         );
