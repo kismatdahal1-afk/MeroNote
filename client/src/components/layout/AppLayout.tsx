@@ -54,7 +54,9 @@ export function AppLayout() {
   const isReaderRoute = /\/reader\//.test(pathname);
 
   return (
-    <div className="bg-hero-gradient min-h-screen">
+    // Reader routes use a flat bg-background shell (no hero gradient) so a
+    // 1px seam at the app-header boundary can never paint hero cream.
+    <div className={isReaderRoute ? "bg-background min-h-screen" : "bg-hero-gradient min-h-screen"}>
       {/* Desktop sidebar — dark tint comes from the dark-mode sidebar tokens */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-surface dark:border-[#20242B] dark:bg-[#0D1015] lg:flex">
         <div className="flex h-16 items-center border-b border-border px-5">
@@ -89,9 +91,16 @@ export function AppLayout() {
           }
           style={isReaderRoute ? { paddingTop: 0, paddingBottom: 0 } : undefined}
         >
-          <PageTransition>
+          {/* Reader routes bypass the slide animation wrapper: its
+              translateX/opacity transform + overflow-x-clip can open a 1px
+              bg seam at the app-header boundary. All other routes animate. */}
+          {isReaderRoute ? (
             <Outlet />
-          </PageTransition>
+          ) : (
+            <PageTransition>
+              <Outlet />
+            </PageTransition>
+          )}
         </main>
       </div>
 

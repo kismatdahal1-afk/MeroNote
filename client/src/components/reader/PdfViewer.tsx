@@ -181,12 +181,16 @@ export function PdfViewer({
     <div
       aria-label="PDF viewer"
       className={cx(
-        "reader-bar mt-0 flex flex-col overflow-hidden pt-0",
+        "reader-bar mt-0 flex flex-col overflow-hidden border-0 pt-0",
         isPage
           // Fill exactly the viewport below the sticky app header (h-16)
           // so the window never scrolls on reader routes: the PDF header
           // above stays pinned and only the PDF area scrolls internally.
-          ? "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-background"
+          // Root uses bg-surface (same as the header stack) so any
+          // subpixel seam at the app-header boundary paints header-color,
+          // never page-bg cream/black. The PDF content area below keeps
+          // its own bg-background.
+          ? "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface"
           : "card-glow overflow-hidden rounded-xl border border-border bg-surface shadow-card",
         className,
       )}
@@ -208,16 +212,18 @@ export function PdfViewer({
               // -mt-px seals the boundary: the header overlaps the app
               // header's bottom edge by 1px so device-pixel rounding can
               // never open a hairline crack between the two headers.
-              // Page variant only; the embedded card keeps its own border.
-              "sticky top-16 z-30 flex-shrink-0 mt-0 flex flex-col",
+              // Opaque bg-surface (no blur/translucency) so the seam never
+              // blends into a visible bg-color line. Page variant only;
+              // the embedded card keeps its own border.
+              "sticky top-16 z-30 flex-shrink-0 mt-0 flex flex-col border-t-0 pt-0",
               isPage ? "-mt-px" : "",
               isPage
-                ? "bg-surface/95 backdrop-blur-md"
+                ? "bg-surface"
                 : "bg-surface-muted/50",
             )}
           >
             {breadcrumbs && isPage && (
-              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-0.5 border-b border-border px-3 py-0 text-[10px] md:text-xs font-medium leading-tight text-muted-foreground/80 whitespace-normal">
+              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-0.5 rounded-none border-b border-border px-3 py-0 pt-0 text-[10px] md:text-xs font-medium leading-tight text-muted-foreground/80 whitespace-normal">
                 {breadcrumbs}
               </div>
             )}
