@@ -1,7 +1,7 @@
 import { useParams, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import { BreadcrumbSegment, BreadcrumbSep } from "./ReaderBreadcrumb";
 import { fetchResource, fetchSemester, fetchSubject } from "../../lib/contentApi";
 import { useApiQuery } from "../../hooks/useApiQuery";
 import { ReaderSkeleton } from "../skeletons/pages";
@@ -205,7 +205,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const pendingPage = useRef<number | null>(null);
   const touchedLocally = useRef(false);
 
-  const persistProgress = (page: number) => {
+  const persistProgress = useCallback((page: number) => {
     if (authStatus !== "authed" || !openResourceId) return;
     touchedLocally.current = true;
     pendingPage.current = page;
@@ -216,7 +216,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
       pendingPage.current = null;
       if (next !== null && openResourceId) void putServerProgress(openResourceId, next).catch(() => {});
     }, 1500);
-  };
+  }, [authStatus, openResourceId]);
 
   useEffect(() => {
     if (authStatus !== "authed" || !openResourceId) return;
@@ -307,23 +307,23 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
   const bookmarked = Boolean(getBookmark(resource.id));
   const download = getDownload(resource.id);
 
-  const handleBookmark = (page: number) => {
+  const handleBookmark = useCallback((page: number) => {
     if (bookmarked) {
       toast("Already bookmarked — manage from Bookmarks page", "info");
       return;
     }
     addBookmark(resource, page, "");
     toast(`Bookmarked page ${page}`);
-  };
+  }, [bookmarked, resource, addBookmark, toast]);
 
-  const handleDownload = () => {
+  const handleDownload = useCallback(() => {
     if (download?.status === "completed" || download?.status === "downloading") {
       toast("Download already in progress or completed", "info");
       return;
     }
     startDownload(resource);
     toast(download ? "Retrying download" : "Download started");
-  };
+  }, [download, resource, startDownload, toast]);
 
   return (
     <PdfViewer
@@ -341,7 +341,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
         admin ? (
           <>
             <Link to="/admin" className="rounded px-1 py-0 hover:text-primary">Admin</Link>
-            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+            <BreadcrumbSep />
             {adminEntry === "drafts" ? (
               <Link to="/admin/drafts" className="rounded px-1 py-0 hover:text-primary">Draft</Link>
             ) : adminEntry === "semesters" ? (
@@ -355,13 +355,13 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             )}
             {adminEntry === "semesters" && semester && (
               <>
-                <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+                <BreadcrumbSep />
                 <span className="max-w-[10rem] truncate rounded px-1 py-0">
                   {semester.name}
                 </span>
               </>
             )}
-            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+            <BreadcrumbSep />
             <Link
               to={`${baseRoute}/${resource.id}`}
               state={detailState}
@@ -369,22 +369,20 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             >
               {resource.title}
             </Link>
-            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+            <BreadcrumbSep />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
         ) : entryRoot ? (
           <>
             <Link to={entryRoot.to} className="shrink-0 rounded px-1 py-0 hover:text-primary">{entryRoot.label}</Link>
             {showsSubjectInResourceTrail(entry, fromSubject, resource.subjectId) && subject && (
-              <span className="inline-flex min-w-0 items-center gap-x-0.5 gap-y-0">
-                <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+              <BreadcrumbSegment>
                 <span className="whitespace-normal rounded px-1 py-0">
                   {subject.name}
                 </span>
-              </span>
+              </BreadcrumbSegment>
             )}
-            <span className="inline-flex min-w-0 items-center gap-x-0.5 gap-y-0">
-              <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+            <BreadcrumbSegment>
               <Link
                 to={`${baseRoute}/${resource.id}`}
                 state={detailNavState}
@@ -392,43 +390,41 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
               >
                 {resource.title}
               </Link>
-            </span>
-            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+            </BreadcrumbSegment>
+            <BreadcrumbSep />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
         ) : (
           <>
             <Link to="/semesters" className="shrink-0 rounded px-1 py-0 hover:text-primary">Semester</Link>
             {semester && (
-              <span className="inline-flex min-w-0 items-center gap-x-0.5 gap-y-0">
-                <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+              <BreadcrumbSegment>
                 <Link
                   to={`/semesters/${semester.id}`}
                   className="rounded px-1 py-0 hover:text-primary"
                 >
                   {semester.name}
                 </Link>
-              </span>
+              </BreadcrumbSegment>
             )}
             {subject && (
-              <span className="inline-flex min-w-0 items-center gap-x-0.5 gap-y-0">
-                <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+              <BreadcrumbSegment>
                 <Link
                   to={`/subjects/${subject.id}`}
                   className="whitespace-normal rounded px-1 py-0 hover:text-primary"
                 >
                   {subject.name}
                 </Link>
-              </span>
+              </BreadcrumbSegment>
             )}
-            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+            <BreadcrumbSep />
             <Link
               to={`${baseRoute}/${resource.id}`}
               className="min-w-0 whitespace-normal rounded px-1 py-0 hover:text-primary"
             >
               {resource.title}
             </Link>
-            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
+            <BreadcrumbSep />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
         )

@@ -1,37 +1,12 @@
-import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
-import {
-  Bookmark, ChevronLeft, ChevronRight, Download, FileWarning, Loader2, Search,
-  Maximize2, Minus, Plus,
-} from "lucide-react";
-import { IconButton } from "../common/IconButton";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useToast } from "../../state/ToastProvider";
 import { cx, clamp } from "../../lib/utils";
 import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
-
-// PDF-only zoom steps, shared by the [-] % [+] buttons and the mobile
-// two-finger pinch gesture (single pdfZoom source of truth). Applied to the
-// PDF page render width inside PdfCanvas — the header, counter, and shell
-// are never scaled. Desktop default stays 100% (unchanged appearance);
-// mobile opens zoomed out for a comfortably framed fit-width view.
-const ZOOM_LEVELS = [0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5];
-const DEFAULT_ZOOM_INDEX = 4; // 100%
-// Mobile-only render reference: on a mobile viewport the 100% UI zoom state
-// renders at the existing 40% scale (100% UI -> 0.4 render). Desktop uses 1.
-const MOBILE_RENDER_REFERENCE = 0.4;
-// Mobile-only pinch ceiling (UI units): the 0.4 reference caps the shared
-// 250% bound at exactly the viewport width, so zoomed content could never
-// overflow/pan on mobile. Pinch may continue to 400% UI (1.6x viewport) so
-// the same viewport-expansion behavior engages there. Desktop bound,
-// button steps, and the 60% floor are unchanged.
-const MOBILE_PINCH_MAX_ZOOM = 4.0;
-
-function isMobileViewport(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(max-width: 767px)").matches
-  );
-}
+import { MOBILE_PINCH_MAX_ZOOM, ZOOM_LEVELS, isMobileViewport, useReaderZoom } from "./useReaderZoom";
+import { ReaderControlRegion, ReaderToolbarDesktop, ReaderToolbarMobile } from "./ReaderToolbar";
+import { ReaderBreadcrumb } from "./ReaderBreadcrumb";
+import { ReaderSearchBar } from "./ReaderSearchBar";
+import { ReaderErrorState, ReaderLoadingState } from "./ReaderDocStates";
 
 interface PdfViewerProps {
   resource: { id: string; title: string; pageCount: number };
@@ -81,12 +56,12 @@ export function PdfViewer({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [pdfZoom, setPdfZoom] = useState(ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]);
-  // UI zoom state stays platform-independent (100% = 1.0 everywhere); only
-  // the render mapping below is mobile-adjusted. Captured once at mount.
-  const [zoomReference] = useState(() =>
-    isMobileViewport() ? MOBILE_RENDER_REFERENCE : 1,
-  );
+  // Single zoom source of truth (UI units); render mapping stays
+  // platform-specific via zoomReference. See useReaderZoom.
+  const {
+    pdfZoom, zoomReference, zoomIn, zoomOut,
+    handlePinchZoom, zoomLabel, canZoomIn, canZoomOut,
+  } = useReaderZoom();
   const programmaticScrollRef = useRef(false);
 
   useEffect(() => {
@@ -114,46 +89,22 @@ export function PdfViewer({
     onPageChange?.(p, totalPages);
   }, [onPageChange, totalPages]);
 
-  const stepZoom = useCallback((dir: 1 | -1) => {
-    setPdfZoom((z) => {
-      const top = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
-      // A mobile pinch may leave zoom above the top button step: stepping
-      // out from there lands on the top step instead of skipping past it.
-      // Stepping in stays clamped (the [+] button already disables there).
-      // Desktop zoom never exceeds the top step, so this is a no-op there.
-      if (z > top) return dir === 1 ? z : top;
-      let best = 0;
-      for (let i = 0; i < ZOOM_LEVELS.length; i++) {
-        if (Math.abs(ZOOM_LEVELS[i] - z) < Math.abs(ZOOM_LEVELS[best] - z)) best = i;
-      }
-      return ZOOM_LEVELS[clamp(best + dir, 0, ZOOM_LEVELS.length - 1)];
-    });
+  // Stable toolbar callbacks: the desktop + mobile toolbars share one
+  // memoized prop bundle so no new closures are created per render.
+  const handlePrevPage = useCallback(() => {
+    goToPage(page - 1);
+  }, [goToPage, page]);
+  const handleNextPage = useCallback(() => {
+    goToPage(page + 1);
+  }, [goToPage, page]);
+  const handleToggleSearch = useCallback(() => {
+    setSearchOpen((s) => !s);
   }, []);
-  const zoomIn = useCallback(() => stepZoom(1), [stepZoom]);
-  const zoomOut = useCallback(() => stepZoom(-1), [stepZoom]);
-  // Mobile pinch commits the exact continuous release value (clamped to
-  // 60% UI and the mobile pinch ceiling) so the PDF stays at precisely
-  // the size the user left it — never snapped to button steps. Desktop
-  // pinch keeps the previous nearest-step commit unchanged. The [-] % [+]
-  // buttons use stepZoom above and are untouched. One stable pdfZoom
-  // source of truth.
-  const handlePinchZoom = useCallback((z: number) => {
-    if (isMobileViewport()) {
-      const clamped = clamp(z, ZOOM_LEVELS[0], MOBILE_PINCH_MAX_ZOOM);
-      setPdfZoom((prev) => (prev === clamped ? prev : clamped));
-      return;
-    }
-    setPdfZoom(() => {
-      let best = 0;
-      for (let i = 0; i < ZOOM_LEVELS.length; i++) {
-        if (Math.abs(ZOOM_LEVELS[i] - z) < Math.abs(ZOOM_LEVELS[best] - z)) best = i;
-      }
-      return ZOOM_LEVELS[best];
-    });
-  }, []);
-  const zoomLabel = `${Math.round(pdfZoom * 100)}%`;
+  const handleBookmarkPage = useCallback(() => {
+    onBookmark?.(page);
+  }, [onBookmark, page]);
 
-  const handleFullscreen = () => {
+  const handleFullscreen = useCallback(() => {
     try {
       if (document.fullscreenElement) {
         const pending = document.exitFullscreen();
@@ -167,7 +118,7 @@ export function PdfViewer({
     } catch {
       setIsFullscreen(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const sync = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -175,7 +126,47 @@ export function PdfViewer({
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
 
+  const handleSearchSubmit = useCallback(() => {
+    toast(searchQuery ? `Search: "${searchQuery}" (available in Phase 6)` : "Enter a search term", "info");
+  }, [searchQuery, toast]);
+
+  const handleSearchClose = useCallback(() => {
+    setSearchQuery("");
+    setSearchOpen(false);
+  }, []);
+
   const isPage = variant === "page";
+  const toolbarCommon = useMemo(() => ({
+    title: resource.title,
+    subtitle,
+    sourceLabel,
+    page,
+    totalPages,
+    onPrevPage: handlePrevPage,
+    onNextPage: handleNextPage,
+    onDirectPage: goToPage,
+    zoomLabel,
+    onZoomIn: zoomIn,
+    onZoomOut: zoomOut,
+    canZoomIn,
+    canZoomOut,
+    searchOpen,
+    onToggleSearch: handleToggleSearch,
+    bookmarked,
+    onBookmarkPage: onBookmark ? handleBookmarkPage : undefined,
+    downloadActive,
+    onDownloadPress: onDownload,
+    isFullscreen,
+    onToggleFullscreen: handleFullscreen,
+  }), [
+    resource.title, subtitle, sourceLabel, page, totalPages,
+    handlePrevPage, handleNextPage, goToPage, zoomLabel, zoomIn, zoomOut,
+    canZoomIn, canZoomOut, searchOpen, handleToggleSearch, bookmarked,
+    onBookmark, handleBookmarkPage, downloadActive, onDownload,
+    isFullscreen, handleFullscreen,
+  ]);
+
+  const loadError = urlError ?? docError;
 
   return (
     <div
@@ -191,227 +182,42 @@ export function PdfViewer({
         className,
       )}
     >
-      <main
-        className={cx(
-          "flex-1 min-h-0 overflow-hidden",
-          isPage ? "pb-0" : "",
-        )}
-      >
+      <main className={cx("flex-1 min-h-0 overflow-hidden", isPage && "pb-0")}>
         <div className="flex flex-col h-full">
-          <header
-            className={cx(
-              // Docks directly under the sticky app header (h-16) with zero
-              // gap (mt-0). Sticky top-16 preserved. Page variant only;
-              // the embedded card keeps its own border.
-              "sticky top-16 z-30 flex-shrink-0 mt-0 flex flex-col border-t-0 pt-0",
-              isPage
-                ? "bg-surface"
-                : "bg-surface-muted/50",
-            )}
-          >
+          {/* One fixed control region: breadcrumb + toolbar (+ search)
+              docked under the app header. Only the document below scrolls. */}
+          <ReaderControlRegion variant={variant}>
             {breadcrumbs && isPage && (
-              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-x-0.5 gap-y-0 rounded-none border-0 px-3 py-0 text-[10px] md:text-xs font-medium leading-none text-muted-foreground/80 whitespace-normal">
-                {breadcrumbs}
-              </div>
+              <ReaderBreadcrumb>{breadcrumbs}</ReaderBreadcrumb>
             )}
 
-            <div className="hidden min-h-10 items-center gap-2 border-b border-border px-3 lg:px-4 md:flex">
-              {toolbarLeading}
-              <div className="min-w-0 flex-1">
-                <h1 className="truncate text-sm font-bold leading-tight text-foreground">{resource.title}</h1>
-                {(subtitle || sourceLabel) && (
-                  <p className="truncate text-xs font-medium leading-tight text-muted-foreground">
-                    {subtitle}
-                    {subtitle && sourceLabel ? " · " : null}
-                    {sourceLabel && (
-                      <span className="text-[11px] font-bold text-success">{sourceLabel}</span>
-                    )}
-                  </p>
-                )}
-              </div>
-
-              <div className="hidden items-center gap-1 md:flex">
-                <IconButton icon={ChevronLeft} label="Previous page" variant="bar" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
-                <div className="flex h-9 items-center gap-1 rounded-lg border border-border-strong bg-surface-muted px-2">
-                  <input
-                    type="number"
-                    value={page}
-                    min={1}
-                    max={totalPages}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      if (v >= 1 && v <= totalPages) goToPage(v);
-                    }}
-                    aria-label="Page number"
-                    className="w-12 bg-transparent text-center text-sm font-semibold text-foreground focus:outline-none"
-                  />
-                  <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">/ {totalPages}</span>
-                </div>
-                <IconButton icon={ChevronRight} label="Next page" variant="bar" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
-              </div>
-
-              <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border-strong bg-surface-muted px-1" role="group" aria-label="PDF zoom">
-                <IconButton icon={Minus} label="Zoom out PDF" variant="bar" size="sm" onClick={zoomOut} disabled={pdfZoom <= ZOOM_LEVELS[0]} />
-                <span className="min-w-10 text-center text-xs font-bold tabular-nums text-foreground" aria-live="polite">{zoomLabel}</span>
-                <IconButton icon={Plus} label="Zoom in PDF" variant="bar" size="sm" onClick={zoomIn} disabled={pdfZoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]} />
-              </div>
-
-              <IconButton
-                icon={Search}
-                label={searchOpen ? "Close search" : "Search in document"}
-                variant={searchOpen ? "active" : "bar"}
-                onClick={() => setSearchOpen((s) => !s)}
-              />
-
-              {onBookmark && (
-                <IconButton
-                  icon={Bookmark}
-                  label="Bookmark current page"
-                  variant={bookmarked ? "bookmark" : "bar"}
-                  filled={bookmarked}
-                  onClick={() => onBookmark?.(page)}
-                />
-              )}
-              {onDownload && (
-                <IconButton
-                  icon={Download}
-                  label="Download resource"
-                  variant={downloadActive ? "active" : "bar"}
-                  onClick={onDownload}
-                />
-              )}
-              <IconButton
-                icon={Maximize2}
-                label={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
-                variant={isFullscreen ? 'active' : 'bar'}
-                onClick={handleFullscreen}
-              />
-            </div>
-
-            <div className="flex md:hidden items-center gap-2 border-0 px-3 py-1">
-              {toolbarLeading}
-              <div className="min-w-0 flex-1">
-                <h1 className="truncate text-sm font-bold leading-tight text-foreground">{resource.title}</h1>
-                {(subtitle || sourceLabel) && (
-                  <p className="truncate text-[11px] font-medium leading-tight text-muted-foreground">
-                    {subtitle}
-                    {subtitle && sourceLabel ? " · " : null}
-                    {sourceLabel && (
-                      <span className="text-[10px] font-bold text-success">{sourceLabel}</span>
-                    )}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex md:hidden items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
-              <div className="flex items-center gap-1 rounded-md bg-surface-muted px-1.5">
-                <IconButton icon={ChevronLeft} label="Previous page" variant="bar" size="sm" onClick={() => goToPage(page - 1)} disabled={page <= 1} />
-                <div className="flex h-7 items-center gap-0.5">
-                  <span className="text-xs font-bold text-foreground">{page}</span>
-                  <span className="text-[10px] font-medium text-muted-foreground">/ {totalPages}</span>
-                </div>
-                <IconButton icon={ChevronRight} label="Next page" variant="bar" size="sm" onClick={() => goToPage(page + 1)} disabled={page >= totalPages} />
-              </div>
-              <div className="flex items-center gap-0.5 rounded-md bg-surface-muted px-1" role="group" aria-label="PDF zoom">
-                <IconButton icon={Minus} label="Zoom out PDF" variant="bar" size="sm" onClick={zoomOut} disabled={pdfZoom <= ZOOM_LEVELS[0]} />
-                <span className="min-w-10 text-center text-[11px] font-bold tabular-nums text-foreground" aria-live="polite">{zoomLabel}</span>
-                <IconButton icon={Plus} label="Zoom in PDF" variant="bar" size="sm" onClick={zoomIn} disabled={pdfZoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]} />
-              </div>
-              <IconButton
-                icon={Search}
-                label={searchOpen ? "Close search" : "Search in document"}
-                variant={searchOpen ? "active" : "bar"}
-                size="sm"
-                onClick={() => setSearchOpen((s) => !s)}
-              />
-              {onBookmark && (
-                <IconButton
-                  icon={Bookmark}
-                  label="Bookmark"
-                  variant={bookmarked ? "bookmark" : "bar"}
-                  filled={bookmarked}
-                  size="sm"
-                  onClick={() => onBookmark?.(page)}
-                />
-              )}
-              {onDownload && (
-                <IconButton
-                  icon={Download}
-                  label="Download"
-                  variant={downloadActive ? "active" : "bar"}
-                  size="sm"
-                  onClick={onDownload}
-                />
-              )}
-              <IconButton
-                icon={Maximize2}
-                label={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
-                variant={isFullscreen ? 'active' : 'bar'}
-                size="sm"
-                onClick={handleFullscreen}
-              />
-            </div>
+            <ReaderToolbarDesktop toolbarLeading={toolbarLeading} {...toolbarCommon} />
+            <ReaderToolbarMobile toolbarLeading={toolbarLeading} {...toolbarCommon} />
 
             {searchOpen && (
-              <div
-                className="border-b border-border px-3 py-1"
-              >
-                <form
-                  className="mx-auto flex max-w-xl items-center gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    toast(searchQuery ? `Search: "${searchQuery}" (available in Phase 6)` : "Enter a search term", "info");
-                  }}
-                >
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search in document..."
-                    aria-label="Search in document"
-                    className="h-9 w-full rounded-lg border border-border-strong bg-surface-muted px-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => { setSearchQuery(""); setSearchOpen(false); }}
-                      className="shrink-0 rounded-lg p-1 text-muted-foreground hover:text-foreground"
-                      aria-label="Close search"
-                    >
-                      <Search className="size-4" />
-                    </button>
-                  )}
-                </form>
-              </div>
+              <ReaderSearchBar
+                query={searchQuery}
+                onQueryChange={setSearchQuery}
+                onSubmit={handleSearchSubmit}
+                onClose={handleSearchClose}
+              />
             )}
-          </header>
+          </ReaderControlRegion>
 
           <div className="flex-1 min-h-0 overflow-hidden bg-background">
-            {urlError || docError ? (
-              <div className="flex min-h-64 flex-col items-center justify-center gap-2 p-8 text-center">
-                <FileWarning className="size-8 text-muted-foreground" aria-hidden="true" />
-                <p className="text-sm font-bold text-foreground">Couldn't open this PDF</p>
-                <p className="max-w-sm text-xs font-medium text-muted-foreground">{urlError ?? docError}</p>
-                {onRetryFile && (
-                  <button
-                    type="button"
-                    onClick={onRetryFile}
-                    className="mt-1 rounded-lg bg-primary-muted px-3.5 py-2 text-xs font-bold text-primary transition-colors hover:bg-primary-muted-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  >
-                    Try again
-                  </button>
-                )}
-              </div>
+            {loadError ? (
+              <ReaderErrorState message={loadError} onRetry={onRetryFile} />
             ) : urlLoading || !fileUrl ? (
-              <div className="flex min-h-64 flex-col items-center justify-center gap-3 p-8" role="status" aria-label="Loading PDF">
-                <Loader2 className="size-7 animate-spin text-primary" aria-hidden="true" />
-                <p className="text-xs font-semibold text-muted-foreground">
-                  {urlLoading ? "Requesting secure access…" : "Loading PDF…"}
-                </p>
-              </div>
+              <ReaderLoadingState
+                message={urlLoading ? "Requesting secure access…" : "Loading PDF…"}
+              />
             ) : (
-              <div className="mx-auto w-full px-3 pb-2 pt-0 h-full md:px-2">
+              // Full-width document lane: at 100% the page stays centered
+              // at its natural A4 size; beyond 100% PdfCanvas spans the
+              // zoomed width so the document expands toward the viewport
+              // edges and pans in both axes instead of sitting in a small
+              // inner frame.
+              <div className="w-full px-2 pb-2 pt-0 h-full">
                 <PdfCanvas
                   url={fileUrl}
                   page={page}
