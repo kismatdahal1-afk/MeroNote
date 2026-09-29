@@ -183,13 +183,10 @@ export function PdfViewer({
       className={cx(
         "reader-bar mt-0 flex flex-col overflow-hidden border-0 pt-0",
         isPage
-          // Fill exactly the viewport below the sticky app header (h-16)
-          // so the window never scrolls on reader routes: the PDF header
-          // above stays pinned and only the PDF area scrolls internally.
-          // Root uses bg-surface (same as the header stack) so any
-          // subpixel seam at the app-header boundary paints header-color,
-          // never page-bg cream/black. The PDF content area below keeps
-          // its own bg-background.
+          // Exact viewport below the app header (h-16): window never
+          // scrolls, only the PDF area does. Root bg-surface (same as the
+          // header stack) hides any subpixel seam; content keeps its own
+          // bg-background below.
           ? "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface"
           : "card-glow overflow-hidden rounded-xl border border-border bg-surface shadow-card",
         className,
@@ -204,17 +201,10 @@ export function PdfViewer({
         <div className="flex flex-col h-full">
           <header
             className={cx(
-              // Stick below the sticky app header (h-16): if the window
-              // itself ever scrolls (e.g. mobile URL-bar viewport shifts),
-              // the PDF header docks attached under the app header instead
-              // of sliding beneath it. Has no effect while the window is
-              // unscrolled — the PDF area scrolls internally.
-              // -mt-px seals the boundary: the header overlaps the app
-              // header's bottom edge by 1px so device-pixel rounding can
-              // never open a hairline crack between the two headers.
-              // Opaque bg-surface (no blur/translucency) so the seam never
-              // blends into a visible bg-color line. Page variant only;
-              // the embedded card keeps its own border.
+              // Docks under the sticky app header (h-16); -mt-px overlaps
+              // the app header edge by 1px so no hairline seam can appear.
+              // Opaque bg-surface keeps the seam invisible. Page variant
+              // only; the embedded card keeps its own border.
               "sticky top-16 z-30 flex-shrink-0 mt-0 flex flex-col border-t-0 pt-0",
               isPage ? "-mt-px" : "",
               isPage
@@ -223,24 +213,23 @@ export function PdfViewer({
             )}
           >
             {breadcrumbs && isPage && (
-              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-x-0.5 gap-y-0 rounded-none border-0 px-3 py-0 pt-0 text-[10px] md:text-xs font-medium leading-none text-muted-foreground/80 whitespace-normal">
+              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-x-0.5 gap-y-0 rounded-none border-0 px-3 py-0 text-[10px] md:text-xs font-medium leading-none text-muted-foreground/80 whitespace-normal">
                 {breadcrumbs}
               </div>
             )}
 
-            <div
-              className={cx(
-                "hidden items-center gap-2 border-b border-border px-3 lg:px-4",
-                "min-h-12 py-1",
-                "md:flex",
-              )}
-            >
+            <div className="hidden min-h-10 items-center gap-2 border-b border-border px-3 lg:px-4 md:flex">
               {toolbarLeading}
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-sm font-bold leading-tight text-foreground">{resource.title}</h1>
-                {subtitle && <p className="truncate text-xs font-medium leading-tight text-muted-foreground">{subtitle}</p>}
-                {sourceLabel && (
-                  <p className="mt-0 truncate text-[11px] font-bold leading-tight text-success">{sourceLabel}</p>
+                {(subtitle || sourceLabel) && (
+                  <p className="truncate text-xs font-medium leading-tight text-muted-foreground">
+                    {subtitle}
+                    {subtitle && sourceLabel ? " · " : null}
+                    {sourceLabel && (
+                      <span className="text-[11px] font-bold text-success">{sourceLabel}</span>
+                    )}
+                  </p>
                 )}
               </div>
 
@@ -305,10 +294,15 @@ export function PdfViewer({
             <div className="flex md:hidden items-center gap-2 border-0 px-3 py-1">
               {toolbarLeading}
               <div className="min-w-0 flex-1">
-                <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
-                {subtitle && <p className="truncate text-[11px] font-medium text-muted-foreground">{subtitle}</p>}
-                {sourceLabel && (
-                  <p className="truncate text-[10px] font-bold text-success">{sourceLabel}</p>
+                <h1 className="truncate text-sm font-bold leading-tight text-foreground">{resource.title}</h1>
+                {(subtitle || sourceLabel) && (
+                  <p className="truncate text-[11px] font-medium leading-tight text-muted-foreground">
+                    {subtitle}
+                    {subtitle && sourceLabel ? " · " : null}
+                    {sourceLabel && (
+                      <span className="text-[10px] font-bold text-success">{sourceLabel}</span>
+                    )}
+                  </p>
                 )}
               </div>
             </div>
@@ -364,7 +358,7 @@ export function PdfViewer({
 
             {searchOpen && (
               <div
-                className="border-b border-border px-3 py-2"
+                className="border-b border-border px-3 py-1"
               >
                 <form
                   className="mx-auto flex max-w-xl items-center gap-2"
