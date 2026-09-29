@@ -184,12 +184,9 @@ export function PdfViewer({
         "reader-bar mt-0 flex flex-col overflow-hidden border-0 pt-0",
         isPage
           // Exact viewport below the app header (h-16): window never
-          // scrolls, only the PDF area does. Root bg-surface (same as the
-          // header stack) hides any subpixel seam; content keeps its own
-          // bg-background below. -mt-px overlaps the app header's bottom
-          // edge by 1px so the background starts exactly at the header
-          // with zero visible gap.
-          ? "-mt-px h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface"
+          // scrolls, only the PDF area does. mt-0 attaches the viewer
+          // directly at the header's bottom edge with zero gap.
+          ? "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface"
           : "card-glow overflow-hidden rounded-xl border border-border bg-surface shadow-card",
         className,
       )}
@@ -203,12 +200,10 @@ export function PdfViewer({
         <div className="flex flex-col h-full">
           <header
             className={cx(
-              // Docks under the sticky app header (h-16); -mt-px overlaps
-              // the app header edge by 1px so no hairline seam can appear.
-              // Opaque bg-surface keeps the seam invisible. Page variant
-              // only; the embedded card keeps its own border.
+              // Docks directly under the sticky app header (h-16) with zero
+              // gap (mt-0). Sticky top-16 preserved. Page variant only;
+              // the embedded card keeps its own border.
               "sticky top-16 z-30 flex-shrink-0 mt-0 flex flex-col border-t-0 pt-0",
-              isPage ? "-mt-px" : "",
               isPage
                 ? "bg-surface"
                 : "bg-surface-muted/50",
