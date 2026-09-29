@@ -223,7 +223,7 @@ export function PdfViewer({
             )}
           >
             {breadcrumbs && isPage && (
-              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-0.5 rounded-none border-b border-border px-3 py-0 pt-0 text-[10px] md:text-xs font-medium leading-tight text-muted-foreground/80 whitespace-normal">
+              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-x-0.5 gap-y-0 rounded-none border-b border-border px-3 py-0 pt-0 text-[10px] md:text-xs font-medium leading-none text-muted-foreground/80 whitespace-normal">
                 {breadcrumbs}
               </div>
             )}

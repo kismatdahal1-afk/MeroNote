@@ -341,7 +341,7 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
         admin ? (
           <>
             <Link to="/admin" className="rounded px-1 py-0 hover:text-primary">Admin</Link>
-            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
             {adminEntry === "drafts" ? (
               <Link to="/admin/drafts" className="rounded px-1 py-0 hover:text-primary">Draft</Link>
             ) : adminEntry === "semesters" ? (
@@ -355,13 +355,13 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             )}
             {adminEntry === "semesters" && semester && (
               <>
-                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+                <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
                 <span className="max-w-[10rem] truncate rounded px-1 py-0">
                   {semester.name}
                 </span>
               </>
             )}
-            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
             <Link
               to={`${baseRoute}/${resource.id}`}
               state={detailState}
@@ -369,22 +369,22 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
             >
               {resource.title}
             </Link>
-            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
         ) : entryRoot ? (
           <>
             <Link to={entryRoot.to} className="shrink-0 rounded px-1 py-0 hover:text-primary">{entryRoot.label}</Link>
             {showsSubjectInResourceTrail(entry, fromSubject, resource.subjectId) && subject && (
-              <span className="inline-flex min-w-0 items-center gap-0.5">
-                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+              <span className="inline-flex min-w-0 items-center gap-x-0.5 gap-y-0">
+                <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
                 <span className="whitespace-normal rounded px-1 py-0">
                   {subject.name}
                 </span>
               </span>
             )}
-            <span className="inline-flex min-w-0 items-center gap-0.5">
-              <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <span className="inline-flex min-w-0 items-center gap-x-0.5 gap-y-0">
+              <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
               <Link
                 to={`${baseRoute}/${resource.id}`}
                 state={detailNavState}
@@ -393,15 +393,15 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
                 {resource.title}
               </Link>
             </span>
-            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
         ) : (
           <>
             <Link to="/semesters" className="shrink-0 rounded px-1 py-0 hover:text-primary">Semester</Link>
             {semester && (
-              <span className="inline-flex min-w-0 items-center gap-0.5">
-                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+              <span className="inline-flex min-w-0 items-center gap-x-0.5 gap-y-0">
+                <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
                 <Link
                   to={`/semesters/${semester.id}`}
                   className="rounded px-1 py-0 hover:text-primary"
@@ -411,8 +411,8 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
               </span>
             )}
             {subject && (
-              <span className="inline-flex min-w-0 items-center gap-0.5">
-                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+              <span className="inline-flex min-w-0 items-center gap-x-0.5 gap-y-0">
+                <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
                 <Link
                   to={`/subjects/${subject.id}`}
                   className="whitespace-normal rounded px-1 py-0 hover:text-primary"
@@ -421,14 +421,14 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
                 </Link>
               </span>
             )}
-            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
             <Link
               to={`${baseRoute}/${resource.id}`}
               className="min-w-0 whitespace-normal rounded px-1 py-0 hover:text-primary"
             >
               {resource.title}
             </Link>
-            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <ChevronRight className="size-[10px] md:size-3 shrink-0" aria-hidden="true" />
             <span aria-current="page" className="font-semibold text-foreground/80">PDF</span>
           </>
         )
