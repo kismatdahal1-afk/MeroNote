@@ -186,8 +186,10 @@ export function PdfViewer({
           // Exact viewport below the app header (h-16): window never
           // scrolls, only the PDF area does. Root bg-surface (same as the
           // header stack) hides any subpixel seam; content keeps its own
-          // bg-background below.
-          ? "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface"
+          // bg-background below. -mt-px overlaps the app header's bottom
+          // edge by 1px so the background starts exactly at the header
+          // with zero visible gap.
+          ? "-mt-px h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface"
           : "card-glow overflow-hidden rounded-xl border border-border bg-surface shadow-card",
         className,
       )}
