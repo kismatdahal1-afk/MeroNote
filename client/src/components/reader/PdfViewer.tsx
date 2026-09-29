@@ -223,7 +223,7 @@ export function PdfViewer({
             )}
           >
             {breadcrumbs && isPage && (
-              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-x-0.5 gap-y-0 rounded-none border-b border-border px-3 py-0 pt-0 text-[10px] md:text-xs font-medium leading-none text-muted-foreground/80 whitespace-normal">
+              <div className="mt-0 flex min-h-0 flex-wrap items-center gap-x-0.5 gap-y-0 rounded-none border-0 px-3 py-0 pt-0 text-[10px] md:text-xs font-medium leading-none text-muted-foreground/80 whitespace-normal">
                 {breadcrumbs}
               </div>
             )}
@@ -302,7 +302,7 @@ export function PdfViewer({
               />
             </div>
 
-            <div className="flex md:hidden items-center gap-2 border-b border-border px-3 py-2">
+            <div className="flex md:hidden items-center gap-2 border-0 px-3 py-2">
               {toolbarLeading}
               <div className="min-w-0 flex-1">
                 <h1 className="truncate text-sm font-bold text-foreground">{resource.title}</h1>
@@ -364,7 +364,7 @@ export function PdfViewer({
 
             {searchOpen && (
               <div
-                className="border-b border-border bg-surface/95 px-3 py-2 backdrop-blur-sm"
+                className="border-b border-border px-3 py-2"
               >
                 <form
                   className="mx-auto flex max-w-xl items-center gap-2"
