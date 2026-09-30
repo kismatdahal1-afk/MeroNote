@@ -61,7 +61,7 @@ export function AuthLayout() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-[73.5rem]">
-        <div className="card-glow grid w-full grid-cols-1 overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-card),0_0_48px_-8px_rgba(0,0,0,0.22)] md:grid-cols-[minmax(0,60fr)_minmax(360px,40fr)] md:min-h-[665px]">
+        <div className="card-glow grid w-full grid-cols-1 overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-card),0_0_80px_-12px_rgba(0,0,0,0.38)] dark:shadow-[var(--shadow-card),0_0_80px_-12px_rgba(255,255,255,0.22)] md:grid-cols-[minmax(0,60fr)_minmax(360px,40fr)] md:min-h-[665px]">
           {/* LEFT — fixed-height illustration section: locked to 665px on
               desktop so Login ↔ Sign Up (or error text) can never resize it */}
           <div className="flex h-56 min-w-0 items-stretch justify-center overflow-hidden sm:h-72 md:h-[665px]">
