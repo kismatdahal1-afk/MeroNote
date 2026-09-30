@@ -46,12 +46,14 @@ export function AuthFormFallback() {
 }
 
 /**
- * Persistent centered 16:9 authentication card shell (UI-only).
+ * Persistent centered authentication card shell (UI-only).
  * No auth logic, no API calls — purely presentational. Mounted once above the
- * /login and /register routes, so the illustration section keeps identical
- * dimensions/appearance and never remounts (no blink) when switching between
- * Login and Sign Up — only the Outlet form content swaps, with a subtle
- * entrance transition. Follows the app theme via tokens.
+ * /login and /register routes: 60% locked-height illustration section with a
+ * top-anchored copy overlay | 40% auth panel. The illustration never remounts
+ * and its box never resizes (no blink) when switching between Login and
+ * Sign Up — only the Outlet form content swaps, with a subtle entrance
+ * transition. Follows the app theme via tokens, with pinned light-mode tones
+ * for the overlay copy and a theme-split card aura.
  */
 export function AuthLayout() {
   const { toast } = useToast();
@@ -61,10 +63,10 @@ export function AuthLayout() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-[73.5rem]">
-        <div className="card-glow grid w-full grid-cols-1 overflow-hidden rounded-2xl border border-border bg-surface shadow-[var(--shadow-card),0_0_80px_-12px_rgba(0,0,0,0.38)] dark:shadow-[var(--shadow-card),0_0_80px_-12px_rgba(255,255,255,0.22)] md:grid-cols-[minmax(0,60fr)_minmax(360px,40fr)] md:min-h-[665px]">
+        <div className="card-glow grid w-full grid-cols-1 overflow-hidden rounded-2xl border border-border bg-surface dark:border-white/20 shadow-[var(--shadow-card),0_0_80px_-12px_rgba(0,0,0,0.38)] dark:shadow-[var(--shadow-card),0_0_80px_-12px_rgba(255,255,255,0.22)] md:grid-cols-[minmax(0,60fr)_minmax(360px,40fr)] md:min-h-[665px]">
           {/* LEFT — fixed-height illustration section: locked to 665px on
               desktop so Login ↔ Sign Up (or error text) can never resize it */}
-          <div className="flex h-56 min-w-0 items-stretch justify-center overflow-hidden sm:h-72 md:h-[665px]">
+          <div className="relative flex h-56 min-w-0 items-stretch justify-center overflow-hidden sm:h-72 md:h-[665px]">
             <img
               src={ILLUSTRATION_SRC}
               alt=""
@@ -73,6 +75,51 @@ export function AuthLayout() {
               decoding="async"
               className="block h-full w-full object-cover object-left"
             />
+            <div className="absolute inset-x-0 top-0 px-6 pt-4 sm:px-8 sm:pt-8 md:px-10">
+              <div key={mode} className="animate-fade-up motion-reduce:animate-none">
+                {mode === "login" ? (
+                  <>
+                    <p className="text-xs font-bold tracking-[0.18em] text-[#5b3df5] sm:text-sm">
+                      WELCOME BACK TO MERONOTE
+                    </p>
+                    <p className="mt-2 hidden text-balance text-2xl font-bold leading-snug tracking-tight text-[#0f172a] sm:block sm:text-3xl">
+                      Your CSIT resources, all in one place.
+                    </p>
+                    <p className="mt-1 text-balance text-xl font-bold leading-snug tracking-tight text-[#0f172a] sm:hidden">
+                      CSIT resources, all in one place.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold tracking-[0.18em] text-[#5b3df5] sm:text-sm">
+                      WELCOME TO MERONOTE
+                    </p>
+                    <p className="mt-2 hidden text-balance text-2xl font-bold leading-snug tracking-tight text-[#0f172a] sm:block sm:text-3xl">
+                      Start your CSIT learning journey.
+                    </p>
+                    <p className="mt-1 text-balance text-xl font-bold leading-snug tracking-tight text-[#0f172a] sm:hidden">
+                      Start learning with MeroNote.
+                    </p>
+                  </>
+                )}
+              </div>
+              {/* No transition on the lines below: copy swaps instantly (or is
+                  identical) when changing pages. Full versions double as the
+                  laptop layout; short justified versions show on mobile only */}
+              <p className="mt-2 hidden max-w-lg text-pretty text-sm leading-relaxed text-[#64748b] sm:block sm:text-base">
+                {mode === "login"
+                  ? "Access your subjects, notes, books, and study resources and continue your learning journey with MeroNote."
+                  : "Create your account and keep your subjects, notes, books, and study resources organized in one place."}
+              </p>
+              <p className="mt-1 max-w-lg text-justify text-xs leading-relaxed text-[#64748b] sm:hidden">
+                {mode === "login"
+                  ? "Continue learning with MeroNote."
+                  : "Create your account and organize your study resources."}
+              </p>
+              <p className="mt-3 hidden text-xs font-semibold tracking-wide text-[#64748b] sm:block sm:text-sm">
+                Subjects • Notes • Books • Resources
+              </p>
+            </div>
           </div>
 
           {/* RIGHT — auth content; only this swaps on Login ↔ Sign Up.
