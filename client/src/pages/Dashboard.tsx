@@ -150,7 +150,7 @@ export default function Dashboard() {
         {/* Waving character illustration — pinned right, overlaps the gap
             below the header without affecting the text flow. */}
         <img
-          src="/images/higesture.png"
+          src="https://res.cloudinary.com/gcnv50p7/image/upload/v1790770518/higesture.png"
           alt=""
           aria-hidden="true"
           className="pointer-events-none absolute -top-4 right-0 h-[9.45rem] w-auto select-none object-contain drop-shadow-md sm:top-0 sm:h-[12.5rem] lg:right-12 lg:h-[15.25rem]"

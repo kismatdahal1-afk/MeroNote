@@ -15,9 +15,9 @@ import { useEffect, useRef, useState } from "react";
  * genuine cursor move. Single state (`hoveredId`), one timer.
  */
 
-const DASHBOARD_SRC = "/images/Dashboard.png";
-const SEMESTER_SRC = "/images/Semester.png";
-const NOTE_SRC = "/images/note.png";
+const DASHBOARD_SRC = "https://res.cloudinary.com/gcnv50p7/image/upload/v1790770517/Dashboard.png";
+const SEMESTER_SRC = "https://res.cloudinary.com/gcnv50p7/image/upload/v1790770519/Semester.png";
+const NOTE_SRC = "https://res.cloudinary.com/gcnv50p7/image/upload/v1790770519/note.png";
 
 type ImageId = "dashboard" | "semester" | "note";
 type Slot = "front" | "left" | "right";

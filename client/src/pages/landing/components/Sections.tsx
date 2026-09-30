@@ -823,17 +823,17 @@ function PhoneShot({ src, alt, width, height }: { src: string; alt: string; widt
 /** Showcase slots: side phones tilt from a planted baseline behind the vertical center phone. */
 const PHONE_SLOTS = [
   {
-    src: "/images/phone3.jpeg",
+    src: "https://res.cloudinary.com/gcnv50p7/image/upload/v1790770518/phone3.jpg",
     alt: "Mero Note study resources on a phone",
     slot: "relative z-10 -mr-8 w-32 shrink-0 origin-bottom -rotate-[9deg] sm:-mr-10 sm:w-40 lg:w-48",
   },
   {
-    src: "/images/phone1.jpeg",
+    src: "https://res.cloudinary.com/gcnv50p7/image/upload/v1790770519/phone1.jpg",
     alt: "Mero Note resource library on a phone",
     slot: "relative z-20 w-36 shrink-0 sm:w-44 lg:w-52",
   },
   {
-    src: "/images/phone2.jpeg",
+    src: "https://res.cloudinary.com/gcnv50p7/image/upload/v1790770519/phone2.jpg",
     alt: "Mero Note study progress on a phone",
     slot: "relative z-10 -ml-8 w-32 shrink-0 origin-bottom rotate-[9deg] sm:-ml-10 sm:w-40 lg:w-48",
   },
