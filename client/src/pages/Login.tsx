@@ -1,9 +1,9 @@
 ﻿import { useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../state/ToastProvider";
 import { useUser } from "../state/UserProvider";
 import { AuthError } from "../lib/authApi";
+import { AuthField, AuthFormError, AuthSubmit, PasswordField } from "../components/auth/AuthFields";
 
 function homeForRole(role: "USER" | "ADMIN"): string {
   return role === "ADMIN" ? "/admin" : "/dashboard";
@@ -46,118 +46,61 @@ export default function Login() {
   };
 
   return (
-    <div className="bg-hero-gradient flex min-h-screen items-center justify-center px-4 py-10">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <img
-            src="/icon/icon.png"
-            alt="Mero Note"
-            width={48}
-            height={48}
-            className="size-12 shrink-0 rounded-2xl object-cover shadow-md"
-          />
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-foreground">
-            Welcome back
-          </h1>
-          <p className="mt-1.5 text-sm font-medium text-muted-foreground">
-            Log in to your Mero Note library
-          </p>
-        </div>
-
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-          className="card-glow space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-card"
-        >
-          <div className="space-y-1.5">
-            <label htmlFor="login-email" className="block text-sm font-semibold text-foreground">
-              Email
-            </label>
-            <input
-              id="login-email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="h-10 w-full rounded-lg border border-border-strong bg-surface-muted px-3.5 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label htmlFor="login-password" className="block text-sm font-semibold text-foreground">
-              Password
-            </label>
-            <div className="relative">
-              <input
-                id="login-password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="h-10 w-full rounded-lg border border-border-strong bg-surface-muted px-3.5 pr-11 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                aria-pressed={showPassword}
-                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-              >
-                {showPassword ? <EyeOff className="size-4.5" aria-hidden="true" /> : <Eye className="size-4.5" aria-hidden="true" />}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-                className="size-4 rounded border-border-strong text-primary focus:ring-primary/25"
-              />
-              Remember me
-            </label>
-            <button
-              type="button"
-              onClick={() => toast("Password reset is coming soon", "info")}
-              className="text-sm font-semibold text-primary hover:underline"
-            >
-              Forgot password?
-            </button>
-          </div>
-
-          {error && (
-            <p role="alert" className="text-sm font-medium text-error">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy || status === "loading"}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-bold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60"
-          >
-            {busy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-            {busy ? "Logging in..." : "Log in"}
-          </button>
-
-          <p className="text-center text-sm font-medium text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link to="/register" className="font-semibold text-primary hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </form>
-
-        <p className="mt-6 text-center text-xs font-medium text-muted-foreground/70">
-          <Link to="/" className="hover:underline">
-            ← Back to welcome page
-          </Link>
+    <>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome Back</h1>
+        <p className="mt-1.5 text-sm font-medium text-muted-foreground">
+          Login to continue to your Mero Note account.
         </p>
       </div>
-    </div>
+
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
+        <AuthField
+          id="login-email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+        />
+
+        <PasswordField
+          id="login-password"
+          label="Password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••"
+          showPassword={showPassword}
+          onTogglePassword={() => setShowPassword((v) => !v)}
+        />
+
+        <div className="flex items-center justify-between">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="size-4 rounded border-border-strong text-primary focus:ring-primary/25"
+            />
+            Remember me
+          </label>
+          <button
+            type="button"
+            onClick={() => toast("Password reset is coming soon", "info")}
+            className="text-sm font-semibold text-primary hover:underline"
+          >
+            Forgot password?
+          </button>
+        </div>
+
+        <AuthFormError message={error} />
+
+        <AuthSubmit busy={busy} busyLabel="Logging in..." disabled={busy || status === "loading"}>
+          Login
+        </AuthSubmit>
+      </form>
+    </>
   );
 }

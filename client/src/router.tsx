@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { RequireAdmin, RequireAuth } from "./components/auth/RequireAuth";
+import { AuthFormFallback, AuthLayout } from "./components/auth/AuthLayout";
 import { ScrollToTop } from "./components/layout/ScrollToTop";
 import { SkeletonCards } from "./components/common/Skeleton";
 import {
@@ -97,8 +98,15 @@ export const appRoutes: RouteObject[] = [
         path: "/",
         children: [
           { index: true, element: withSuspense(<LandingPage />) },
-          { path: "login", element: withSuspense(<Login />) },
-          { path: "register", element: withSuspense(<Register />) },
+          // Auth card shell mounts once above both routes so the illustration
+          // section never remounts (no blink) when switching Login ↔ Sign Up.
+          {
+            element: <AuthLayout />,
+            children: [
+              { path: "login", element: withSuspense(<Login />, <AuthFormFallback />) },
+              { path: "register", element: withSuspense(<Register />, <AuthFormFallback />) },
+            ],
+          },
           { path: "privacy-policy", element: withSuspense(<PrivacyPolicy />) },
           { path: "terms", element: withSuspense(<Terms />) },
           { path: "copyright-policy", element: withSuspense(<CopyrightPolicy />) },
