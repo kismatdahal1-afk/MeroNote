@@ -13,6 +13,7 @@ import { useTheme } from "../state/ThemeProvider";
 import { useUser } from "../state/UserProvider";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
+import { POST_LOGOUT_ENTRY } from "../lib/site";
 import { formatFileSize, cx } from "../lib/utils";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
@@ -164,7 +165,10 @@ export default function Settings() {
     try {
       await logout();
       toast("Logged out");
-      navigate("/login");
+      // B2: always re-enter through `/` so browser guests land on the
+      // Landing page and standalone PWA guests flow to Login via
+      // LandingPage + landingEntryTarget. Never stay on a protected route.
+      navigate(POST_LOGOUT_ENTRY);
     } catch {
       toast("Could not log out. Please try again.", "error");
     } finally {

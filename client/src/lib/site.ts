@@ -43,6 +43,17 @@ export function loginWithNext(destination: string): string {
   return `/login?next=${encodeURIComponent(destination)}`;
 }
 
+/**
+ * Canonical post-logout destination (Plan B / Phase B2).
+ *
+ * Always the app entry (`/`): LandingPage + `landingEntryTarget` then
+ * resolve it — browser guests stay on the Landing page, standalone
+ * PWA guests continue to `/login`, authed users (stale) to role home.
+ * Logout call sites must use this instead of navigating to `/login`
+ * directly or staying on a protected route.
+ */
+export const POST_LOGOUT_ENTRY = "/";
+
 export type EntryAuthStatus = "loading" | "guest" | "authed";
 export type EntryRole = "USER" | "ADMIN";
 

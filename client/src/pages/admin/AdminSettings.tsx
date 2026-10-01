@@ -20,6 +20,7 @@ import { adminList } from "../../lib/adminApi";
 import { useApiQuery } from "../../hooks/useApiQuery";
 import { useToast } from "../../state/ToastProvider";
 import { useUser } from "../../state/UserProvider";
+import { POST_LOGOUT_ENTRY } from "../../lib/site";
 import type { NoticeType, NoticePriority, Resource, Notice } from "../../types";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -245,7 +246,9 @@ export default function AdminSettings() {
     try {
       await logout();
       toast("Logged out");
-      navigate("/login");
+      // B2: re-enter through `/` (see POST_LOGOUT_ENTRY) — never stay on a
+      // protected route or hard-code `/login` for the browser case.
+      navigate(POST_LOGOUT_ENTRY);
     } catch {
       toast("Could not log out. Please try again.", "error");
     } finally {
