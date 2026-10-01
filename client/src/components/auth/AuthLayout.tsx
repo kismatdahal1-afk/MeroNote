@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { useToast } from "../../state/ToastProvider";
+import { googleOAuthUrl } from "../../lib/googleAuth";
 
 const ILLUSTRATION_SRC =
   "https://res.cloudinary.com/gcnv50p7/image/upload/v1790789711/object.png";
@@ -46,9 +47,11 @@ export function AuthFormFallback() {
 }
 
 /**
- * Persistent centered authentication card shell (UI-only).
- * No auth logic, no API calls — purely presentational. Mounted once above the
- * /login and /register routes: 60% locked-height illustration section with a
+ * Persistent centered authentication card shell.
+ * Presentational layout only — no session logic, no API calls. The Google
+ * button below simply navigates to the backend OAuth entry; all identity,
+ * session, and error decisions stay server-side (see lib/googleAuth.ts).
+ * Mounted once above the /login and /register routes: 60% locked-height illustration section with a
  * top-anchored copy overlay | 40% auth panel. The illustration never remounts
  * and its box never resizes (no blink) when switching between Login and
  * Sign Up — only the Outlet form content swaps, with a subtle entrance
@@ -56,9 +59,18 @@ export function AuthFormFallback() {
  * for the overlay copy and a theme-split card aura.
  */
 export function AuthLayout() {
-  const { toast } = useToast();
   const { pathname } = useLocation();
   const mode: AuthMode = pathname.startsWith("/register") ? "signup" : "login";
+  // Guards rapid re-clicks; the page unloads once navigation begins.
+  const [redirecting, setRedirecting] = useState(false);
+
+  const startGoogle = () => {
+    if (redirecting) return;
+    setRedirecting(true);
+    // Top-level navigation (not fetch): the backend sets the OAuth state
+    // cookie and redirects on to Google from there.
+    window.location.assign(googleOAuthUrl());
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
@@ -139,8 +151,9 @@ export function AuthLayout() {
 
               <button
                 type="button"
-                onClick={() => toast("Google sign-in is coming soon", "info")}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                onClick={startGoogle}
+                disabled={redirecting}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <GoogleMark />
                 {mode === "login" ? "Continue with Google" : "Sign up with Google"}

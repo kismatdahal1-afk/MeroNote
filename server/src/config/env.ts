@@ -27,4 +27,10 @@ export const env = {
   b2BucketName: process.env.B2_BUCKET_NAME || "",
   // Maximum accepted PDF size in bytes (default 100 MB).
   maxPdfBytes: Number(process.env.MAX_PDF_BYTES) || 100 * 1024 * 1024,
+  // Step 3: Google OAuth (backend-redirect flow). Secret stays server-side —
+  // never expose via VITE_* frontend config. Empty until the deploy
+  // environment provides values; Google routes validate when implemented.
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  googleCallbackUrl: process.env.GOOGLE_CALLBACK_URL || "",
 };

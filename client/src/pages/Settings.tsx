@@ -14,6 +14,7 @@ import { useUser } from "../state/UserProvider";
 import { useLibrary } from "../state/LibraryProvider";
 import { useToast } from "../state/ToastProvider";
 import { POST_LOGOUT_ENTRY } from "../lib/site";
+import { UserAvatar } from "../components/common/UserAvatar";
 import { formatFileSize, cx } from "../lib/utils";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
@@ -107,7 +108,7 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
-  const { name, email, role, setName, logout } = useUser();
+  const { name, email, role, setName, logout, user } = useUser();
   const { totalDownloadSize, downloads } = useLibrary();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -182,12 +183,6 @@ export default function Settings() {
     { value: "system", label: "System", icon: Monitor },
   ];
 
-  const initials = name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("");
-
   return (
     <div>
       <PageHeader title="Settings" subtitle="Preferences for your Mero Note experience." />
@@ -196,12 +191,7 @@ export default function Settings() {
         {/* Profile — top, prominent */}
         <Card className="bg-hero-gradient p-6 sm:p-8">
           <div className="flex flex-row items-center gap-4 sm:gap-6">
-            <span
-              aria-hidden="true"
-              className="flex size-20 shrink-0 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground shadow-card sm:size-24 sm:text-3xl"
-            >
-              {initials}
-            </span>
+            <UserAvatar name={name} imageUrl={user?.profileImageUrl} size="lg" />
             <div className="min-w-0 flex-1 text-left">
               <div className="flex flex-wrap items-center justify-start gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">

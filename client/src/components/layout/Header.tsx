@@ -5,6 +5,7 @@ import { useUser } from "../../state/UserProvider";
 import { HeaderSearch } from "../common/SearchBar";
 import { IconButton } from "../common/IconButton";
 import { OfflineBadge } from "../common/OfflineBadge";
+import { UserAvatar } from "../common/UserAvatar";
 
 export function BrandMark({ subtitle = false }: { subtitle?: boolean }) {
   const { role } = useUser();
@@ -46,9 +47,8 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { resolvedTheme, toggleTheme } = useTheme();
-  const { name, role } = useUser();
+  const { name, role, user } = useUser();
   const { pathname } = useLocation();
-  const initials = name.split(" ").map((p) => p[0]).slice(0, 2).join("");
   // Same portal detection as BrandMark/SidebarNav: inside /admin stay in
   // Admin (Admin Settings), everywhere else go to Student Settings.
   const settingsPath = role === "ADMIN" && pathname.startsWith("/admin") ? "/admin/settings" : "/settings";
@@ -82,9 +82,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           aria-label={`Account: ${name}`}
         >
-          <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-            {initials}
-          </span>
+          <UserAvatar name={name} imageUrl={user?.profileImageUrl} size="sm" />
           <span className="hidden text-sm font-semibold text-foreground lg:block">
             {name}
           </span>

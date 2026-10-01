@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../state/ToastProvider";
 import { useUser } from "../state/UserProvider";
 import { AuthError } from "../lib/authApi";
+import { googleErrorMessage } from "../lib/googleAuth";
 import { AuthField, AuthFormError, AuthSubmit, PasswordField } from "../components/auth/AuthFields";
 
 const REMEMBERED_EMAIL_KEY = "meronote_remembered_email";
@@ -20,7 +21,7 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { status, user, login } = useUser();
 
   useEffect(() => {
@@ -34,6 +35,19 @@ export default function Login() {
     } catch {
       // Storage unavailable — keep defaults (empty email, unchecked).
     }
+  }, []);
+
+  // Consume a backend Google OAuth `?error=` redirect exactly once: show it
+  // in the existing form-error UI, then drop only that param (replace, so no
+  // extra history entry; other params like `next` are preserved). Unknown
+  // codes are ignored silently. StrictMode-safe: the rerun sees no param.
+  useEffect(() => {
+    const message = googleErrorMessage(searchParams.get("error"));
+    if (!message) return;
+    setError(message);
+    const cleaned = new URLSearchParams(searchParams);
+    cleaned.delete("error");
+    setSearchParams(cleaned, { replace: true });
   }, []);
 
   if (status === "authed" && user) {

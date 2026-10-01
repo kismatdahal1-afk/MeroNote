@@ -18,6 +18,15 @@ import {
   revokeUserRefreshFamilies,
 } from "./refresh";
 import { clearCsrfCookie, issueCsrfToken } from "./csrf";
+import {
+  buildGoogleAuthUrl,
+  clearOAuthState,
+  exchangeGoogleCode,
+  googleOAuthEnabled,
+  issueOAuthState,
+  readOAuthState,
+  verifyGoogleIdentity,
+} from "./google";
 import { env } from "../config/env";
 
 /**
@@ -47,10 +56,24 @@ interface SafeUser {
   name: string;
   email: string;
   role: "USER" | "ADMIN";
+  /** Google profile image URL when the account has one; omitted otherwise. */
+  profileImageUrl?: string;
 }
 
-function toSafeUser(user: { _id: unknown; name: string; email: string; role: "USER" | "ADMIN" }): SafeUser {
-  return { id: String(user._id), name: user.name, email: user.email, role: user.role };
+function toSafeUser(user: {
+  _id: unknown;
+  name: string;
+  email: string;
+  role: "USER" | "ADMIN";
+  profileImageUrl?: string;
+}): SafeUser {
+  return {
+    id: String(user._id),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    ...(user.profileImageUrl ? { profileImageUrl: user.profileImageUrl } : {}),
+  };
 }
 
 function setSessionCookie(res: Response, userId: string, role: "USER" | "ADMIN", version: number): void {
@@ -92,6 +115,29 @@ async function attachRefreshFamily(
 ): Promise<void> {
   const { raw, expiresAt } = await issueRefreshToken({ userId, familyId: newRefreshFamilyId(), sessionVersion, lifetimeDays });
   setRefreshCookie(res, raw, expiresAt);
+}
+
+/**
+ * Issue the full MeroNote session after identity is proven (Step 4: shared
+ * by password login/register and Google OAuth callback).
+ *
+ * Performs the existing session creation work in the existing order:
+ * short-lived access JWT cookie + fresh CSRF token + fresh refresh family.
+ * Throws on refresh-storage failure; callers map that to 500 without
+ * claiming success (the access session stays usable on retry).
+ */
+export async function issueSession(
+  res: Response,
+  userId: string,
+  role: "USER" | "ADMIN",
+  sessionVersion: number,
+  lifetimeDays: number,
+): Promise<void> {
+  // F1: stamp the current session epoch into the access JWT.
+  setSessionCookie(res, userId, role, sessionVersion);
+  // Fresh CSRF token per session (rotates any pre-login value).
+  issueCsrfToken(res);
+  await attachRefreshFamily(res, userId, sessionVersion, lifetimeDays);
 }
 
 function readString(body: unknown, field: string): string {
@@ -148,14 +194,11 @@ export async function register(req: Request, res: Response): Promise<void> {
   }
 
   // F1: stamp the current session epoch into the access JWT.
-  setSessionCookie(res, String(user._id), "USER", user.sessionVersion ?? 0);
-  // Fresh CSRF token per session (rotates any pre-login value).
-  issueCsrfToken(res);
   // Registration has no remember-me UI: default refresh lifetime. A storage
   // failure here must not hang (unwrapped async handler) nor claim success:
   // the access session stays usable and a later refresh attempt re-reports.
   try {
-    await attachRefreshFamily(res, String(user._id), user.sessionVersion ?? 0, env.jwtExpiresDays);
+    await issueSession(res, String(user._id), "USER", user.sessionVersion ?? 0, env.jwtExpiresDays);
   } catch {
     res.status(500).json({ status: "error", message: "Internal server error." });
     return;
@@ -178,19 +221,18 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 
   const user = await User.findOne({ email }).select("+passwordHash").exec();
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+  // Step 3: passwordHash is optional (Google-only accounts have none) — a
+  // Google account on the password path fails cleanly with generic 401.
+  if (!user || !(await verifyPassword(password, user.passwordHash ?? ""))) {
     fail();
     return;
   }
 
   // F1: stamp the current session epoch into the access JWT.
-  setSessionCookie(res, String(user._id), user.role, user.sessionVersion ?? 0);
-  // Fresh CSRF token per session (rotates any pre-login value).
-  issueCsrfToken(res);
   // Long-lived duration lives here: normal login 7d, remember-me 30d. Same
   // hang/success honesty as register above on storage failure.
   try {
-    await attachRefreshFamily(res, String(user._id), user.sessionVersion ?? 0, remember ? rememberMeDays() : env.jwtExpiresDays);
+    await issueSession(res, String(user._id), user.role, user.sessionVersion ?? 0, remember ? rememberMeDays() : env.jwtExpiresDays);
   } catch {
     res.status(500).json({ status: "error", message: "Internal server error." });
     return;
@@ -374,4 +416,160 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
     return;
   }
   res.json({ status: "ok", data: toSafeUser(user) });
+}
+
+/**
+ * Google OAuth (Step 4: backend authorization-code flow).
+ *
+ * Google only proves identity. Afterwards the SAME MeroNote session is
+ * issued via `issueSession` — no parallel session system, no Google token
+ * stored/logged/returned. Frontend wiring belongs to a later step.
+ */
+
+/** Allowlisted failure codes for the `?error=` login redirect (no open redirect). */
+const GOOGLE_FAILURE_CODES = [
+  "google_denied",
+  "google_failed",
+  "google_invalid_state",
+  "google_unverified_email",
+  "google_email_registered",
+  "google_conflict",
+] as const;
+
+type GoogleFailureCode = (typeof GOOGLE_FAILURE_CODES)[number];
+
+function frontendBase(): string {
+  return env.clientUrl.replace(/\/+$/, "");
+}
+
+function googleFail(res: Response, code: GoogleFailureCode): void {
+  res.redirect(302, `${frontendBase()}/login?error=${code}`);
+}
+
+function googlePicture(value: string | undefined): string | undefined {
+  if (!value || value.length > 2048) return undefined;
+  try {
+    if (new URL(value).protocol !== "https:") return undefined;
+  } catch {
+    return undefined;
+  }
+  return value;
+}
+
+/**
+ * GET /api/auth/google — start the OAuth flow (public).
+ *
+ * Validates configuration, binds a fresh single-use state to this browser
+ * via cookie, and redirects to Google. Requests only openid/email/profile.
+ */
+export function googleAuth(_req: Request, res: Response): void {
+  if (!googleOAuthEnabled()) {
+    res.status(503).json({ status: "error", message: "Google sign-in is not available right now." });
+    return;
+  }
+  const state = issueOAuthState(res);
+  res.redirect(302, buildGoogleAuthUrl(state));
+}
+
+/**
+ * GET /api/auth/google/callback — finish the OAuth flow (public, no
+ * requireAuth/requireCsrf: Google redirects here cross-site without any
+ * MeroNote credential, and the single-use state cookie is the CSRF proof).
+ */
+export async function googleCallback(req: Request, res: Response): Promise<void> {
+  const denied = typeof req.query.error === "string" && req.query.error ? req.query.error : "";
+  if (denied) {
+    // User denied access (or Google refused): state is spent, never reused.
+    clearOAuthState(res);
+    googleFail(res, "google_denied");
+    return;
+  }
+
+  const code = typeof req.query.code === "string" ? req.query.code : "";
+  const state = typeof req.query.state === "string" ? req.query.state : "";
+  const stored = readOAuthState(req);
+  // Single-use: consume before anything else, so a replay finds no state.
+  clearOAuthState(res);
+  if (!code || !state || !stored || state !== stored) {
+    googleFail(res, "google_invalid_state");
+    return;
+  }
+
+  let identity;
+  try {
+    identity = await verifyGoogleIdentity(await exchangeGoogleCode(code));
+  } catch {
+    googleFail(res, "google_failed");
+    return;
+  }
+
+  const email = identity.email.trim().toLowerCase();
+  if (!identity.emailVerified || !EMAIL_PATTERN.test(email) || email.length > 254) {
+    googleFail(res, "google_unverified_email");
+    return;
+  }
+
+  // Case A — stable Google identity already known: authenticate, no duplicate.
+  const byGoogleId = await User.findOne({ googleId: identity.sub }).exec();
+  if (byGoogleId) {
+    try {
+      await issueSession(res, String(byGoogleId._id), byGoogleId.role, byGoogleId.sessionVersion ?? 0, env.jwtExpiresDays);
+    } catch {
+      res.status(500).json({ status: "error", message: "Internal server error." });
+      return;
+    }
+    res.redirect(302, `${frontendBase()}/`);
+    return;
+  }
+
+  const byEmail = await User.findOne({ email }).exec();
+  if (byEmail) {
+    // Case C — password account: never link/convert. Case D — Google account
+    // with a different sub: never reassign the ID. Reject, account untouched.
+    googleFail(res, byEmail.googleId ? "google_conflict" : "google_email_registered");
+    return;
+  }
+
+  // Case B — new Google user: one normal MeroNote document, no password.
+  const fallbackName = email.split("@")[0] ?? "";
+  const name = (identity.name.trim() || fallbackName || "Student").slice(0, 80);
+  const picture = googlePicture(identity.picture);
+  let user;
+  try {
+    user = await User.create({
+      name,
+      email,
+      authProvider: "google",
+      googleId: identity.sub,
+      ...(picture ? { profileImageUrl: picture } : {}),
+      role: "USER",
+    });
+  } catch (err) {
+    if ((err as { code?: number }).code === 11000) {
+      // Lost a creation race (same sub or same email): re-resolve by the
+      // stable Google identity instead of creating a duplicate.
+      const raced = await User.findOne({ googleId: identity.sub }).exec();
+      if (raced && raced.email === email) {
+        try {
+          await issueSession(res, String(raced._id), raced.role, raced.sessionVersion ?? 0, env.jwtExpiresDays);
+        } catch {
+          res.status(500).json({ status: "error", message: "Internal server error." });
+          return;
+        }
+        res.redirect(302, `${frontendBase()}/`);
+        return;
+      }
+      googleFail(res, "google_conflict");
+      return;
+    }
+    throw err;
+  }
+
+  try {
+    await issueSession(res, String(user._id), user.role, user.sessionVersion ?? 0, env.jwtExpiresDays);
+  } catch {
+    res.status(500).json({ status: "error", message: "Internal server error." });
+    return;
+  }
+  res.redirect(302, `${frontendBase()}/`);
 }

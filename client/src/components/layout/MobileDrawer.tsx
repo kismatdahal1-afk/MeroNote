@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { useUser } from "../../state/UserProvider";
 import { SidebarNav } from "./Sidebar";
 import { IconButton } from "../common/IconButton";
+import { UserAvatar } from "../common/UserAvatar";
 
 interface MobileDrawerProps {
   open: boolean;
@@ -9,8 +10,7 @@ interface MobileDrawerProps {
 }
 
 export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
-  const { name, email } = useUser();
-  const initials = name.split(" ").map((p) => p[0]).slice(0, 2).join("");
+  const { name, email, user } = useUser();
 
   if (!open) return null;
 
@@ -24,9 +24,7 @@ export function MobileDrawer({ open, onClose }: MobileDrawerProps) {
       <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col border-r border-border bg-surface shadow-xl dark:border-[#20242B] dark:bg-[#0D1015]">
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-              {initials}
-            </span>
+            <UserAvatar name={name} imageUrl={user?.profileImageUrl} size="md" />
             <div className="flex flex-col">
               <span className="text-sm font-bold text-foreground">
                 {name}

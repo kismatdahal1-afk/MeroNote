@@ -1,5 +1,5 @@
 import { Schema, model, type Document, type Types } from "mongoose";
-import { USER_ROLES } from "./enums";
+import { AUTH_PROVIDERS, USER_ROLES } from "./enums";
 
 export interface ISemesterPref {
   semesterId: Types.ObjectId;
@@ -10,7 +10,14 @@ export interface ISemesterPref {
 export interface IUser extends Document {
   name: string;
   email: string;
-  passwordHash: string;
+  /** password = password-based account; google = Google-authenticated account. */
+  authProvider: (typeof AUTH_PROVIDERS)[number];
+  /** Absent for Google-only accounts (never fake, never an OAuth token). */
+  passwordHash?: string;
+  /** Google stable subject/sub. Absent for password accounts — never null. */
+  googleId?: string;
+  /** Google profile image URL when available. Absent when unknown. */
+  profileImageUrl?: string;
   role: (typeof USER_ROLES)[number];
   semesterPrefs: ISemesterPref[];
   /** F1 session epoch: bumped atomically on logout; JWT.v must match it. */
@@ -41,7 +48,16 @@ const userSchema = new Schema<IUser>(
       match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     },
     // Never returned by default (Phase 4 auth will select it explicitly).
-    passwordHash: { type: String, required: true, select: false },
+    // Optional: Google-only accounts have no password (never fake it).
+    passwordHash: { type: String, required: false, select: false },
+    // Step 3: single-collection auth provider. Legacy documents without this
+    // field are interpreted as the password-provider case — no migration.
+    authProvider: { type: String, required: false, enum: AUTH_PROVIDERS, default: "password" },
+    // Google stable subject/sub. Sparse unique: many password users coexist
+    // without an ID while each Google identity stays unique. No null default.
+    googleId: { type: String, required: false, unique: true, sparse: true },
+    // External profile-image URL only (reference string; no binary stored).
+    profileImageUrl: { type: String, required: false, trim: true, maxlength: 2048 },
     role: { type: String, required: true, enum: USER_ROLES, default: "USER" },
     semesterPrefs: {
       type: [semesterPrefSchema],

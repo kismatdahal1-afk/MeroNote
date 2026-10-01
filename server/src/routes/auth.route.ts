@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { getCsrfToken, login, logout, me, refresh, register, updateProfile } from "../auth/auth.controller";
+import { getCsrfToken, googleAuth, googleCallback, login, logout, me, refresh, register, updateProfile } from "../auth/auth.controller";
 import { requireAdmin, requireAuth } from "../auth/auth.middleware";
 import { requireCsrf } from "../auth/csrf";
-import { loginLimiter, refreshLimiter, registerLimiter } from "../auth/rateLimit";
+import { googleLimiter, loginLimiter, refreshLimiter, registerLimiter } from "../auth/rateLimit";
 import { asyncHandler } from "../lib/api";
 
 const router = Router();
@@ -13,6 +13,11 @@ const router = Router();
 router.get("/csrf", getCsrfToken);
 router.post("/register", registerLimiter, register);
 router.post("/login", loginLimiter, login);
+// Step 4: backend Google OAuth (public authorization-code flow). The callback
+// is a cross-site GET from Google carrying its own single-use state proof,
+// so it stays exempt from requireAuth/requireCsrf like login/register.
+router.get("/google", googleLimiter, googleAuth);
+router.get("/google/callback", googleLimiter, asyncHandler(googleCallback));
 router.post("/logout", requireCsrf, logout);
 // F4 refresh rotation: opaque HttpOnly cookie in, fresh access + child refresh
 // out. CSRF-guarded like every cookie-authenticated mutation (its own rate

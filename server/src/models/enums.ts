@@ -46,6 +46,9 @@ export const SUBJECT_CATEGORIES = ["core", "elective", "practical"] as const;
 
 export const USER_ROLES = ["USER", "ADMIN"] as const;
 
+/** How a MeroNote user authenticates (Step 3: single users collection). */
+export const AUTH_PROVIDERS = ["password", "google"] as const;
+
 /** User-specific semester plan status (Phase 16). Mirrors the existing
  *  frontend SemesterUserStatus terminology: upcoming | ongoing | passed. */
 export const SEMESTER_USER_STATUSES = ["upcoming", "ongoing", "passed"] as const;

@@ -21,6 +21,7 @@ import { useApiQuery } from "../../hooks/useApiQuery";
 import { useToast } from "../../state/ToastProvider";
 import { useUser } from "../../state/UserProvider";
 import { POST_LOGOUT_ENTRY } from "../../lib/site";
+import { UserAvatar } from "../../components/common/UserAvatar";
 import type { NoticeType, NoticePriority, Resource, Notice } from "../../types";
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -160,7 +161,7 @@ function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function AdminSettings() {
   const { toast } = useToast();
-  const { name, email, role, setName, logout } = useUser();
+  const { name, email, role, setName, logout, user } = useUser();
   const navigate = useNavigate();
   const [settings, setSettings] = useState<LocalSettings>(loadSettings);
   const [pendingReset, setPendingReset] = useState(false);
@@ -199,12 +200,6 @@ export default function AdminSettings() {
   };
 
   const s = settings;
-
-  const initials = name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("");
 
   const openEdit = () => {
     setDraftName(name);
@@ -267,12 +262,7 @@ export default function AdminSettings() {
         {/* Profile — identical structure to Student Settings, admin identity */}
         <Card className="bg-hero-gradient p-6 sm:p-8">
           <div className="flex flex-row items-center gap-4 sm:gap-6">
-            <span
-              aria-hidden="true"
-              className="flex size-20 shrink-0 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground shadow-card sm:size-24 sm:text-3xl"
-            >
-              {initials}
-            </span>
+            <UserAvatar name={name} imageUrl={user?.profileImageUrl} size="lg" />
             <div className="min-w-0 flex-1 text-left">
               <div className="flex flex-wrap items-center justify-start gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">

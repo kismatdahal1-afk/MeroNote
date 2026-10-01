@@ -17,6 +17,8 @@ export interface AuthUser {
   name: string;
   email: string;
   role: "USER" | "ADMIN";
+  /** Google profile image URL when the account has one; absent otherwise. */
+  profileImageUrl?: string;
 }
 
 export class AuthError extends Error {
