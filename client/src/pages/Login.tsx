@@ -1,9 +1,11 @@
-﻿import { useState, type FormEvent } from "react";
+﻿import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../state/ToastProvider";
 import { useUser } from "../state/UserProvider";
 import { AuthError } from "../lib/authApi";
 import { AuthField, AuthFormError, AuthSubmit, PasswordField } from "../components/auth/AuthFields";
+
+const REMEMBERED_EMAIL_KEY = "meronote_remembered_email";
 
 function homeForRole(role: "USER" | "ADMIN"): string {
   return role === "ADMIN" ? "/admin" : "/dashboard";
@@ -21,6 +23,19 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const { status, user, login } = useUser();
 
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(REMEMBERED_EMAIL_KEY);
+      const trimmed = stored?.trim() ?? "";
+      if (trimmed) {
+        setEmail(trimmed);
+        setRemember(true);
+      }
+    } catch {
+      // Storage unavailable — keep defaults (empty email, unchecked).
+    }
+  }, []);
+
   if (status === "authed" && user) {
     return <Navigate to={homeForRole(user.role)} replace />;
   }
@@ -35,6 +50,15 @@ export default function Login() {
     setBusy(true);
     try {
       const authed = await login(email.trim(), password, remember);
+      try {
+        if (remember) {
+          window.localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim());
+        } else {
+          window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+        }
+      } catch {
+        // Storage unavailable — login already succeeded, so ignore.
+      }
       toast(`Welcome back, ${authed.name}`);
       const next = searchParams.get("next");
       navigate(next && next.startsWith("/") ? next : homeForRole(authed.role));
