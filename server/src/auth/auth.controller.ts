@@ -330,15 +330,15 @@ export async function logout(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  if (claims) {
-    // F1: kill every access JWT of this user. A DB failure must not pretend
-    // success while the old tokens stay valid — no cookie is cleared.
-    try {
-      await User.updateOne({ _id: claims.sub }, { $inc: { sessionVersion: 1 } }).exec();
-    } catch {
-      res.status(500).json({ status: "error", message: "Internal server error." });
-      return;
-    }
+  // F1: kill every access JWT of this user on every device — including ones
+  // issued before this request's access JWT expired (owner resolved via the
+  // refresh record above). A DB failure must not pretend success while old
+  // tokens stay valid — no cookie is cleared.
+  try {
+    await User.updateOne({ _id: userId }, { $inc: { sessionVersion: 1 } }).exec();
+  } catch {
+    res.status(500).json({ status: "error", message: "Internal server error." });
+    return;
   }
 
   // F4: kill every refresh family of this user. Same failure safety: a live

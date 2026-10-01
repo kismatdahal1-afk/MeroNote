@@ -18,6 +18,16 @@ export function initialsOf(name: string): string {
     .join("");
 }
 
+/**
+ * Totally blank values and non-HTTPS schemes never reach `<img>`: the
+ * backend stores only verified HTTPS picture URLs, and this mirrors that
+ * contract for any legacy/manual document value.
+ */
+export function avatarSrc(imageUrl?: string): string {
+  const src = imageUrl?.trim() ?? "";
+  return /^https:\/\//i.test(src) ? src : "";
+}
+
 type AvatarSize = "sm" | "md" | "lg";
 
 /** Exact circle geometry previously inlined at each usage site. */
@@ -37,7 +47,7 @@ interface UserAvatarProps {
 
 export function UserAvatar({ name, imageUrl, size = "md" }: UserAvatarProps) {
   const [failed, setFailed] = useState(false);
-  const src = imageUrl?.trim() ?? "";
+  const src = avatarSrc(imageUrl);
   if (!src || failed) {
     return (
       <span

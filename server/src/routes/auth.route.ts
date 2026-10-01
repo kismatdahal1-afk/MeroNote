@@ -11,19 +11,19 @@ const router = Router();
 // readable CSRF cookie. Register/login stay exempt (no victim session
 // exists pre-authentication); logout is CSRF-guarded (bumps sessionVersion).
 router.get("/csrf", getCsrfToken);
-router.post("/register", registerLimiter, register);
-router.post("/login", loginLimiter, login);
+router.post("/register", registerLimiter, asyncHandler(register));
+router.post("/login", loginLimiter, asyncHandler(login));
 // Step 4: backend Google OAuth (public authorization-code flow). The callback
 // is a cross-site GET from Google carrying its own single-use state proof,
 // so it stays exempt from requireAuth/requireCsrf like login/register.
 router.get("/google", googleLimiter, googleAuth);
 router.get("/google/callback", googleLimiter, asyncHandler(googleCallback));
-router.post("/logout", requireCsrf, logout);
+router.post("/logout", requireCsrf, asyncHandler(logout));
 // F4 refresh rotation: opaque HttpOnly cookie in, fresh access + child refresh
 // out. CSRF-guarded like every cookie-authenticated mutation (its own rate
 // budget; never triggers a session refresh cycle itself).
-router.post("/refresh", refreshLimiter, requireCsrf, refresh);
-router.get("/me", requireAuth, me);
+router.post("/refresh", refreshLimiter, requireCsrf, asyncHandler(refresh));
+router.get("/me", requireAuth, asyncHandler(me));
 // Edit Profile: name only (email immutable, ignored even if sent).
 router.patch("/me", requireAuth, requireCsrf, asyncHandler(updateProfile));
 
