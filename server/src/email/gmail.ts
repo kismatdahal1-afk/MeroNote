@@ -135,7 +135,7 @@ function registrationOtpHtml(otp: string): string {
     "<title>Your MeroNote verification code</title>",
     "</head>",
     '<body style="margin:0;padding:0;background-color:#080a0d;">',
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#080a0d;">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#080a0d;border-radius:5%;overflow:hidden;">',
     "<tr>",
     '<td align="center" style="padding:32px 16px;">',
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">',

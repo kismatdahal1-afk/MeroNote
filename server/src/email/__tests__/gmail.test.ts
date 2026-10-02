@@ -140,6 +140,8 @@ describe("Gmail API provider", () => {
     expect(mime).toContain("background-color:#080a0d");
     expect(mime).toContain("color:#5b3df5");
     expect(mime).toContain("color:#f1f5f9");
+    // Background section carries the subtle 5% corner curve (no new card).
+    expect(mime.match(/border-radius:5%/g) ?? []).toHaveLength(1);
     // Layer 2: exactly one bordered content box — the OTP rectangle.
     expect(mime.match(/border:1px solid #252c36/g) ?? []).toHaveLength(1);
     expect(mime).toContain("background-color:#1b212b");
