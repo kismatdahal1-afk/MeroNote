@@ -133,28 +133,28 @@ describe("Gmail API provider", () => {
     expect(encodeMimeMessage(mime)).toMatch(/^[A-Za-z0-9-_]+$/);
   });
 
-  it("renders two layers only: bright background plus one OTP rectangle", async () => {
+  it("renders two layers only: dark background plus one OTP rectangle", async () => {
     await sendRegistrationOtpEmail({ to: "user@example.com", otp: "123456" });
     const mime = decodeRaw(sentRaw());
-    // Layer 1: full MeroNote bright (light-mode) background, brand purple.
-    expect(mime).toContain("background-color:#efe9e0");
+    // Layer 1: full MeroNote dark (soft-black) background, brand purple.
+    expect(mime).toContain("background-color:#080a0d");
     expect(mime).toContain("color:#5b3df5");
-    expect(mime).toContain("color:#0f172a");
+    expect(mime).toContain("color:#f1f5f9");
     // Layer 2: exactly one bordered content box — the OTP rectangle.
-    expect(mime.match(/border:1px solid #ddd2bd/g) ?? []).toHaveLength(1);
-    expect(mime).toContain("background-color:#fffdf8");
+    expect(mime.match(/border:1px solid #252c36/g) ?? []).toHaveLength(1);
+    expect(mime).toContain("background-color:#1b212b");
     // Header row: official app icon top-left (45px), brand text centered.
     const htmlPart = mime.slice(mime.indexOf("Content-Type: text/html"));
     expect(htmlPart).toContain('<img src="https://meronote.vercel.app/icon/icon-192.png" alt="MeroNote"');
     expect(htmlPart).toContain('width="45" height="45"');
     expect(htmlPart.indexOf("icon-192.png")).toBeLessThan(htmlPart.indexOf("Verify Your Email"));
-    // OTP digits are dark and prominent inside that rectangle.
-    expect(mime).toContain("color:#0f172a");
+    // OTP digits are white and prominent inside that rectangle.
+    expect(mime).toContain("color:#ffffff");
     expect(mime).toContain("font-size:32px");
-    // No dark-theme leftovers and no external resources beyond the icon.
-    expect(mime).not.toContain("#080a0d");
-    expect(mime).not.toContain("#1b212b");
-    expect(mime).not.toContain("color:#ffffff");
+    // No bright-theme leftovers and a single external resource (the icon).
+    expect(mime).not.toContain("#efe9e0");
+    expect(mime).not.toContain("#fffdf8");
+    expect(mime).not.toContain("#0f172a");
     expect(mime).not.toContain("http://");
     expect(mime.match(/https:\/\//g) ?? []).toHaveLength(1);
   });
