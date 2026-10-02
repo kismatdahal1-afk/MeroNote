@@ -1,7 +1,7 @@
 /**
  * Step 3 initiate/resend endpoint tests (isolated in-memory MongoDB).
  *
- * The Resend provider boundary is mocked (`vi.mock`); no real emails are
+ * The Gmail provider boundary is mocked (`vi.mock`); no real emails are
  * sent and no production data is touched. Covers pending creation, the
  * existing-user stop, cooldown, the 5-sends/10-minutes per-email budget,
  * fail-closed provider handling (no slot consumed on failure), concurrency,
@@ -16,9 +16,9 @@ import { PendingRegistration } from "../../models/pendingRegistration.model";
 import { User } from "../../models/user.model";
 import { consumePendingOtp, hashOtp } from "../otp";
 import { initiateRegistration, resendRegistrationOtp } from "../auth.controller";
-import { sendRegistrationOtpEmail } from "../../email/resend";
+import { sendRegistrationOtpEmail } from "../../email/gmail";
 
-vi.mock("../../email/resend", () => ({ sendRegistrationOtpEmail: vi.fn() }));
+vi.mock("../../email/gmail", () => ({ sendRegistrationOtpEmail: vi.fn() }));
 
 const mockedSend = sendRegistrationOtpEmail as unknown as ReturnType<typeof vi.fn>;
 

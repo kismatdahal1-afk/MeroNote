@@ -29,7 +29,7 @@ import {
   pendingExpiryFrom,
   resendAvailableFrom,
 } from "./otp";
-import { sendRegistrationOtpEmail } from "../email/resend";
+import { sendRegistrationOtpEmail } from "../email/gmail";
 import { clearCsrfCookie, issueCsrfToken } from "./csrf";
 import {
   buildGoogleAuthUrl,
@@ -640,7 +640,7 @@ function sendWindowStart(now: Date): Date {
   return new Date(now.getTime() - OTP_SEND_WINDOW_SECONDS * 1000);
 }
 
-/** Pre-rotation pending state for rollback when Resend fails. */
+/** Pre-rotation pending state for rollback when the email send fails. */
 interface PendingOtpSnapshot {
   name: string;
   passwordHash: string;
@@ -749,7 +749,7 @@ async function rotatePendingOtp(
 }
 
 /**
- * Restore the pre-rotation OTP state after a Resend failure, so a failed
+ * Restore the pre-rotation OTP state after a send failure, so a failed
  * send consumes no slot and the previous OTP stays usable. Conditional on
  * our hash still being current — if another rotation landed meanwhile, the
  * newer state (from a later attempt) is left alone.

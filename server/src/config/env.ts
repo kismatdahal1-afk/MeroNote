@@ -33,9 +33,12 @@ export const env = {
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   googleCallbackUrl: process.env.GOOGLE_CALLBACK_URL || "",
-  // Step 3: Resend OTP email (registration verification). Backend-only —
-  // never expose via VITE_* frontend config. Empty until the deploy
-  // environment provides values; the provider fails closed when missing.
-  resendApiKey: process.env.RESEND_API_KEY || "",
-  otpFromEmail: process.env.OTP_FROM_EMAIL || "",
+  // Gmail SMTP OAuth2 for OTP email delivery (replaces Resend). All four
+  // are backend-only — never expose via VITE_* frontend config. Empty until
+  // the deploy environment provides values; the provider fails closed and
+  // validates lazily at send time, so MongoDB boot never depends on Gmail.
+  gmailUser: process.env.GMAIL_USER || "",
+  gmailOAuthClientId: process.env.GMAIL_OAUTH_CLIENT_ID || "",
+  gmailOAuthClientSecret: process.env.GMAIL_OAUTH_CLIENT_SECRET || "",
+  gmailOAuthRefreshToken: process.env.GMAIL_OAUTH_REFRESH_TOKEN || "",
 };

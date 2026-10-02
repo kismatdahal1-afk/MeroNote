@@ -1,7 +1,7 @@
 /**
  * Step 4 verify endpoint tests (isolated in-memory MongoDB).
  *
- * The Resend provider boundary is mocked; no real emails are sent and no
+ * The Gmail provider boundary is mocked; no real emails are sent and no
  * production data is touched. Covers validation, pending states, the OTP
  * matrix (including the confirmed 429-on-exhausted contract and concurrent
  * single-winner verification), User creation races, verbatim password-hash
@@ -18,9 +18,9 @@ import { User } from "../../models/user.model";
 import { env } from "../../config/env";
 import * as refreshModule from "../refresh";
 import { initiateRegistration, login, resendRegistrationOtp, verifyRegistration } from "../auth.controller";
-import { sendRegistrationOtpEmail } from "../../email/resend";
+import { sendRegistrationOtpEmail } from "../../email/gmail";
 
-vi.mock("../../email/resend", () => ({ sendRegistrationOtpEmail: vi.fn() }));
+vi.mock("../../email/gmail", () => ({ sendRegistrationOtpEmail: vi.fn() }));
 
 const mockedSend = sendRegistrationOtpEmail as unknown as ReturnType<typeof vi.fn>;
 
@@ -93,7 +93,7 @@ function assertNoSecrets(body: unknown, secrets: string[]): void {
   for (const secret of secrets) {
     if (secret) expect(text).not.toContain(secret);
   }
-  for (const key of ["otpHash", "otpSalt", "passwordHash", "password", "token", "RESEND_API_KEY", "JWT_SECRET"]) {
+  for (const key of ["otpHash", "otpSalt", "passwordHash", "password", "token", "GMAIL_OAUTH", "JWT_SECRET"]) {
     expect(text).not.toContain(key);
   }
 }
