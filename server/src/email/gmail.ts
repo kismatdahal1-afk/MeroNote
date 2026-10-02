@@ -1,17 +1,22 @@
-import nodemailer from "nodemailer";
+import crypto from "node:crypto";
+import { OAuth2Client } from "google-auth-library";
+import { google } from "googleapis";
 import { env } from "../config/env";
 
 /**
- * Gmail SMTP OAuth2 OTP email provider (thin boundary, no business logic).
+ * Gmail API OTP email provider (thin boundary, no business logic).
  *
- * - Backend-only: `GMAIL_USER` / `GMAIL_OAUTH_*` come from server env, are
- *   never exposed to the frontend, never returned from an API, and never
- *   logged. No Gmail password or app password is used — authentication is
- *   OAuth2 via the long-lived refresh token; Nodemailer mints short-lived
- *   access tokens itself and they never leave memory.
- * - Same export surface as the previous provider, so OTP controller logic
- *   is unchanged: throws `EmailProviderError` on every failure, and callers
- *   map that to the existing generic client error (fail closed).
+ * Delivery path: OAuth2 refresh-token flow (access tokens live only in
+ * memory, minted on demand by google-auth-library) → Gmail API
+ * `users.messages.send` over HTTPS :443. No SMTP, no passwords, no stored
+ * tokens. Replaces the previous Nodemailer SMTP transport behind the
+ * identical export surface, so OTP controller logic is unchanged: throws
+ * `EmailProviderError` on every failure, and callers map that to the
+ * existing generic client error (fail closed).
+ *
+ * Backend-only: `GMAIL_USER` / `GMAIL_OAUTH_*` come from server env, are
+ * never exposed to the frontend, never returned from an API, and never
+ * logged.
  */
 
 export interface RegistrationOtpEmail {
@@ -46,8 +51,8 @@ export class EmailProviderError extends Error {
 }
 
 /**
- * Keep provider error codes log-safe: Nodemailer/SMTP uses short codes
- * (`EAUTH`, `ECONNECTION`, …). Anything else is omitted rather than risked.
+ * Keep provider error codes log-safe: short tokens only (`401`,
+ * `ECONNREFUSED`, …). Anything else is omitted rather than risked.
  */
 function safeProviderErrorName(value: unknown): string | undefined {
   if (typeof value !== "string" || value.length > 64) return undefined;
@@ -58,34 +63,24 @@ function errorNameOf(err: unknown): string | undefined {
   return err instanceof Error ? safeProviderErrorName(err.name) : undefined;
 }
 
-/**
- * Keep Node socket fields log-safe: `errno`/`syscall` are short lowercase
- * tokens (`ETIMEDOUT`, `connect`, `getaddrinfo`). Anything else (IPs,
- * messages, objects) is omitted rather than risked.
- */
-function safeSocketField(value: unknown): string | undefined {
-  if (typeof value !== "string" || value.length > 32) return undefined;
-  return /^[A-Za-z_]+$/.test(value) ? value : undefined;
-}
-
-/** SMTP/network failure codes that indicate transport, not rejection. */
+/** Network failure codes that indicate transport, not rejection. */
 const TRANSPORT_CODES = new Set([
-  "ECONNECTION",
+  "ECONNRESET",
   "ETIMEDOUT",
-  "EDNS",
-  "ESOCKET",
+  "ENOTFOUND",
   "EAI_AGAIN",
   "ECONNREFUSED",
-  "ECONNRESET",
-  "ENOTFOUND",
+  "EPIPE",
+  "ERR_NETWORK",
 ]);
 
-/** Minimal structural view of a Nodemailer send failure (never logged whole). */
-interface SmtpFailure {
+/**
+ * Minimal structural view of a Gmail API send failure (never logged whole).
+ * Gaxios failures carry the HTTP `response.status` and/or a `code`.
+ */
+interface GmailApiFailure {
+  response?: { status?: unknown } | null;
   code?: unknown;
-  responseCode?: unknown;
-  errno?: unknown;
-  syscall?: unknown;
 }
 
 /**
@@ -96,18 +91,17 @@ function logOtpSendFailure(detail: {
   errorType: OtpSendErrorType;
   statusCode: number | null;
   providerErrorName?: string;
-  errno?: string;
-  syscall?: string;
 }): void {
   console.error("[OTP][Gmail] Registration email send failed", {
     provider: "gmail",
     errorType: detail.errorType,
     statusCode: detail.statusCode,
     ...(detail.providerErrorName ? { providerErrorName: detail.providerErrorName } : {}),
-    ...(detail.errno ? { errno: detail.errno } : {}),
-    ...(detail.syscall ? { syscall: detail.syscall } : {}),
   });
 }
+
+/** Gmail API request timeout: failures surface in seconds, never hang. */
+const GMAIL_API_TIMEOUT_MS = 20000;
 
 function registrationOtpText(otp: string): string {
   return [
@@ -133,56 +127,69 @@ function registrationOtpHtml(otp: string): string {
   ].join("\n");
 }
 
+/**
+ * Build the RFC 2822 MIME message (multipart/alternative, CRLF line
+ * endings throughout). Subject/recipient are ASCII-safe by construction
+ * (fixed subject, validated email), so no RFC 2047 encoding is needed.
+ */
+export function buildOtpMimeMessage(to: string, otp: string): string {
+  const boundary = `meronote-${crypto.randomBytes(16).toString("hex")}`;
+  // Bodies are authored with LF; normalize to CRLF (collapsing any existing
+  // CRLF first so this never produces `\r\r\n`).
+  const textBody = registrationOtpText(otp).replace(/\r\n/g, "\n").replace(/\n/g, "\r\n");
+  const htmlBody = registrationOtpHtml(otp).replace(/\r\n/g, "\n").replace(/\n/g, "\r\n");
+  return [
+    `From: ${env.gmailUser}`,
+    `To: ${to}`,
+    "Subject: Your MeroNote verification code",
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    `Content-Type: text/plain; charset="UTF-8"`,
+    "",
+    textBody,
+    `--${boundary}`,
+    `Content-Type: text/html; charset="UTF-8"`,
+    "",
+    htmlBody,
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
+}
+
+/** Base64url without padding, as required by `messages.send`. */
+export function encodeMimeMessage(mime: string): string {
+  return Buffer.from(mime, "utf8").toString("base64url");
+}
+
 /** Send the registration OTP to `to`. Never logs the OTP or credentials. */
 export async function sendRegistrationOtpEmail(input: RegistrationOtpEmail): Promise<void> {
   if (!env.gmailUser || !env.gmailOAuthClientId || !env.gmailOAuthClientSecret || !env.gmailOAuthRefreshToken) {
     logOtpSendFailure({ errorType: "configuration", statusCode: null });
     throw new EmailProviderError("configuration", "Email provider is not configured.");
   }
-  // Port 587 with STARTTLS (explicit TLS upgrade). Port 465 (implicit TLS)
-  // is silently dropped on the production egress path; 587 submission is
-  // the Gmail-supported alternative. OAuth2/token handling is unchanged.
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    requireTLS: true,
-    auth: {
-      type: "OAuth2",
-      user: env.gmailUser,
-      clientId: env.gmailOAuthClientId,
-      clientSecret: env.gmailOAuthClientSecret,
-      refreshToken: env.gmailOAuthRefreshToken,
-    },
-  });
+  const oauth = new OAuth2Client(env.gmailOAuthClientId, env.gmailOAuthClientSecret);
+  oauth.setCredentials({ refresh_token: env.gmailOAuthRefreshToken });
+  const gmail = google.gmail({ version: "v1", auth: oauth });
+  const raw = encodeMimeMessage(buildOtpMimeMessage(input.to, input.otp));
   try {
-    await transporter.sendMail({
-      from: env.gmailUser,
-      to: input.to,
-      subject: "Your MeroNote verification code",
-      text: registrationOtpText(input.otp),
-      html: registrationOtpHtml(input.otp),
-    });
+    await gmail.users.messages.send({ userId: "me", requestBody: { raw } }, { timeout: GMAIL_API_TIMEOUT_MS });
   } catch (err) {
-    // Nodemailer SMTP failures carry `code` (EAUTH/ECONNECTION/…) and, for
-    // server rejections, a numeric `responseCode` (535/550/…). A numeric
-    // reply means Gmail answered and refused; a transport code (or neither)
-    // means the message never got an answer.
-    const failure = err as SmtpFailure | null;
-    const statusCode = typeof failure?.responseCode === "number" ? failure.responseCode : null;
+    // Gaxios failures carry HTTP `response.status` for provider rejections
+    // and a bare `code` for network failures. Anything else is unexpected.
+    const failure = err as GmailApiFailure | null;
+    const responseStatus = failure?.response?.status;
+    const statusCode = typeof responseStatus === "number" ? responseStatus : null;
     const code = typeof failure?.code === "string" ? failure.code : undefined;
     const errorType: OtpSendErrorType =
-      statusCode !== null || code === "EAUTH"
+      statusCode !== null
         ? "provider_rejection"
         : code !== undefined && TRANSPORT_CODES.has(code)
           ? "transport"
           : "unexpected";
     const providerErrorName = safeProviderErrorName(code) ?? errorNameOf(err);
-    // Underlying Node socket fields survive Nodemailer's ESOCKET wrap and
-    // pinpoint the layer (ETIMEDOUT/connect = silent drop; getaddrinfo = DNS).
-    const errno = safeSocketField(failure?.errno);
-    const syscall = safeSocketField(failure?.syscall);
-    logOtpSendFailure({ errorType, statusCode, providerErrorName, errno, syscall });
+    logOtpSendFailure({ errorType, statusCode, providerErrorName });
     throw new EmailProviderError(errorType, "Failed to send verification email.", {
       statusCode,
       providerErrorName,
