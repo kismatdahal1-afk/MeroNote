@@ -18,3 +18,4 @@ export * from "./userSemesterPlan.model";
 export * from "./downloadHistory.model";
 export * from "./userPreferences.model";
 export * from "./refreshToken.model";
+export * from "./pendingRegistration.model";
