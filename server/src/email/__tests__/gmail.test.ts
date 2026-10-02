@@ -133,6 +133,26 @@ describe("Gmail API provider", () => {
     expect(encodeMimeMessage(mime)).toMatch(/^[A-Za-z0-9-_]+$/);
   });
 
+  it("renders two layers only: dark background plus one OTP rectangle", async () => {
+    await sendRegistrationOtpEmail({ to: "user@example.com", otp: "123456" });
+    const mime = decodeRaw(sentRaw());
+    // Layer 1: full MeroNote dark background, brand purple, light text.
+    expect(mime).toContain("background-color:#080a0d");
+    expect(mime).toContain("color:#5b3df5");
+    expect(mime).toContain("color:#f1f5f9");
+    // Layer 2: exactly one bordered content box — the OTP rectangle.
+    expect(mime.match(/border:1px solid #252c36/g) ?? []).toHaveLength(1);
+    expect(mime).toContain("background-color:#1b212b");
+    // OTP digits are white and prominent inside that rectangle.
+    expect(mime).toContain("color:#ffffff");
+    expect(mime).toContain("font-size:32px");
+    // No light-theme leftovers and no external resources of any kind.
+    expect(mime).not.toContain("#f4f4f5");
+    expect(mime).not.toContain("#18181b");
+    expect(mime).not.toContain("http://");
+    expect(mime).not.toContain("https://");
+  });
+
   it("uses CRLF throughout with no lone LF and no doubled carriage returns", async () => {
     const mime = buildOtpMimeMessage("user@example.com", "123456");
     expect(mime).toContain("\r\n");

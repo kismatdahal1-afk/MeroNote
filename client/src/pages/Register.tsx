@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useToast } from "../state/ToastProvider";
 import { useUser } from "../state/UserProvider";
 import { AuthError } from "../lib/authApi";
-import { savePendingEmail } from "../lib/otpFlow";
+import { saveOtpIssuedAt, savePendingEmail } from "../lib/otpFlow";
 import { AuthField, AuthFormError, AuthSubmit, PasswordField } from "../components/auth/AuthFields";
 
 export default function Register() {
@@ -55,6 +55,7 @@ export default function Register() {
       const normalizedEmail = email.trim();
       await initiateRegister(trimmedName, normalizedEmail, password, confirmPassword);
       savePendingEmail(normalizedEmail);
+      saveOtpIssuedAt();
       toast("Verification code sent. Check your email.");
       navigate("/register/verify", { state: { email: normalizedEmail } });
     } catch (err) {

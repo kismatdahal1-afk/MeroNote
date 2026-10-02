@@ -15,6 +15,13 @@ export const OTP_VALIDITY_SECONDS = 120;
 /** sessionStorage key for the pending verification email (non-sensitive). */
 const PENDING_EMAIL_KEY = "meronote_pending_email";
 
+/**
+ * sessionStorage key for the OTP issuance timestamp (Unix milliseconds).
+ * Non-sensitive timing context only — lets the expiry countdown survive a
+ * page refresh. Never the OTP, password, token, or hash.
+ */
+const OTP_ISSUED_AT_KEY = "meronote_otp_issued_at";
+
 function storage(): Storage | null {
   if (typeof window === "undefined") return null;
   try {
@@ -46,6 +53,50 @@ export function clearPendingEmail(): void {
   } catch {
     // Nothing to clean.
   }
+}
+
+/** Record when the current OTP was issued (defaults to now). */
+export function saveOtpIssuedAt(now: number = Date.now()): void {
+  try {
+    storage()?.setItem(OTP_ISSUED_AT_KEY, String(now));
+  } catch {
+    // Storage unavailable — the countdown restarts full on refresh.
+  }
+}
+
+/** Read the stored OTP issuance timestamp, or null when absent/invalid. */
+export function readOtpIssuedAt(): number | null {
+  try {
+    const raw = storage()?.getItem(OTP_ISSUED_AT_KEY);
+    if (!raw) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearOtpIssuedAt(): void {
+  try {
+    storage()?.removeItem(OTP_ISSUED_AT_KEY);
+  } catch {
+    // Nothing to clean.
+  }
+}
+
+/**
+ * Remaining OTP lifetime in whole seconds from an issuance timestamp.
+ * Clamped at zero (and at the full window for future timestamps);
+ * UX display only — the backend enforces expiry.
+ */
+export function remainingOtpSeconds(
+  issuedAt: number | null,
+  now: number = Date.now(),
+  validitySeconds: number = OTP_VALIDITY_SECONDS,
+): number {
+  if (issuedAt === null) return validitySeconds;
+  const elapsed = Math.floor((now - issuedAt) / 1000);
+  return Math.max(0, Math.min(validitySeconds, validitySeconds - elapsed));
 }
 
 /** `true` for exactly 6 ASCII digits (client pre-check; backend is authoritative). */

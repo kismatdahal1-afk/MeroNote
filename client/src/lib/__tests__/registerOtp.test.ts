@@ -9,11 +9,15 @@ import {
   INITIAL_RESEND_COOLDOWN_SECONDS,
   OTP_LENGTH,
   OTP_VALIDITY_SECONDS,
+  clearOtpIssuedAt,
   clearPendingEmail,
   formatCountdownMMSS,
   isValidOtpFormat,
   maskEmail,
+  readOtpIssuedAt,
   readPendingEmail,
+  remainingOtpSeconds,
+  saveOtpIssuedAt,
   savePendingEmail,
 } from "../otpFlow";
 
@@ -207,5 +211,49 @@ describe("otpFlow helpers", () => {
     expect(() => savePendingEmail("otp@example.com")).not.toThrow();
     expect(readPendingEmail()).toBe("");
     expect(() => clearPendingEmail()).not.toThrow();
+  });
+
+  it("round-trips only the OTP issuance timestamp", () => {
+    const { store, setCalls } = stubSessionStorage();
+    expect(readOtpIssuedAt()).toBeNull();
+    saveOtpIssuedAt(1700000000000);
+    expect(readOtpIssuedAt()).toBe(1700000000000);
+    expect(setCalls).toHaveLength(1);
+    expect(setCalls[0][0]).not.toContain("email");
+    expect(setCalls[0][1]).toBe("1700000000000");
+    expect(Object.keys(store)).toEqual(["meronote_otp_issued_at"]);
+    clearOtpIssuedAt();
+    expect(readOtpIssuedAt()).toBeNull();
+  });
+
+  it("rejects invalid stored timestamps", () => {
+    const { store } = stubSessionStorage();
+    for (const bad of ["", "not-a-number", "-5", "0", "Infinity", "12.5x"]) {
+      store["meronote_otp_issued_at"] = bad;
+      expect(readOtpIssuedAt()).toBeNull();
+    }
+  });
+
+  it("reconstructs the remaining OTP lifetime after refresh", () => {
+    const now = 1700000000000;
+    expect(remainingOtpSeconds(now, now)).toBe(120);
+    expect(remainingOtpSeconds(now - 80_000, now)).toBe(40);
+    expect(remainingOtpSeconds(now - 119_000, now)).toBe(1);
+    expect(remainingOtpSeconds(now - 120_000, now)).toBe(0);
+    expect(remainingOtpSeconds(now - 3600_000, now)).toBe(0);
+    expect(remainingOtpSeconds(null, now)).toBe(120);
+    // Future timestamps clamp to the full window instead of overshooting.
+    expect(remainingOtpSeconds(now + 30_000, now)).toBe(120);
+  });
+
+  it("overwrites the timestamp on resend without touching anything else", () => {
+    const { store, setCalls } = stubSessionStorage();
+    savePendingEmail("otp@example.com");
+    saveOtpIssuedAt(1000);
+    saveOtpIssuedAt(2000);
+    expect(readOtpIssuedAt()).toBe(2000);
+    expect(readPendingEmail()).toBe("otp@example.com");
+    expect(setCalls.filter(([key]) => key === "meronote_otp_issued_at")).toHaveLength(2);
+    expect(Object.keys(store).sort()).toEqual(["meronote_otp_issued_at", "meronote_pending_email"]);
   });
 });

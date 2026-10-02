@@ -9,11 +9,15 @@ import {
   INITIAL_RESEND_COOLDOWN_SECONDS,
   OTP_LENGTH,
   OTP_VALIDITY_SECONDS,
+  clearOtpIssuedAt,
   clearPendingEmail,
   formatCountdownMMSS,
   isValidOtpFormat,
   maskEmail,
+  readOtpIssuedAt,
   readPendingEmail,
+  remainingOtpSeconds,
+  saveOtpIssuedAt,
 } from "../lib/otpFlow";
 
 /**
@@ -41,8 +45,10 @@ export default function VerifyOtp() {
   const [resending, setResending] = useState(false);
   const [cooldown, setCooldown] = useState(INITIAL_RESEND_COOLDOWN_SECONDS);
   // Remaining lifetime of the current OTP (UX indicator only; the backend
-  // enforces expiry). Independent from the resend cooldown below.
-  const [expiresIn, setExpiresIn] = useState(OTP_VALIDITY_SECONDS);
+  // enforces expiry). Reconstructed from the stored issuance timestamp so a
+  // page refresh shows the true remainder instead of a full window.
+  // Independent from the resend cooldown below.
+  const [expiresIn, setExpiresIn] = useState(() => remainingOtpSeconds(readOtpIssuedAt()));
 
   useEffect(() => {
     if (cooldown <= 0 && expiresIn <= 0) return;
@@ -75,6 +81,7 @@ export default function VerifyOtp() {
     try {
       const authed = await verifyOtp(email, otp);
       clearPendingEmail();
+      clearOtpIssuedAt();
       toast(`Welcome to Mero Note, ${authed.name}`);
       navigate("/dashboard");
     } catch (err) {
@@ -110,6 +117,7 @@ export default function VerifyOtp() {
       // A new OTP was issued: the old code is dead, so clear it (verifying
       // it would only burn an attempt) and restart both timers.
       setOtp("");
+      saveOtpIssuedAt();
       setExpiresIn(OTP_VALIDITY_SECONDS);
       setCooldown(INITIAL_RESEND_COOLDOWN_SECONDS);
       toast("A new verification code was sent to your email.");
