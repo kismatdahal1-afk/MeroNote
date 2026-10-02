@@ -9,6 +9,12 @@ import { notFoundHandler, errorHandler } from "./middleware/error.middleware";
 export function createApp(): express.Express {
   const app = express();
 
+  // Render terminates TLS at its router (single proxy hop) and forwards
+  // client IPs via X-Forwarded-For. Trust exactly one hop so `req.ip` (used
+  // by express-rate-limit's default key generator) reflects the real client.
+  // Never `true`: that would let any client spoof its IP and bypass limits.
+  app.set("trust proxy", 1);
+
   // Fingerprint + baseline hardening for a JSON API (no CSP: no HTML served).
   app.disable("x-powered-by");
   app.use(helmet({ contentSecurityPolicy: false }));
