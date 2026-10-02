@@ -1,8 +1,20 @@
 import { Router } from "express";
-import { getCsrfToken, googleAuth, googleCallback, login, logout, me, refresh, register, updateProfile } from "../auth/auth.controller";
+import {
+  getCsrfToken,
+  googleAuth,
+  googleCallback,
+  initiateRegistration,
+  login,
+  logout,
+  me,
+  refresh,
+  register,
+  resendRegistrationOtp,
+  updateProfile,
+} from "../auth/auth.controller";
 import { requireAdmin, requireAuth } from "../auth/auth.middleware";
 import { requireCsrf } from "../auth/csrf";
-import { googleLimiter, loginLimiter, refreshLimiter, registerLimiter } from "../auth/rateLimit";
+import { googleLimiter, loginLimiter, refreshLimiter, registerInitiateLimiter, registerLimiter, registerResendLimiter } from "../auth/rateLimit";
 import { asyncHandler } from "../lib/api";
 
 const router = Router();
@@ -13,6 +25,11 @@ const router = Router();
 router.get("/csrf", getCsrfToken);
 router.post("/register", registerLimiter, asyncHandler(register));
 router.post("/login", loginLimiter, asyncHandler(login));
+// Step 3 OTP registration (public, pre-session like register/login: no victim
+// session exists yet, so no requireCsrf; per-email cooldown + send budget are
+// enforced atomically in MongoDB inside the handlers).
+router.post("/register/initiate", registerInitiateLimiter, asyncHandler(initiateRegistration));
+router.post("/register/resend", registerResendLimiter, asyncHandler(resendRegistrationOtp));
 // Step 4: backend Google OAuth (public authorization-code flow). The callback
 // is a cross-site GET from Google carrying its own single-use state proof,
 // so it stays exempt from requireAuth/requireCsrf like login/register.

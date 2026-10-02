@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { User } from "../models";
+import { PendingRegistration, User } from "../models";
 import { hashPassword, verifyPassword } from "./password";
 import {
   accessTokenMinutes,
@@ -17,6 +17,17 @@ import {
   newRefreshFamilyId,
   revokeUserRefreshFamilies,
 } from "./refresh";
+import {
+  OTP_MAX_ATTEMPTS,
+  OTP_SEND_LIMIT,
+  OTP_SEND_WINDOW_SECONDS,
+  generateOtp,
+  hashOtp,
+  newOtpSalt,
+  pendingExpiryFrom,
+  resendAvailableFrom,
+} from "./otp";
+import { sendRegistrationOtpEmail } from "../email/resend";
 import { clearCsrfCookie, issueCsrfToken } from "./csrf";
 import {
   buildGoogleAuthUrl,
@@ -146,33 +157,52 @@ function readString(body: unknown, field: string): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/**
+ * Shared manual-registration field validation. `register` and the Step 3 OTP
+ * initiation flow use these exact rules in this exact order, so neither can
+ * drift weaker than the other. Sends the 400 response and returns false when
+ * invalid.
+ */
+function validateRegistrationFields(
+  res: Response,
+  name: string,
+  email: string,
+  password: string,
+  confirmPassword: string,
+): boolean {
+  // Display name is client-supplied and required (same limits as the user
+  // model and profile edit). readString already trims and rejects
+  // non-strings, so missing/empty/whitespace-only values land here as "".
+  if (!name) {
+    res.status(400).json({ status: "error", message: "Name cannot be empty." });
+    return false;
+  }
+  if (name.length > 80) {
+    res.status(400).json({ status: "error", message: "Name must be at most 80 characters." });
+    return false;
+  }
+  if (!EMAIL_PATTERN.test(email) || email.length > 254) {
+    res.status(400).json({ status: "error", message: "Enter a valid email address." });
+    return false;
+  }
+  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+    res.status(400).json({ status: "error", message: "Password must be at least 8 characters." });
+    return false;
+  }
+  if (password !== confirmPassword) {
+    res.status(400).json({ status: "error", message: "Passwords do not match." });
+    return false;
+  }
+  return true;
+}
+
 export async function register(req: Request, res: Response): Promise<void> {
   const name = readString(req.body, "name");
   const email = readString(req.body, "email").toLowerCase();
   const password = readString(req.body, "password");
   const confirmPassword = readString(req.body, "confirmPassword");
 
-  // Display name is client-supplied and required (same limits as the user
-  // model and profile edit). readString already trims and rejects
-  // non-strings, so missing/empty/whitespace-only values land here as "".
-  if (!name) {
-    res.status(400).json({ status: "error", message: "Name cannot be empty." });
-    return;
-  }
-  if (name.length > 80) {
-    res.status(400).json({ status: "error", message: "Name must be at most 80 characters." });
-    return;
-  }
-  if (!EMAIL_PATTERN.test(email) || email.length > 254) {
-    res.status(400).json({ status: "error", message: "Enter a valid email address." });
-    return;
-  }
-  if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
-    res.status(400).json({ status: "error", message: "Password must be at least 8 characters." });
-    return;
-  }
-  if (password !== confirmPassword) {
-    res.status(400).json({ status: "error", message: "Passwords do not match." });
+  if (!validateRegistrationFields(res, name, email, password, confirmPassword)) {
     return;
   }
 
@@ -572,4 +602,295 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
     return;
   }
   res.redirect(302, `${frontendBase()}/`);
+}
+
+/**
+ * Step 3 OTP registration initiation + resend (no verify step yet).
+ *
+ * Invariants (enforced here, asserted in tests):
+ * - No `User` document is created and no session (access/refresh/CSRF
+ *   cookies) is issued by either endpoint. User creation + `issueSession`
+ *   belong to the later verify step.
+ * - Plaintext OTPs/passwords never reach MongoDB, logs, or API responses.
+ *   Responses carry only `{status, message}` (+ `retryAfterSeconds` on 429).
+ * - The per-email send budget (5 sends / 10-minute window) and the 60-second
+ *   resend cooldown are enforced atomically in MongoDB, never trusted from
+ *   the client. Limits are per normalized email — never a global cap.
+ * - Provider failures fail closed: the pending state is rolled back (fresh
+ *   pendings are deleted, rotations are restored) so no send slot is consumed
+ *   and retry stays possible. Provider internals are never exposed.
+ */
+
+const OTP_SENT_MESSAGE = "Verification code sent.";
+const OTP_SEND_FAILURE_MESSAGE = "We could not send the verification email. Please try again.";
+const OTP_DUPLICATE_MESSAGE = "An account with this email already exists.";
+const OTP_NO_PENDING_MESSAGE = "No pending verification found for this email. Please start registration first.";
+const OTP_COOLDOWN_MESSAGE = "Please wait before requesting another code.";
+const OTP_SEND_LIMIT_MESSAGE = "Too many verification emails. Please try again later.";
+
+/** Whole seconds until `date` from `now` (0 when already reached). */
+function retryAfterSeconds(date: Date, now: Date): number {
+  return Math.max(0, Math.ceil((date.getTime() - now.getTime()) / 1000));
+}
+
+/** Start of the per-email 10-minute send window ending at `now`. */
+function sendWindowStart(now: Date): Date {
+  return new Date(now.getTime() - OTP_SEND_WINDOW_SECONDS * 1000);
+}
+
+/** Pre-rotation pending state for rollback when Resend fails. */
+interface PendingOtpSnapshot {
+  name: string;
+  passwordHash: string;
+  otpHash: string;
+  otpSalt: string;
+  attempts: number;
+  expiresAt: Date;
+  resendAvailableAt: Date;
+  sendCount: number;
+  firstSentAt: Date;
+}
+
+type RotatePendingOutcome =
+  | { status: "rotated"; id: string; otp: string; newOtpHash: string; snapshot: PendingOtpSnapshot }
+  | { status: "cooldown"; retryAfterSeconds: number }
+  | { status: "limit"; retryAfterSeconds: number }
+  | { status: "not-found" };
+
+/** Whole seconds until the current send window resets. */
+function sendWindowRetryAfterSeconds(firstSentAt: Date, now: Date): number {
+  return retryAfterSeconds(new Date(firstSentAt.getTime() + OTP_SEND_WINDOW_SECONDS * 1000), now);
+}
+
+/**
+ * Atomically rotate the OTP of an existing pending registration AND claim
+ * one per-email send slot.
+ *
+ * The claiming `updateOne` pins the exact pre-read `sendCount`/`firstSentAt`
+ * in its filter (optimistic concurrency), so two simultaneous resends cannot
+ * both claim the last slot: exactly one filter matches. A miss is
+ * disambiguated by re-reading: missing record, cooldown, or exhausted
+ * budget. `extraSet` lets initiation refresh name/passwordHash to the latest
+ * submission; resend passes none.
+ */
+async function rotatePendingOtp(
+  email: string,
+  now: Date,
+  extraSet?: { name: string; passwordHash: string },
+): Promise<RotatePendingOutcome> {
+  const current = await PendingRegistration.findOne({ email })
+    .select("+otpHash +otpSalt +passwordHash")
+    .exec();
+  if (!current) return { status: "not-found" };
+  if (now.getTime() < current.resendAvailableAt.getTime()) {
+    return { status: "cooldown", retryAfterSeconds: retryAfterSeconds(current.resendAvailableAt, now) };
+  }
+  const windowStart = sendWindowStart(now);
+  const windowExpired = current.firstSentAt.getTime() <= windowStart.getTime();
+  if (!windowExpired && current.sendCount >= OTP_SEND_LIMIT) {
+    return { status: "limit", retryAfterSeconds: sendWindowRetryAfterSeconds(current.firstSentAt, now) };
+  }
+
+  const otp = generateOtp();
+  const otpSalt = newOtpSalt();
+  const newOtpHash = hashOtp(otp, otpSalt);
+  const rotation = {
+    otpHash: newOtpHash,
+    otpSalt,
+    expiresAt: pendingExpiryFrom(now),
+    resendAvailableAt: resendAvailableFrom(now),
+    attempts: 0,
+    maxAttempts: OTP_MAX_ATTEMPTS,
+    ...(extraSet ?? {}),
+  };
+  const claimed = await PendingRegistration.updateOne(
+    {
+      _id: current._id,
+      resendAvailableAt: { $lte: now },
+      sendCount: current.sendCount,
+      firstSentAt: current.firstSentAt,
+    },
+    windowExpired
+      ? { $set: { ...rotation, sendCount: 1, firstSentAt: now } }
+      : { $inc: { sendCount: 1 }, $set: rotation },
+  ).exec();
+
+  if (claimed.modifiedCount !== 1) {
+    // The atomic filter is authoritative: a miss means the record vanished,
+    // the cooldown is active, or the send budget is spent. (Expiry alone
+    // never fails the filter — resend revives expired-but-present records.)
+    const recheck = await PendingRegistration.findById(current._id).exec();
+    if (!recheck) return { status: "not-found" };
+    if (now.getTime() < recheck.resendAvailableAt.getTime()) {
+      return { status: "cooldown", retryAfterSeconds: retryAfterSeconds(recheck.resendAvailableAt, now) };
+    }
+    return { status: "limit", retryAfterSeconds: sendWindowRetryAfterSeconds(recheck.firstSentAt, now) };
+  }
+
+  return {
+    status: "rotated",
+    id: String(current._id),
+    otp,
+    newOtpHash,
+    snapshot: {
+      name: current.name,
+      passwordHash: current.passwordHash,
+      otpHash: current.otpHash,
+      otpSalt: current.otpSalt,
+      attempts: current.attempts,
+      expiresAt: current.expiresAt,
+      resendAvailableAt: current.resendAvailableAt,
+      sendCount: current.sendCount,
+      firstSentAt: current.firstSentAt,
+    },
+  };
+}
+
+/**
+ * Restore the pre-rotation OTP state after a Resend failure, so a failed
+ * send consumes no slot and the previous OTP stays usable. Conditional on
+ * our hash still being current — if another rotation landed meanwhile, the
+ * newer state (from a later attempt) is left alone.
+ */
+async function rollbackRotatedOtp(id: string, newOtpHash: string, snapshot: PendingOtpSnapshot): Promise<void> {
+  await PendingRegistration.updateOne({ _id: id, otpHash: newOtpHash }, { $set: { ...snapshot } }).exec();
+}
+
+/** 429 envelope shared by cooldown and send-budget rejections. */
+function otpRateLimited(res: Response, message: string, retryAfterSeconds: number): void {
+  res.status(429).json({ status: "error", message, retryAfterSeconds });
+}
+
+/**
+ * Send the OTP, else fail closed: run `onFailure` (delete a fresh pending /
+ * restore a rotated one so no send slot is consumed), answer a generic 500,
+ * and report false. True means the email was accepted and the caller answers
+ * success. Provider internals never reach the client.
+ */
+async function sendOtpOrFailClosed(
+  res: Response,
+  to: string,
+  otp: string,
+  onFailure: () => Promise<unknown>,
+): Promise<boolean> {
+  try {
+    await sendRegistrationOtpEmail({ to, otp });
+    return true;
+  } catch {
+    await onFailure();
+    res.status(500).json({ status: "error", message: OTP_SEND_FAILURE_MESSAGE });
+    return false;
+  }
+}
+
+/**
+ * POST /api/auth/register/initiate — validate, reserve a pending
+ * registration, and send the first OTP. Creates no User and no session.
+ */
+export async function initiateRegistration(req: Request, res: Response): Promise<void> {
+  const name = readString(req.body, "name");
+  const email = readString(req.body, "email").toLowerCase();
+  const password = readString(req.body, "password");
+  const confirmPassword = readString(req.body, "confirmPassword");
+
+  if (!validateRegistrationFields(res, name, email, password, confirmPassword)) {
+    return;
+  }
+
+  const existing = await User.findOne({ email }).exec();
+  if (existing) {
+    // Intentional existing-product behavior: same explicit duplicate
+    // response as legacy register (email-enumeration trade-off documented).
+    res.status(409).json({ status: "error", message: OTP_DUPLICATE_MESSAGE });
+    return;
+  }
+
+  const passwordHash = await hashPassword(password);
+
+  // At most one retry: a pending record that vanishes (TTL) between the
+  // duplicate-key conflict and the rotation is recreated as fresh.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const now = new Date();
+    const otp = generateOtp();
+    const otpSalt = newOtpSalt();
+    let pending;
+    try {
+      pending = await PendingRegistration.create({
+        name,
+        email,
+        passwordHash,
+        otpHash: hashOtp(otp, otpSalt),
+        otpSalt,
+        attempts: 0,
+        maxAttempts: OTP_MAX_ATTEMPTS,
+        expiresAt: pendingExpiryFrom(now),
+        resendAvailableAt: resendAvailableFrom(now),
+        sendCount: 1,
+        firstSentAt: now,
+      });
+    } catch (err) {
+      if ((err as { code?: number }).code === 11000) {
+        // Same email already pending: rotate under cooldown/budget guards
+        // (repeated initiate calls cannot bypass the 60-second cooldown).
+        const outcome = await rotatePendingOtp(email, new Date(), { name, passwordHash });
+        if (outcome.status === "rotated") {
+          const sent = await sendOtpOrFailClosed(res, email, outcome.otp, () =>
+            rollbackRotatedOtp(outcome.id, outcome.newOtpHash, outcome.snapshot),
+          );
+          if (sent) res.json({ status: "ok", message: OTP_SENT_MESSAGE });
+          return;
+        }
+        if (outcome.status === "not-found") continue;
+        if (outcome.status === "cooldown") {
+          otpRateLimited(res, OTP_COOLDOWN_MESSAGE, outcome.retryAfterSeconds);
+          return;
+        }
+        otpRateLimited(res, OTP_SEND_LIMIT_MESSAGE, outcome.retryAfterSeconds);
+        return;
+      }
+      throw err;
+    }
+
+    // Fail closed without blocking retry: a fresh pending that never
+    // reached the inbox is removed, so the next attempt starts clean.
+    const sent = await sendOtpOrFailClosed(res, email, otp, () =>
+      PendingRegistration.deleteOne({ _id: pending._id }).exec(),
+    );
+    if (sent) res.json({ status: "ok", message: OTP_SENT_MESSAGE });
+    return;
+  }
+
+  res.status(500).json({ status: "error", message: "Internal server error." });
+}
+
+/**
+ * POST /api/auth/register/resend — rotate to a brand-new OTP and re-send it.
+ * Old OTP dies immediately, attempts reset, expiry/cooldown restart, and the
+ * per-email send budget is claimed atomically. Creates no User, no session.
+ */
+export async function resendRegistrationOtp(req: Request, res: Response): Promise<void> {
+  const email = readString(req.body, "email").toLowerCase();
+  if (!EMAIL_PATTERN.test(email) || email.length > 254) {
+    res.status(400).json({ status: "error", message: "Enter a valid email address." });
+    return;
+  }
+
+  const outcome = await rotatePendingOtp(email, new Date());
+  if (outcome.status === "not-found") {
+    res.status(400).json({ status: "error", message: OTP_NO_PENDING_MESSAGE });
+    return;
+  }
+  if (outcome.status === "cooldown") {
+    otpRateLimited(res, OTP_COOLDOWN_MESSAGE, outcome.retryAfterSeconds);
+    return;
+  }
+  if (outcome.status === "limit") {
+    otpRateLimited(res, OTP_SEND_LIMIT_MESSAGE, outcome.retryAfterSeconds);
+    return;
+  }
+
+  const sent = await sendOtpOrFailClosed(res, email, outcome.otp, () =>
+    rollbackRotatedOtp(outcome.id, outcome.newOtpHash, outcome.snapshot),
+  );
+  if (sent) res.json({ status: "ok", message: OTP_SENT_MESSAGE });
 }

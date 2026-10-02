@@ -21,6 +21,14 @@ function authLimiter(message: string) {
 /** Login + registration share the same budget rationale (credential abuse). */
 export const loginLimiter = authLimiter("Too many attempts. Please try again in a minute.");
 export const registerLimiter = authLimiter("Too many attempts. Please try again in a minute.");
+/**
+ * Step 3 OTP initiation + resend: separate instances (own budgets) so OTP
+ * traffic never eats the login/register brute-force budget. Per-email
+ * cooldown (60s) and send budget (5/10min) are enforced atomically in
+ * MongoDB; these IP/request limiters are the outer abuse ring only.
+ */
+export const registerInitiateLimiter = authLimiter("Too many attempts. Please try again in a minute.");
+export const registerResendLimiter = authLimiter("Too many attempts. Please try again in a minute.");
 /** Google OAuth entry points: same budget rationale as password login. */
 export const googleLimiter = authLimiter("Too many attempts. Please try again in a minute.");
 /**
