@@ -143,14 +143,20 @@ describe("Gmail API provider", () => {
     // Layer 2: exactly one bordered content box — the OTP rectangle.
     expect(mime.match(/border:1px solid #252c36/g) ?? []).toHaveLength(1);
     expect(mime).toContain("background-color:#1b212b");
+    // Header row: official app icon top-left, brand text centered beside it.
+    // (Scoped to the HTML part — the text/plain part precedes it in MIME order.)
+    const htmlPart = mime.slice(mime.indexOf("Content-Type: text/html"));
+    expect(htmlPart).toContain('<img src="https://meronote.vercel.app/icon/icon-192.png" alt="MeroNote"');
+    expect(htmlPart).toContain('width="32" height="32"');
+    expect(htmlPart.indexOf("icon-192.png")).toBeLessThan(htmlPart.indexOf("Verify Your Email"));
     // OTP digits are white and prominent inside that rectangle.
     expect(mime).toContain("color:#ffffff");
     expect(mime).toContain("font-size:32px");
-    // No light-theme leftovers and no external resources of any kind.
+    // No light-theme leftovers; the icon is the only external resource.
     expect(mime).not.toContain("#f4f4f5");
     expect(mime).not.toContain("#18181b");
     expect(mime).not.toContain("http://");
-    expect(mime).not.toContain("https://");
+    expect(mime.match(/https:\/\//g) ?? []).toHaveLength(1);
   });
 
   it("uses CRLF throughout with no lone LF and no doubled carriage returns", async () => {

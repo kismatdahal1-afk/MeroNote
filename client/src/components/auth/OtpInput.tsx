@@ -1,4 +1,4 @@
-import { useRef, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, type ClipboardEvent, type KeyboardEvent } from "react";
 import { OTP_LENGTH } from "../../lib/otpFlow";
 
 /**
@@ -29,6 +29,16 @@ export function OtpInput({ id = "otp", value, onChange, disabled }: OtpInputProp
     boxesRef.current[clamped]?.focus();
     boxesRef.current[clamped]?.select();
   };
+
+  // Mount-only: place the cursor in the first box so the user can type
+  // immediately. Callback refs populate during commit, before passive
+  // effects run, so box 0 exists here. Never re-runs: later renders
+  // (typing, resend, errors) must not steal focus back.
+  useEffect(() => {
+    if (disabled) return;
+    focusBox(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only by design
+  }, []);
 
   const handleBoxChange = (index: number, text: string): void => {
     if (disabled) return;

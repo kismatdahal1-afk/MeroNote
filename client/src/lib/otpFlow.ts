@@ -104,6 +104,17 @@ export function isValidOtpFormat(otp: string): boolean {
   return new RegExp(`^\\d{${OTP_LENGTH}}$`).test(otp);
 }
 
+/**
+ * Whether a completed OTP should auto-submit. True only for a full valid
+ * code while no verification is in flight, and only if this exact code was
+ * not already auto-submitted (a failed attempt must never retrigger itself
+ * when the loading flag settles — otherwise one wrong code would burn every
+ * backend attempt in a retry loop). Manual Enter always stays available.
+ */
+export function shouldAutoSubmitOtp(otp: string, busy: boolean, lastAutoSubmitted = ""): boolean {
+  return !busy && isValidOtpFormat(otp) && otp !== lastAutoSubmitted;
+}
+
 /** Format a countdown as MM:SS (clamped at zero; UX display only). */
 export function formatCountdownMMSS(totalSeconds: number): string {
   const clamped = Math.max(0, Math.floor(totalSeconds));

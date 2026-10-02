@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "../state/ToastProvider";
 import { useUser } from "../state/UserProvider";
@@ -18,6 +18,7 @@ import {
   readPendingEmail,
   remainingOtpSeconds,
   saveOtpIssuedAt,
+  shouldAutoSubmitOtp,
 } from "../lib/otpFlow";
 
 /**
@@ -59,6 +60,19 @@ export default function VerifyOtp() {
     return () => window.clearInterval(timer);
   }, [cooldown, expiresIn]);
 
+  // Auto-submit the moment a complete valid code exists (paste or sixth
+  // digit). The shared busy guard inside submitOtp is the single duplicate
+  // gate for auto and manual (Enter) submissions alike; lastAutoSubmitted
+  // stops a failed code from resubmitting itself when loading settles.
+  const lastAutoSubmittedRef = useRef("");
+  useEffect(() => {
+    if (shouldAutoSubmitOtp(otp, busy, lastAutoSubmittedRef.current)) {
+      lastAutoSubmittedRef.current = otp;
+      void submitOtp(otp);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- submitOtp intentionally excluded (see above)
+  }, [otp, busy]);
+
   if (status === "authed" && user) {
     return <Navigate to={user.role === "ADMIN" ? "/admin" : "/dashboard"} replace />;
   }
@@ -67,11 +81,11 @@ export default function VerifyOtp() {
     return <Navigate to="/register" replace />;
   }
 
-  const handleVerify = async (e: FormEvent) => {
-    e.preventDefault();
-    // Disabled buttons don't stop every implicit (Enter-key) submit.
+  const submitOtp = async (code: string) => {
+    // Disabled buttons don't stop every implicit (Enter-key) submit, and
+    // the auto-submit effect can race a manual submit: one busy gate total.
     if (busy) return;
-    if (!isValidOtpFormat(otp)) {
+    if (!isValidOtpFormat(code)) {
       setError("Please enter the 6-digit verification code.");
       return;
     }
@@ -79,7 +93,7 @@ export default function VerifyOtp() {
     setAccountExists(false);
     setBusy(true);
     try {
-      const authed = await verifyOtp(email, otp);
+      const authed = await verifyOtp(email, code);
       clearPendingEmail();
       clearOtpIssuedAt();
       toast(`Welcome to Mero Note, ${authed.name}`);
@@ -106,6 +120,11 @@ export default function VerifyOtp() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleVerify = (e: FormEvent) => {
+    e.preventDefault();
+    void submitOtp(otp);
   };
 
   const handleResend = async () => {

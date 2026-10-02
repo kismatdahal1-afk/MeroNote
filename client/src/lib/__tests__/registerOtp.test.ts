@@ -19,6 +19,7 @@ import {
   remainingOtpSeconds,
   saveOtpIssuedAt,
   savePendingEmail,
+  shouldAutoSubmitOtp,
 } from "../otpFlow";
 
 /**
@@ -244,6 +245,20 @@ describe("otpFlow helpers", () => {
     expect(remainingOtpSeconds(null, now)).toBe(120);
     // Future timestamps clamp to the full window instead of overshooting.
     expect(remainingOtpSeconds(now + 30_000, now)).toBe(120);
+  });
+
+  it("auto-submits only a complete valid code while idle", () => {
+    expect(shouldAutoSubmitOtp("123456", false)).toBe(true);
+    // Partial, invalid, or empty input never auto-submits.
+    expect(shouldAutoSubmitOtp("12345", false)).toBe(false);
+    expect(shouldAutoSubmitOtp("", false)).toBe(false);
+    expect(shouldAutoSubmitOtp("12345a", false)).toBe(false);
+    expect(shouldAutoSubmitOtp("12 456", false)).toBe(false);
+    // An in-flight verification suppresses duplicates (auto or manual).
+    expect(shouldAutoSubmitOtp("123456", true)).toBe(false);
+    // A failed code never resubmits itself; editing to a new code re-arms.
+    expect(shouldAutoSubmitOtp("123456", false, "123456")).toBe(false);
+    expect(shouldAutoSubmitOtp("654321", false, "123456")).toBe(true);
   });
 
   it("overwrites the timestamp on resend without touching anything else", () => {
