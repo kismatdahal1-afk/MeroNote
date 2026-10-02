@@ -11,10 +11,11 @@ import {
   register,
   resendRegistrationOtp,
   updateProfile,
+  verifyRegistration,
 } from "../auth/auth.controller";
 import { requireAdmin, requireAuth } from "../auth/auth.middleware";
 import { requireCsrf } from "../auth/csrf";
-import { googleLimiter, loginLimiter, refreshLimiter, registerInitiateLimiter, registerLimiter, registerResendLimiter } from "../auth/rateLimit";
+import { googleLimiter, loginLimiter, refreshLimiter, registerInitiateLimiter, registerLimiter, registerResendLimiter, registerVerifyLimiter } from "../auth/rateLimit";
 import { asyncHandler } from "../lib/api";
 
 const router = Router();
@@ -30,6 +31,9 @@ router.post("/login", loginLimiter, asyncHandler(login));
 // enforced atomically in MongoDB inside the handlers).
 router.post("/register/initiate", registerInitiateLimiter, asyncHandler(initiateRegistration));
 router.post("/register/resend", registerResendLimiter, asyncHandler(resendRegistrationOtp));
+// Step 4 OTP verification (public, pre-session like initiate/resend; the
+// 5-attempt OTP budget is the per-email guessing cap).
+router.post("/register/verify", registerVerifyLimiter, asyncHandler(verifyRegistration));
 // Step 4: backend Google OAuth (public authorization-code flow). The callback
 // is a cross-site GET from Google carrying its own single-use state proof,
 // so it stays exempt from requireAuth/requireCsrf like login/register.

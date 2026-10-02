@@ -29,6 +29,8 @@ export const registerLimiter = authLimiter("Too many attempts. Please try again 
  */
 export const registerInitiateLimiter = authLimiter("Too many attempts. Please try again in a minute.");
 export const registerResendLimiter = authLimiter("Too many attempts. Please try again in a minute.");
+/** Step 4 OTP verification: own budget (per-email guessing is capped by the 5-attempt OTP budget). */
+export const registerVerifyLimiter = authLimiter("Too many attempts. Please try again in a minute.");
 /** Google OAuth entry points: same budget rationale as password login. */
 export const googleLimiter = authLimiter("Too many attempts. Please try again in a minute.");
 /**

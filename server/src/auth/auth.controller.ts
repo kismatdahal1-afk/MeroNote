@@ -21,8 +21,10 @@ import {
   OTP_MAX_ATTEMPTS,
   OTP_SEND_LIMIT,
   OTP_SEND_WINDOW_SECONDS,
+  consumePendingOtp,
   generateOtp,
   hashOtp,
+  isValidOtpFormat,
   newOtpSalt,
   pendingExpiryFrom,
   resendAvailableFrom,
@@ -893,4 +895,102 @@ export async function resendRegistrationOtp(req: Request, res: Response): Promis
     rollbackRotatedOtp(outcome.id, outcome.newOtpHash, outcome.snapshot),
   );
   if (sent) res.json({ status: "ok", message: OTP_SENT_MESSAGE });
+}
+
+/**
+ * Step 4 OTP verification + account creation (final backend registration step).
+ *
+ * Flow: validate → atomically consume the OTP via the Step 2 primitive
+ * (pending record is deleted on success; name/passwordHash arrive in the
+ * consume result) → re-check `User` → `User.create` (unique index is the
+ * final race boundary) → `issueSession` (the normal MeroNote session).
+ *
+ * Invariants: no User and no session unless the OTP was consumed AND the
+ * User was created. Exhausted attempt budgets answer 429 with
+ * `retryAfterSeconds` derived from the dead OTP's `expiresAt`, consistent
+ * with the Step 3 rate-limit contract.
+ */
+
+const OTP_INVALID_MESSAGE = "Incorrect verification code.";
+const OTP_EXPIRED_MESSAGE = "Verification code has expired. Please request a new one.";
+const OTP_EXHAUSTED_MESSAGE = "Too many incorrect attempts. Please request a new code.";
+const OTP_CONSUMED_MESSAGE = "This verification code has already been used. Please request a new one.";
+
+/**
+ * POST /api/auth/register/verify — consume the OTP, create the real User
+ * from the trusted pending data, and issue the normal MeroNote session.
+ * Public (pre-session). The stored bcrypt hash is transferred verbatim —
+ * never re-hashed. No OTP/user-credential material ever leaves in responses.
+ */
+export async function verifyRegistration(req: Request, res: Response): Promise<void> {
+  const email = readString(req.body, "email").toLowerCase();
+  const otp = readString(req.body, "otp");
+  if (!EMAIL_PATTERN.test(email) || email.length > 254) {
+    res.status(400).json({ status: "error", message: "Enter a valid email address." });
+    return;
+  }
+  if (!isValidOtpFormat(otp)) {
+    res.status(400).json({ status: "error", message: OTP_INVALID_MESSAGE });
+    return;
+  }
+
+  const outcome = await consumePendingOtp(email, otp);
+  if (outcome.status === "invalid") {
+    res.status(400).json({ status: "error", message: OTP_INVALID_MESSAGE, attemptsLeft: outcome.attemptsLeft });
+    return;
+  }
+  if (outcome.status === "expired") {
+    res.status(400).json({ status: "error", message: OTP_EXPIRED_MESSAGE });
+    return;
+  }
+  if (outcome.status === "exhausted") {
+    const dead = await PendingRegistration.findOne({ email }).select("expiresAt").exec();
+    otpRateLimited(
+      res,
+      OTP_EXHAUSTED_MESSAGE,
+      dead ? retryAfterSeconds(dead.expiresAt, new Date()) : 0,
+    );
+    return;
+  }
+  if (outcome.status === "not-found" || outcome.status === "already-consumed") {
+    const message = outcome.status === "not-found" ? OTP_NO_PENDING_MESSAGE : OTP_CONSUMED_MESSAGE;
+    res.status(400).json({ status: "error", message });
+    return;
+  }
+
+  // OTP consumed exactly once (Step 2 atomic delete). Re-check the User:
+  // another flow (e.g. legacy register) may have claimed the email since
+  // initiation. The unique index below remains the final race boundary.
+  const existing = await User.findOne({ email }).exec();
+  if (existing) {
+    res.status(409).json({ status: "error", message: OTP_DUPLICATE_MESSAGE });
+    return;
+  }
+
+  let user;
+  try {
+    user = await User.create({
+      name: outcome.name,
+      email: outcome.email,
+      passwordHash: outcome.passwordHash,
+      authProvider: "password",
+      role: "USER",
+    });
+  } catch (err) {
+    if ((err as { code?: number }).code === 11000) {
+      res.status(409).json({ status: "error", message: OTP_DUPLICATE_MESSAGE });
+      return;
+    }
+    throw err;
+  }
+
+  // Same session contract as normal registration/login. A storage failure
+  // must not claim success: the account itself is valid and retry is login.
+  try {
+    await issueSession(res, String(user._id), "USER", user.sessionVersion ?? 0, env.jwtExpiresDays);
+  } catch {
+    res.status(500).json({ status: "error", message: "Internal server error." });
+    return;
+  }
+  res.status(201).json({ status: "ok", data: toSafeUser(user) });
 }
