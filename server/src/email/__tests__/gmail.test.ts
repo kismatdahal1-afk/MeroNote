@@ -163,6 +163,33 @@ describe("Gmail failure diagnostics", () => {
     expect(logged).not.toContain("123456");
   });
 
+  it("logs underlying socket errno/syscall for ESOCKET transport failures", async () => {
+    sendMock.mockRejectedValue(
+      smtpError({ code: "ESOCKET", errno: "ETIMEDOUT", syscall: "connect", address: "142.0.0.1", port: 465 }),
+    );
+    const errorSpy = vi.spyOn(console, "error");
+    const err = await sendRegistrationOtpEmail({ to: "user@example.com", otp: "123456" }).catch((e: Error) => e);
+    expect((err as EmailProviderError).errorType).toBe("transport");
+    const logged = loggedPayloads(errorSpy).join(" ");
+    expect(logged).toContain("ETIMEDOUT");
+    expect(logged).toContain("connect");
+    expect(logged).not.toContain("142.0.0.1");
+    expect(logged).not.toContain(TEST_ENV.gmailOAuthRefreshToken);
+    expect(logged).not.toContain("123456");
+  });
+
+  it("rejects unsafe socket field values instead of logging them", async () => {
+    sendMock.mockRejectedValue(
+      smtpError({ code: "ESOCKET", errno: "ETIMEDOUT 142.0.0.1:465", syscall: { nested: "object" } }),
+    );
+    const errorSpy = vi.spyOn(console, "error");
+    await sendRegistrationOtpEmail({ to: "user@example.com", otp: "123456" }).catch(() => undefined);
+    const logged = loggedPayloads(errorSpy).join(" ");
+    expect(logged).toContain("transport");
+    expect(logged).not.toContain("142.0.0.1");
+    expect(logged).not.toContain("nested");
+  });
+
   it("logs missing configuration without values and stays generic externally", async () => {
     env.gmailOAuthRefreshToken = "";
     const errorSpy = vi.spyOn(console, "error");

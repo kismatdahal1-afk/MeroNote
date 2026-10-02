@@ -58,6 +58,16 @@ function errorNameOf(err: unknown): string | undefined {
   return err instanceof Error ? safeProviderErrorName(err.name) : undefined;
 }
 
+/**
+ * Keep Node socket fields log-safe: `errno`/`syscall` are short lowercase
+ * tokens (`ETIMEDOUT`, `connect`, `getaddrinfo`). Anything else (IPs,
+ * messages, objects) is omitted rather than risked.
+ */
+function safeSocketField(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length > 32) return undefined;
+  return /^[A-Za-z_]+$/.test(value) ? value : undefined;
+}
+
 /** SMTP/network failure codes that indicate transport, not rejection. */
 const TRANSPORT_CODES = new Set([
   "ECONNECTION",
@@ -74,6 +84,8 @@ const TRANSPORT_CODES = new Set([
 interface SmtpFailure {
   code?: unknown;
   responseCode?: unknown;
+  errno?: unknown;
+  syscall?: unknown;
 }
 
 /**
@@ -84,12 +96,16 @@ function logOtpSendFailure(detail: {
   errorType: OtpSendErrorType;
   statusCode: number | null;
   providerErrorName?: string;
+  errno?: string;
+  syscall?: string;
 }): void {
   console.error("[OTP][Gmail] Registration email send failed", {
     provider: "gmail",
     errorType: detail.errorType,
     statusCode: detail.statusCode,
     ...(detail.providerErrorName ? { providerErrorName: detail.providerErrorName } : {}),
+    ...(detail.errno ? { errno: detail.errno } : {}),
+    ...(detail.syscall ? { syscall: detail.syscall } : {}),
   });
 }
 
@@ -158,7 +174,11 @@ export async function sendRegistrationOtpEmail(input: RegistrationOtpEmail): Pro
           ? "transport"
           : "unexpected";
     const providerErrorName = safeProviderErrorName(code) ?? errorNameOf(err);
-    logOtpSendFailure({ errorType, statusCode, providerErrorName });
+    // Underlying Node socket fields survive Nodemailer's ESOCKET wrap and
+    // pinpoint the layer (ETIMEDOUT/connect = silent drop; getaddrinfo = DNS).
+    const errno = safeSocketField(failure?.errno);
+    const syscall = safeSocketField(failure?.syscall);
+    logOtpSendFailure({ errorType, statusCode, providerErrorName, errno, syscall });
     throw new EmailProviderError(errorType, "Failed to send verification email.", {
       statusCode,
       providerErrorName,

@@ -82,7 +82,7 @@ function assertNoSecrets(body: unknown, secrets: string[]): void {
   expect(text).not.toContain("otpHash");
   expect(text).not.toContain("otpSalt");
   expect(text).not.toContain("passwordHash");
-  expect(text).not.toContain("RESEND_API_KEY");
+  expect(text).not.toContain("GMAIL_OAUTH");
 }
 
 beforeAll(async () => {
