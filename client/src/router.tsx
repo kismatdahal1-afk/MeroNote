@@ -33,6 +33,7 @@ import {
 const LandingPage = lazy(() => import("./pages/landing/LandingPage"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
+const VerifyOtp = lazy(() => import("./pages/VerifyOtp"));
 const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
 const Terms = lazy(() => import("./pages/legal/Terms"));
 const CopyrightPolicy = lazy(() => import("./pages/legal/CopyrightPolicy"));
@@ -105,6 +106,7 @@ export const appRoutes: RouteObject[] = [
             children: [
               { path: "login", element: withSuspense(<Login />, <AuthFormFallback />) },
               { path: "register", element: withSuspense(<Register />, <AuthFormFallback />) },
+              { path: "register/verify", element: withSuspense(<VerifyOtp />, <AuthFormFallback />) },
             ],
           },
           { path: "privacy-policy", element: withSuspense(<PrivacyPolicy />) },

@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useToast } from "../state/ToastProvider";
 import { useUser } from "../state/UserProvider";
 import { AuthError } from "../lib/authApi";
+import { savePendingEmail } from "../lib/otpFlow";
 import { AuthField, AuthFormError, AuthSubmit, PasswordField } from "../components/auth/AuthFields";
 
 export default function Register() {
@@ -16,7 +17,7 @@ export default function Register() {
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { status, user, register } = useUser();
+  const { status, user, initiateRegister } = useUser();
 
   if (status === "authed" && user) {
     return <Navigate to={user.role === "ADMIN" ? "/admin" : "/dashboard"} replace />;
@@ -48,9 +49,14 @@ export default function Register() {
     setError("");
     setBusy(true);
     try {
-      const authed = await register(trimmedName, email.trim(), password, confirmPassword);
-      toast(`Welcome to Mero Note, ${authed.name}`);
-      navigate("/dashboard");
+      // Step 5: initiation sends the OTP and creates no account/session.
+      // Only the email (non-sensitive routing context) leaves this page;
+      // the password stays in component memory and is dropped on unmount.
+      const normalizedEmail = email.trim();
+      await initiateRegister(trimmedName, normalizedEmail, password, confirmPassword);
+      savePendingEmail(normalizedEmail);
+      toast("Verification code sent. Check your email.");
+      navigate("/register/verify", { state: { email: normalizedEmail } });
     } catch (err) {
       setError(err instanceof AuthError ? err.message : "Registration failed. Please try again.");
     } finally {
@@ -112,7 +118,7 @@ export default function Register() {
 
         <AuthFormError message={error} />
 
-        <AuthSubmit busy={busy} busyLabel="Creating account..." disabled={busy || status === "loading"}>
+        <AuthSubmit busy={busy} busyLabel="Sending code..." disabled={busy || status === "loading"}>
           Create Account
         </AuthSubmit>
       </form>

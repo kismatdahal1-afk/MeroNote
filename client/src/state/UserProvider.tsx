@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AuthError, fetchMe, loginRequest, logoutRequest, registerRequest, updateProfileRequest, type AuthUser } from "../lib/authApi";
+import { AuthError, fetchMe, initiateRegisterRequest, loginRequest, logoutRequest, registerRequest, resendOtpRequest, updateProfileRequest, verifyOtpRequest, type AuthUser } from "../lib/authApi";
 import { refreshSession } from "../lib/authRefresh";
 import { createAuthGate, isUnauthorizedStatus } from "../lib/authGate";
 
@@ -28,6 +28,15 @@ interface UserContextValue {
   setName: (name: string) => Promise<AuthUser>;
   login: (email: string, password: string, remember: boolean) => Promise<AuthUser>;
   register: (name: string, email: string, password: string, confirmPassword: string) => Promise<AuthUser>;
+  /**
+   * Step 5 OTP registration. `initiateRegister` sends the first code and
+   * changes no auth state (no User is created server-side yet); `verifyOtp`
+   * consumes the code and adopts the new session exactly like `register`;
+   * `resendOtp` rotates the code and changes no auth state.
+   */
+  initiateRegister: (name: string, email: string, password: string, confirmPassword: string) => Promise<void>;
+  verifyOtp: (email: string, otp: string) => Promise<AuthUser>;
+  resendOtp: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   /**
@@ -157,6 +166,32 @@ export function UserProvider({ children }: { children: ReactNode }) {
     return authed;
   }, []);
 
+  const initiateRegister = useCallback(
+    async (name: string, email: string, password: string, confirmPassword: string) => {
+      const seq = gateRef.current.begin();
+      await initiateRegisterRequest(name, email, password, confirmPassword);
+      // No auth state changes: the server created no User and no session.
+      // Stale completions must still not disturb a newer transition.
+      if (!gateRef.current.isCurrent(seq)) return;
+    },
+    [],
+  );
+
+  const verifyOtp = useCallback(async (email: string, otp: string) => {
+    const seq = gateRef.current.begin();
+    const authed = await verifyOtpRequest(email, otp);
+    if (!gateRef.current.isCurrent(seq)) return authed;
+    setUser(authed);
+    setStatus("authed");
+    return authed;
+  }, []);
+
+  const resendOtp = useCallback(async (email: string) => {
+    const seq = gateRef.current.begin();
+    await resendOtpRequest(email);
+    if (!gateRef.current.isCurrent(seq)) return;
+  }, []);
+
   const logout = useCallback(async () => {
     const seq = gateRef.current.begin();
     try {
@@ -178,11 +213,14 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setName,
       login,
       register,
+      initiateRegister,
+      verifyOtp,
+      resendOtp,
       logout,
       refresh,
       invalidateSession,
     }),
-    [user, status, setName, login, register, logout, refresh, invalidateSession],
+    [user, status, setName, login, register, initiateRegister, verifyOtp, resendOtp, logout, refresh, invalidateSession],
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
