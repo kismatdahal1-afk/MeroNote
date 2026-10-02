@@ -139,10 +139,14 @@ export async function sendRegistrationOtpEmail(input: RegistrationOtpEmail): Pro
     logOtpSendFailure({ errorType: "configuration", statusCode: null });
     throw new EmailProviderError("configuration", "Email provider is not configured.");
   }
+  // Port 587 with STARTTLS (explicit TLS upgrade). Port 465 (implicit TLS)
+  // is silently dropped on the production egress path; 587 submission is
+  // the Gmail-supported alternative. OAuth2/token handling is unchanged.
   const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    port: 587,
+    secure: false,
+    requireTLS: true,
     auth: {
       type: "OAuth2",
       user: env.gmailUser,

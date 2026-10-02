@@ -63,8 +63,9 @@ describe("Gmail OTP provider", () => {
     expect(mockedCreateTransport).toHaveBeenCalledTimes(1);
     expect(mockedCreateTransport).toHaveBeenCalledWith({
       host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
+      port: 587,
+      secure: false,
+      requireTLS: true,
       auth: {
         type: "OAuth2",
         user: TEST_ENV.gmailUser,
