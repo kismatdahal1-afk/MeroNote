@@ -118,13 +118,14 @@ function registrationOtpText(otp: string): string {
 }
 
 function registrationOtpHtml(otp: string): string {
-  // Transactional email: two visual layers only — the full MeroNote dark
-  // background with all content directly on it, plus ONE bordered rectangle
-  // around the OTP digits. Table layout, inline styles, and system fonts
-  // only (no JS, webfonts, animations, images, or tracking), so the message
-  // stays intact when images/styles are blocked. Colors are the established
-  // MeroNote dark tokens: #080a0d background, #5b3df5 brand purple, #1b212b
-  // OTP box, #f1f5f9 text, #94a3b8 supporting text.
+  // Transactional email: two visual layers only — the full MeroNote bright
+  // (light-mode) global background with all content directly on it, plus ONE
+  // bordered rectangle around the OTP digits. Table layout, inline styles,
+  // and system fonts only (no JS, webfonts, animations, images except the
+  // header icon, or tracking), so the message stays intact when images are
+  // blocked. Colors are the established MeroNote light tokens: #efe9e0
+  // background, #5b3df5 brand purple, #fffdf8 OTP box, #0f172a text,
+  // #64748b supporting text.
   return [
     "<!DOCTYPE html>",
     '<html lang="en">',
@@ -133,8 +134,8 @@ function registrationOtpHtml(otp: string): string {
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
     "<title>Your MeroNote verification code</title>",
     "</head>",
-    '<body style="margin:0;padding:0;background-color:#080a0d;">',
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#080a0d;">',
+    '<body style="margin:0;padding:0;background-color:#efe9e0;">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#efe9e0;">',
     "<tr>",
     '<td align="center" style="padding:32px 16px;">',
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">',
@@ -142,13 +143,13 @@ function registrationOtpHtml(otp: string): string {
     '<td align="center" style="padding:8px 16px;">',
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 auto;">',
     "<tr>",
-    '<td align="left" valign="top" width="36" style="width:36px;padding:0;">',
-    '<img src="https://meronote.vercel.app/icon/icon-192.png" alt="MeroNote" width="32" height="32" style="display:block;width:32px;height:32px;border:0;">',
+    '<td align="left" valign="top" width="48" style="width:48px;padding:0;">',
+    '<img src="https://meronote.vercel.app/icon/icon-192.png" alt="MeroNote" width="45" height="45" style="display:block;width:45px;height:45px;border:0;">',
     "</td>",
     '<td align="center" valign="middle" style="padding:0;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:bold;color:#5b3df5;">',
     "MeroNote",
     "</td>",
-    '<td width="36" style="width:36px;padding:0;font-size:0;line-height:0;">&nbsp;</td>',
+    '<td width="48" style="width:48px;padding:0;font-size:0;line-height:0;">&nbsp;</td>',
     "</tr>",
     "</table>",
     "</td>",
@@ -163,31 +164,31 @@ function registrationOtpHtml(otp: string): string {
     "</td>",
     "</tr>",
     "<tr>",
-    '<td align="center" style="padding:12px 16px 8px 16px;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:bold;color:#f1f5f9;">',
+    '<td align="center" style="padding:12px 16px 8px 16px;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:bold;color:#0f172a;">',
     "Verify Your Email",
     "</td>",
     "</tr>",
     "<tr>",
-    '<td align="center" style="padding:4px 16px 8px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#94a3b8;">',
+    '<td align="center" style="padding:4px 16px 8px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#64748b;">',
     "Your verification code is:",
     "</td>",
     "</tr>",
     "<tr>",
     '<td align="center" style="padding:12px 16px 12px 16px;">',
-    '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;border:1px solid #252c36;border-radius:10px;background-color:#1b212b;">',
+    '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;border:1px solid #ddd2bd;border-radius:10px;background-color:#fffdf8;">',
     "<tr>",
-    `<td align="center" style="padding:18px 36px;font-family:Arial,Helvetica,sans-serif;font-size:32px;font-weight:bold;letter-spacing:8px;color:#ffffff;">${otp}</td>`,
+    `<td align="center" style="padding:18px 36px;font-family:Arial,Helvetica,sans-serif;font-size:32px;font-weight:bold;letter-spacing:8px;color:#0f172a;">${otp}</td>`,
     "</tr>",
     "</table>",
     "</td>",
     "</tr>",
     "<tr>",
-    '<td align="center" style="padding:4px 16px 4px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#94a3b8;">',
+    '<td align="center" style="padding:4px 16px 4px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#64748b;">',
     "This code expires in 2 minutes.",
     "</td>",
     "</tr>",
     "<tr>",
-    '<td align="center" style="padding:4px 16px 16px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#94a3b8;">',
+    '<td align="center" style="padding:4px 16px 16px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#64748b;">',
     "If you didn't request this verification code, you can safely ignore this email.",
     "</td>",
     "</tr>",
