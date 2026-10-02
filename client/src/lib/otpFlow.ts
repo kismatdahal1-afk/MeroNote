@@ -9,6 +9,8 @@
 
 export const OTP_LENGTH = 6;
 export const INITIAL_RESEND_COOLDOWN_SECONDS = 60;
+/** OTP validity window in seconds (UX display only; the backend enforces it). */
+export const OTP_VALIDITY_SECONDS = 120;
 
 /** sessionStorage key for the pending verification email (non-sensitive). */
 const PENDING_EMAIL_KEY = "meronote_pending_email";
@@ -49,6 +51,14 @@ export function clearPendingEmail(): void {
 /** `true` for exactly 6 ASCII digits (client pre-check; backend is authoritative). */
 export function isValidOtpFormat(otp: string): boolean {
   return new RegExp(`^\\d{${OTP_LENGTH}}$`).test(otp);
+}
+
+/** Format a countdown as MM:SS (clamped at zero; UX display only). */
+export function formatCountdownMMSS(totalSeconds: number): string {
+  const clamped = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(clamped / 60);
+  const seconds = clamped % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 /**

@@ -8,7 +8,9 @@ import {
 import {
   INITIAL_RESEND_COOLDOWN_SECONDS,
   OTP_LENGTH,
+  OTP_VALIDITY_SECONDS,
   clearPendingEmail,
+  formatCountdownMMSS,
   isValidOtpFormat,
   maskEmail,
   readPendingEmail,
@@ -155,12 +157,25 @@ describe("otpFlow helpers", () => {
   it("validates the 6-digit OTP format", () => {
     expect(OTP_LENGTH).toBe(6);
     expect(INITIAL_RESEND_COOLDOWN_SECONDS).toBe(60);
+    expect(OTP_VALIDITY_SECONDS).toBe(120);
     expect(isValidOtpFormat("123456")).toBe(true);
     expect(isValidOtpFormat("12345")).toBe(false);
     expect(isValidOtpFormat("1234567")).toBe(false);
     expect(isValidOtpFormat("12345a")).toBe(false);
     expect(isValidOtpFormat("12 456")).toBe(false);
     expect(isValidOtpFormat("")).toBe(false);
+  });
+
+  it("formats timer countdowns as MM:SS", () => {
+    expect(formatCountdownMMSS(120)).toBe("02:00");
+    expect(formatCountdownMMSS(102)).toBe("01:42");
+    expect(formatCountdownMMSS(60)).toBe("01:00");
+    expect(formatCountdownMMSS(59)).toBe("00:59");
+    expect(formatCountdownMMSS(37)).toBe("00:37");
+    expect(formatCountdownMMSS(5)).toBe("00:05");
+    expect(formatCountdownMMSS(1)).toBe("00:01");
+    expect(formatCountdownMMSS(0)).toBe("00:00");
+    expect(formatCountdownMMSS(-7)).toBe("00:00");
   });
 
   it("masks emails without leaking the local part", () => {

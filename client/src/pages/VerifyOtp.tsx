@@ -8,7 +8,9 @@ import { OtpInput } from "../components/auth/OtpInput";
 import {
   INITIAL_RESEND_COOLDOWN_SECONDS,
   OTP_LENGTH,
+  OTP_VALIDITY_SECONDS,
   clearPendingEmail,
+  formatCountdownMMSS,
   isValidOtpFormat,
   maskEmail,
   readPendingEmail,
@@ -38,14 +40,18 @@ export default function VerifyOtp() {
   const [busy, setBusy] = useState(false);
   const [resending, setResending] = useState(false);
   const [cooldown, setCooldown] = useState(INITIAL_RESEND_COOLDOWN_SECONDS);
+  // Remaining lifetime of the current OTP (UX indicator only; the backend
+  // enforces expiry). Independent from the resend cooldown below.
+  const [expiresIn, setExpiresIn] = useState(OTP_VALIDITY_SECONDS);
 
   useEffect(() => {
-    if (cooldown <= 0) return;
+    if (cooldown <= 0 && expiresIn <= 0) return;
     const timer = window.setInterval(() => {
       setCooldown((remaining) => (remaining <= 1 ? 0 : remaining - 1));
+      setExpiresIn((remaining) => (remaining <= 1 ? 0 : remaining - 1));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [cooldown]);
+  }, [cooldown, expiresIn]);
 
   if (status === "authed" && user) {
     return <Navigate to={user.role === "ADMIN" ? "/admin" : "/dashboard"} replace />;
@@ -74,6 +80,10 @@ export default function VerifyOtp() {
     } catch (err) {
       if (err instanceof AuthError) {
         if (err.status === 409) setAccountExists(true);
+        // NOTE: a verify 429 carries the dead OTP's remaining lifetime, NOT
+        // a resend cooldown — it must never block the resend button, which
+        // is the only recovery path after exhausted attempts. The resend
+        // cooldown is driven solely by resend responses, enforced backend-side.
         if (typeof err.attemptsLeft === "number") {
           setError(
             err.attemptsLeft > 0
@@ -82,9 +92,6 @@ export default function VerifyOtp() {
           );
         } else {
           setError(err.message);
-        }
-        if (typeof err.retryAfterSeconds === "number") {
-          setCooldown(err.retryAfterSeconds);
         }
       } else {
         setError("Verification failed. Please try again.");
@@ -100,9 +107,10 @@ export default function VerifyOtp() {
     setResending(true);
     try {
       await resendOtp(email);
-      // The rotation killed any typed code: clear it so verify can't burn
-      // an attempt on the dead OTP.
+      // A new OTP was issued: the old code is dead, so clear it (verifying
+      // it would only burn an attempt) and restart both timers.
       setOtp("");
+      setExpiresIn(OTP_VALIDITY_SECONDS);
       setCooldown(INITIAL_RESEND_COOLDOWN_SECONDS);
       toast("A new verification code was sent to your email.");
     } catch (err) {
@@ -135,6 +143,10 @@ export default function VerifyOtp() {
       <form onSubmit={handleVerify} noValidate className="space-y-4">
         <OtpInput id="verify-otp" value={otp} onChange={setOtp} disabled={busy} />
 
+        <p className={`text-center text-sm font-medium ${expiresIn > 0 ? "text-muted-foreground" : "text-error"}`}>
+          {expiresIn > 0 ? `Code expires in ${formatCountdownMMSS(expiresIn)}` : "Code expired"}
+        </p>
+
         <AuthFormError message={error} />
 
         <AuthSubmit busy={busy} busyLabel="Verifying..." disabled={busy || status === "loading" || otp.length !== OTP_LENGTH}>
@@ -143,16 +155,17 @@ export default function VerifyOtp() {
       </form>
 
       <div className="mt-4 text-center text-sm font-medium text-muted-foreground">
+        <p>Didn&apos;t receive the code?</p>
         {cooldown > 0 ? (
           // No live region: announcing every tick would spam screen readers.
           // The resend button appearing when the cooldown ends is the signal.
-          <span>Resend code in {cooldown}s</span>
+          <span className="mt-1 block">Resend in {formatCountdownMMSS(cooldown)}</span>
         ) : (
           <button
             type="button"
             onClick={handleResend}
             disabled={resending || busy}
-            className="font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-1 font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
           >
             {resending ? "Sending..." : "Resend code"}
           </button>

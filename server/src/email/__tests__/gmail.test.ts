@@ -114,7 +114,15 @@ describe("Gmail API provider", () => {
     expect(mime).toContain("multipart/alternative");
     expect(mime).toContain("123456");
     expect(mime).toContain("This code expires in 2 minutes.");
-    expect(mime).toContain("<p>MeroNote</p>");
+    expect(mime).toContain("Verify Your Email");
+    expect(mime).toContain('role="presentation"');
+    expect(mime).toContain("multipart/alternative");
+    expect(mime).toContain("text/plain");
+    expect(mime).toContain("text/html");
+    expect(mime).toContain("MeroNote");
+    // Plain-text fallback carries the same required information.
+    expect(mime).toContain("Your verification code is: 123456");
+    expect(mime).toContain("safely ignore this email");
   });
 
   it("builds MIME messages that round-trip through base64url", async () => {
@@ -135,7 +143,10 @@ describe("Gmail API provider", () => {
     // Bodies survive normalization with content intact.
     expect(mime).toContain("Your verification code is:");
     expect(mime).toContain("This code expires in 2 minutes.");
-    expect(mime).toContain("<p>MeroNote</p>");
+    expect(mime).toContain("Verify Your Email");
+    expect(mime).toContain("safely ignore this email");
+    expect(mime).toContain('role="presentation"');
+    expect(mime).toContain("MeroNote");
     const roundTripped = decodeRaw(encodeMimeMessage(mime));
     expect(roundTripped).toBe(mime);
     expect(encodeMimeMessage(mime)).toMatch(/^[A-Za-z0-9-_]+$/);
