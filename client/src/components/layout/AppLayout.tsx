@@ -45,12 +45,13 @@ function PageTransition({ children }: { children: React.ReactNode }) {
 export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { pathname } = useLocation();
-  // Reader routes render the full-bleed PDF viewer: the shell's outer
-  // gutter and centered column are lifted for these routes only, so the
-  // viewer spans the full content width (sidebar boundary to viewport
-  // edge) and attaches directly under the app header. The viewer itself
-  // fits the viewport exactly (100dvh minus app header), so the window
-  // never scrolls and only the PDF area scrolls internally.
+  // Reader routes render the full-bleed PDF viewer without the app header:
+  // the shell's outer gutter and centered column are lifted for these
+  // routes only, so the viewer spans the full content width (sidebar
+  // boundary to viewport edge) and touches the viewport top directly.
+  // The viewer itself fits the viewport exactly (100dvh), so the window
+  // never scrolls and only the PDF area scrolls internally. The reader
+  // toolbar's Back button remains the way out.
   const isReaderRoute = /\/reader\//.test(pathname);
 
   return (
@@ -74,15 +75,15 @@ export function AppLayout() {
       <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       <div className="lg:pl-64">
-        <Header onMenuClick={() => setDrawerOpen(true)} />
+        {!isReaderRoute && <Header onMenuClick={() => setDrawerOpen(true)} />}
         {/* pb-28 on mobile clears the fixed bottom nav (74px + safe-area);
             desktop keeps its own spacing (nav is hidden on lg). Reader
             routes are full-bleed at every breakpoint (no gutter, no
-            centered column) with true 0px spacing under the app header
-            (the header renders its bottom border transparent there). The
-            inline paddingBottom holds pb-0 below lg, where a global
-            bottom-nav clearance rule would otherwise override the class
-            and reintroduce window scroll on reader routes. */}
+            centered column) starting at the viewport top with true 0px
+            outer spacing. The inline paddingBottom holds pb-0 below lg,
+            where a global bottom-nav clearance rule would otherwise
+            override the class and reintroduce window scroll on reader
+            routes. */}
         <main
           className={
             isReaderRoute
@@ -93,7 +94,7 @@ export function AppLayout() {
         >
           {/* Reader routes bypass the slide animation wrapper: its
               translateX/opacity transform + overflow-x-clip can open a 1px
-              bg seam at the app-header boundary. All other routes animate. */}
+              bg seam at the viewport top. All other routes animate. */}
           {isReaderRoute ? (
             <Outlet />
           ) : (

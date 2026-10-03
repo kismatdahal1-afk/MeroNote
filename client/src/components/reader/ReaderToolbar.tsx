@@ -6,7 +6,7 @@ import {
 import { IconButton } from "../common/IconButton";
 
 /** The single fixed reader-control region: breadcrumb + toolbar behave as
- *  one unit, stuck below the app header (h-16) via top-16 with zero gap.
+ *  one unit, docked at the viewport top (no app header on reader routes).
  *  Only the document area below scrolls. */
 export function ReaderControlRegion({
   children,
@@ -15,7 +15,7 @@ export function ReaderControlRegion({
 }) {
   return (
     <header
-      className="sticky top-16 z-30 mt-0 flex flex-shrink-0 flex-col border-t-0 bg-surface pt-0"
+      className="sticky top-0 z-30 mt-0 flex flex-shrink-0 flex-col border-t-0 bg-surface pt-0"
     >
       {children}
     </header>
