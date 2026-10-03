@@ -19,6 +19,7 @@ interface PdfViewerProps {
   onDownload?: () => void;
   downloadActive?: boolean;
   breadcrumbs?: ReactNode;
+  header?: ReactNode;
   className?: string;
   fileUrl?: string | null;
   urlLoading?: boolean;
@@ -38,6 +39,7 @@ export function PdfViewer({
   onDownload,
   downloadActive = false,
   breadcrumbs,
+  header,
   className,
   fileUrl = null,
   urlLoading = false,
@@ -172,8 +174,16 @@ export function PdfViewer({
     >
       <main className="flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col h-full">
-          {/* One fixed control region: breadcrumb + toolbar docked under
-              the app header. Only the document below scrolls. */}
+          {/* Resource-page header (Back + title + trail), matching the
+              resource detail page. Fixed at the shell top; only the
+              document lane below scrolls. */}
+          {header && (
+            <div className="flex-shrink-0 px-3 pt-2 lg:px-4">
+              {header}
+            </div>
+          )}
+          {/* One fixed control region: breadcrumb + toolbar docked below
+              the page header. Only the document below scrolls. */}
           <ReaderControlRegion>
             {breadcrumbs && (
               <ReaderBreadcrumb>{breadcrumbs}</ReaderBreadcrumb>
