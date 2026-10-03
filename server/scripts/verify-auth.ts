@@ -104,8 +104,8 @@ async function main(): Promise<void> {
   const reg = await post("/api/auth/register", {
     name: "Test Student",
     email: "student@example.com",
-    password: "study-hard-123",
-    confirmPassword: "study-hard-123",
+    password: "Study-hard-123@",
+    confirmPassword: "Study-hard-123@",
   });
   check("register 201 + safe user", reg.status === 201 && reg.json.data?.role === "USER", `status=${reg.status}`);
   const studentCookie = sessionCookie(reg.setCookie);
@@ -115,15 +115,15 @@ async function main(): Promise<void> {
   const dup = await post("/api/auth/register", {
     name: "Test Student",
     email: "student@example.com",
-    password: "study-hard-123",
-    confirmPassword: "study-hard-123",
+    password: "Study-hard-123@",
+    confirmPassword: "Study-hard-123@",
   });
   check("duplicate email 409", dup.status === 409);
 
   // 3. Invalid input rejected.
-  const badEmail = await post("/api/auth/register", { name: "Test Student", email: "not-an-email", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  const badEmail = await post("/api/auth/register", { name: "Test Student", email: "not-an-email", password: "Study-hard-123@", confirmPassword: "Study-hard-123@" });
   const weak = await post("/api/auth/register", { name: "Test Student", email: "weak@example.com", password: "short", confirmPassword: "short" });
-  const mismatch = await post("/api/auth/register", { name: "Test Student", email: "mm@example.com", password: "study-hard-123", confirmPassword: "different-123" });
+  const mismatch = await post("/api/auth/register", { name: "Test Student", email: "mm@example.com", password: "Study-hard-123@", confirmPassword: "different-123" });
   check("invalid email/weak password/mismatch → 400", badEmail.status === 400 && weak.status === 400 && mismatch.status === 400);
 
   // 4. Signup name: stored verbatim in MongoDB and returned in SafeUser.
@@ -132,17 +132,17 @@ async function main(): Promise<void> {
   check("register response contains the name", reg.json.data?.name === "Test Student");
 
   // 5. Signup name validation matrix.
-  const emptyName = await post("/api/auth/register", { name: "", email: "empty@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
-  const blankName = await post("/api/auth/register", { name: "   ", email: "blank@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
-  const missingName = await post("/api/auth/register", { email: "missing@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
-  const numericName = await post("/api/auth/register", { name: 42, email: "numeric@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
-  const longName = await post("/api/auth/register", { name: "n".repeat(81), email: "long@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  const emptyName = await post("/api/auth/register", { name: "", email: "empty@example.com", password: "Study-hard-123@", confirmPassword: "Study-hard-123@" });
+  const blankName = await post("/api/auth/register", { name: "   ", email: "blank@example.com", password: "Study-hard-123@", confirmPassword: "Study-hard-123@" });
+  const missingName = await post("/api/auth/register", { email: "missing@example.com", password: "Study-hard-123@", confirmPassword: "Study-hard-123@" });
+  const numericName = await post("/api/auth/register", { name: 42, email: "numeric@example.com", password: "Study-hard-123@", confirmPassword: "Study-hard-123@" });
+  const longName = await post("/api/auth/register", { name: "n".repeat(81), email: "long@example.com", password: "Study-hard-123@", confirmPassword: "Study-hard-123@" });
   check(
     "empty/whitespace/missing/non-string/overlong name → 400",
     [emptyName, blankName, missingName, numericName, longName].every((r) => r.status === 400),
     `statuses=${[emptyName, blankName, missingName, numericName, longName].map((r) => r.status).join(",")}`,
   );
-  const padded = await post("/api/auth/register", { name: "  Padded Name  ", email: "padded@example.com", password: "study-hard-123", confirmPassword: "study-hard-123" });
+  const padded = await post("/api/auth/register", { name: "  Padded Name  ", email: "padded@example.com", password: "Study-hard-123@", confirmPassword: "Study-hard-123@" });
   const paddedStored = await User.findOne({ email: "padded@example.com" }).lean().exec();
   check(
     "name is trimmed before storage",
@@ -153,16 +153,16 @@ async function main(): Promise<void> {
   // 6. Password stored only as hash; never returned.
   const stored = await User.findOne({ email: "student@example.com" }).select("+passwordHash").lean().exec();
   const hash = (stored as { passwordHash?: string } | null)?.passwordHash ?? "";
-  check("passwordHash is bcrypt hash, not plain text", hash.startsWith("$2") && hash !== "study-hard-123");
+  check("passwordHash is bcrypt hash, not plain text", hash.startsWith("$2") && hash !== "Study-hard-123@");
   const bodies = JSON.stringify([reg.json, dup.json, badEmail.json]);
   check("passwordHash never in responses", !bodies.includes("passwordHash") && !bodies.includes("$2"));
 
   // 7. Login ok / ko.
-  const login = await post("/api/auth/login", { email: "student@example.com", password: "study-hard-123", remember: true });
+  const login = await post("/api/auth/login", { email: "student@example.com", password: "Study-hard-123@", remember: true });
   check("login 200 + sets cookie", login.status === 200 && Boolean(sessionCookie(login.setCookie)));
   check("remember-me cookie is persistent", (login.setCookie ?? "").includes("Expires=") || (login.setCookie ?? "").includes("Max-Age"));
   const wrong = await post("/api/auth/login", { email: "student@example.com", password: "wrong-password-1" });
-  const unknown = await post("/api/auth/login", { email: "nobody@example.com", password: "study-hard-123" });
+  const unknown = await post("/api/auth/login", { email: "nobody@example.com", password: "Study-hard-123@" });
   check(
     "wrong password / unknown user → 401 generic",
     wrong.status === 401 && unknown.status === 401 && wrong.json.message === unknown.json.message,
@@ -186,7 +186,7 @@ async function main(): Promise<void> {
 
    // 9. Admin promotion + admin access with new login.
    await User.findOneAndUpdate({ email: "student@example.com" }, { $set: { role: "ADMIN" } }).exec();
-   const adminLogin = await post("/api/auth/login", { email: "student@example.com", password: "study-hard-123" });
+   const adminLogin = await post("/api/auth/login", { email: "student@example.com", password: "Study-hard-123@" });
    const adminCookie = sessionCookie(adminLogin.setCookie);
    const adminAdmin = await get("/api/auth/admin/ping", adminCookie);
    check("USER → admin route 403", userAdmin.status === 403);

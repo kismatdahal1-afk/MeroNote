@@ -122,7 +122,7 @@ async function main(): Promise<void> {
     );
 
     // 4. Fixtures: USER + ADMIN sessions (4 auth POSTs total — far below the bucket).
-    const pw = { password: "phase14-test-123", confirmPassword: "phase14-test-123" };
+    const pw = { password: "Phase14-test-123@", confirmPassword: "Phase14-test-123@" };
     const regA = await call("POST", "/api/auth/register", null, { name: "P14 A", email: "p14a@example.com", ...pw });
     const regB = await call("POST", "/api/auth/register", null, { name: "P14 B", email: "p14b@example.com", ...pw });
     const dup = await call("POST", "/api/auth/register", null, { name: "P14 Dup", email: "p14a@example.com", ...pw });

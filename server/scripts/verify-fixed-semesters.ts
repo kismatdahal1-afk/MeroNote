@@ -95,7 +95,7 @@ async function main(): Promise<void> {
   };
   const cookieOf = (setCookie: string | null): string => (setCookie ? setCookie.split(";")[0] : "");
   const register = async (email: string): Promise<void> => {
-    const res = await call("POST", "/api/auth/register", null, { name: "Fixed User", email, password: "fixed-test-123", confirmPassword: "fixed-test-123" });
+    const res = await call("POST", "/api/auth/register", null, { name: "Fixed User", email, password: "Fixed-test-123@", confirmPassword: "Fixed-test-123@" });
     if (res.status !== 201) throw new Error(`fixture register failed: ${res.status}`);
   };
   await register("fixedadmin@example.com");
@@ -103,7 +103,7 @@ async function main(): Promise<void> {
   const loginRes = await fetch(`${base}/api/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "fixedadmin@example.com", password: "fixed-test-123" }),
+    body: JSON.stringify({ email: "fixedadmin@example.com", password: "Fixed-test-123@" }),
   });
   const admin = cookieOf(loginRes.headers.get("set-cookie"));
 

@@ -67,7 +67,7 @@ function bodyReq(body: Record<string, unknown>): Request {
   return { body, query: {}, cookies: {} } as unknown as Request;
 }
 
-const VALID = { name: "Manual", email: "otp@example.com", password: "correct-horse-8", confirmPassword: "correct-horse-8" };
+const VALID = { name: "Manual", email: "otp@example.com", password: "Correct-horse-8@", confirmPassword: "Correct-horse-8@" };
 
 function lastSentOtp(): string {
   const calls = mockedSend.mock.calls;

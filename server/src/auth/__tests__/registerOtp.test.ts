@@ -64,7 +64,7 @@ function bodyReq(body: Record<string, unknown>): Request {
   return { body, query: {}, cookies: {} } as unknown as Request;
 }
 
-const VALID = { name: "Manual", email: "otp@example.com", password: "correct-horse-8", confirmPassword: "correct-horse-8" };
+const VALID = { name: "Manual", email: "otp@example.com", password: "Correct-horse-8@", confirmPassword: "Correct-horse-8@" };
 
 function sentOtps(): string[] {
   return mockedSend.mock.calls.map((call) => (call[0] as { otp: string }).otp);
@@ -129,7 +129,7 @@ describe("POST /register/initiate", () => {
     expect(doc?.firstSentAt).toBeInstanceOf(Date);
     // Bcrypt password hash, never plaintext.
     expect(doc?.passwordHash).toMatch(/^\$2[aby]\$/);
-    expect(doc?.passwordHash).not.toContain("correct-horse-8");
+    expect(doc?.passwordHash).not.toContain("Correct-horse-8@");
     // OTP hash matches Step 2 HMAC construction, never plaintext.
     expect(doc?.otpHash).toBe(hashOtp(sent.otp, doc?.otpSalt as string));
     expect(doc?.otpHash).not.toContain(sent.otp);
@@ -160,7 +160,7 @@ describe("POST /register/initiate", () => {
       { ...VALID, name: "  " },
       { ...VALID, email: "not-an-email" },
       { ...VALID, password: "short", confirmPassword: "short" },
-      { ...VALID, confirmPassword: "different-horse-9" },
+      { ...VALID, confirmPassword: "Different-horse-9@" },
     ]) {
       const res = fakeRes();
       await initiateRegistration(bodyReq(body), res as unknown as Response);
@@ -406,7 +406,7 @@ describe("provider failure fails closed", () => {
     mockedSend.mockRejectedValueOnce(new Error("provider down"));
     const res = fakeRes();
     await initiateRegistration(
-      bodyReq({ ...VALID, name: "Manual Two", password: "different-horse-9", confirmPassword: "different-horse-9" }),
+      bodyReq({ ...VALID, name: "Manual Two", password: "Different-horse-9@", confirmPassword: "Different-horse-9@" }),
       res as unknown as Response,
     );
     expect(res.statusCode).toBe(500);

@@ -89,15 +89,15 @@ async function main(): Promise<void> {
     const r = await post("/api/auth/register", {
       name: "F1 User",
       email,
-      password: "study-hard-123",
-      confirmPassword: "study-hard-123",
+      password: "Study-hard-123@",
+      confirmPassword: "Study-hard-123@",
     });
     return toJar(r.setCookie);
   }
 
   // Helper: login and return credentials
   async function loginUser(email: string, remember = false): Promise<Jar> {
-    const r = await post("/api/auth/login", { email, password: "study-hard-123", remember });
+    const r = await post("/api/auth/login", { email, password: "Study-hard-123@", remember });
     return toJar(r.setCookie);
   }
 
@@ -156,7 +156,7 @@ async function main(): Promise<void> {
     await User.findOneAndUpdate({ email: "f1-admin@example.com" }, { $set: { role: "ADMIN" } }).exec();
     const adminLogin = await post("/api/auth/login", {
       email: "f1-admin@example.com",
-      password: "study-hard-123",
+      password: "Study-hard-123@",
     });
     const adminJar = toJar(adminLogin.setCookie);
 

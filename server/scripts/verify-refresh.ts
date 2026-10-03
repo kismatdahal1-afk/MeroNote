@@ -108,8 +108,8 @@ async function main(): Promise<void> {
       const r = await req("POST", "/api/auth/register", { "content-type": "application/json" }, {
         name: "Refresh User",
         email,
-        password: "study-hard-123",
-        confirmPassword: "study-hard-123",
+        password: "Study-hard-123@",
+        confirmPassword: "Study-hard-123@",
       });
       if (r.status !== 201) throw new Error(`register failed: ${r.status}`);
       return toJar(r.setCookie);
@@ -128,8 +128,8 @@ async function main(): Promise<void> {
     const reg = await req("POST", "/api/auth/register", { "content-type": "application/json" }, {
       name: "Refresh User",
       email: "refresh@example.com",
-      password: "study-hard-123",
-      confirmPassword: "study-hard-123",
+      password: "Study-hard-123@",
+      confirmPassword: "Study-hard-123@",
     });
     check("register 201", reg.status === 201, `status=${reg.status}`);
     const jarR1 = toJar(reg.setCookie);
@@ -259,7 +259,7 @@ async function main(): Promise<void> {
     const jarDevA = await registerUser("refresh-multi@example.com");
     const loginB = await req("POST", "/api/auth/login", { "content-type": "application/json" }, {
       email: "refresh-multi@example.com",
-      password: "study-hard-123",
+      password: "Study-hard-123@",
     });
     const jarDevB = toJar(loginB.setCookie);
     await req("POST", "/api/auth/logout", withProof(jarDevA), {});

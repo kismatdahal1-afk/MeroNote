@@ -73,7 +73,7 @@ async function main(): Promise<void> {
     const res = await fetch(`${base}/api/auth/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password: "admin-test-123" }),
+      body: JSON.stringify({ email, password: "Admin-test-123@" }),
     });
     return cookieOf(res.headers.get("set-cookie"));
   };
@@ -81,8 +81,8 @@ async function main(): Promise<void> {
     const res = await call("POST", "/api/auth/register", null, {
       name: "CMS Admin",
       email,
-      password: "admin-test-123",
-      confirmPassword: "admin-test-123",
+      password: "Admin-test-123@",
+      confirmPassword: "Admin-test-123@",
     });
     if (res.status !== 201) throw new Error(`fixture register failed: ${res.status}`);
   };

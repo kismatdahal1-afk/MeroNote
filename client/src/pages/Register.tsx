@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useToast } from "../state/ToastProvider";
 import { useUser } from "../state/UserProvider";
 import { AuthError } from "../lib/authApi";
+import { validateRegistrationPassword } from "../lib/passwordRules";
 import { saveOtpIssuedAt, savePendingEmail } from "../lib/otpFlow";
 import { AuthField, AuthFormError, AuthSubmit, PasswordField } from "../components/auth/AuthFields";
 
@@ -38,12 +39,9 @@ export default function Register() {
       setError("Please fill in name, email, password, and confirmation.");
       return;
     }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    const passwordError = validateRegistrationPassword(password, confirmPassword);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     setError("");
@@ -101,7 +99,7 @@ export default function Register() {
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="At least 8 characters"
+          placeholder="8+ characters: upper, lower, number & symbol"
           showPassword={showPassword}
           onTogglePassword={() => setShowPassword((v) => !v)}
         />

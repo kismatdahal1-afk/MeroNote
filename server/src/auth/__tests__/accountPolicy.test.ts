@@ -144,7 +144,7 @@ describe("password registration policy", () => {
   it("creates a password user with default provider and no googleId", async () => {
     const res = fakeRes();
     await register(
-      bodyReq({ name: "Manual", email: "Manual@Example.com", password: "password-123", confirmPassword: "password-123" }),
+      bodyReq({ name: "Manual", email: "Manual@Example.com", password: "Password-123@", confirmPassword: "Password-123@" }),
       res as unknown as Response,
     );
     expect(res.statusCode).toBe(201);
@@ -160,7 +160,7 @@ describe("password registration policy", () => {
     const before = await authSnapshot("dup@example.com");
     const res = fakeRes();
     await register(
-      bodyReq({ name: "Other", email: "dup@example.com", password: "password-123", confirmPassword: "password-123" }),
+      bodyReq({ name: "Other", email: "dup@example.com", password: "Password-123@", confirmPassword: "Password-123@" }),
       res as unknown as Response,
     );
     expect(res.statusCode).toBe(409);
@@ -175,7 +175,7 @@ describe("password registration policy", () => {
     const before = await authSnapshot("gowned@example.com");
     const res = fakeRes();
     await register(
-      bodyReq({ name: "Manual", email: "gowned@example.com", password: "password-123", confirmPassword: "password-123" }),
+      bodyReq({ name: "Manual", email: "gowned@example.com", password: "Password-123@", confirmPassword: "Password-123@" }),
       res as unknown as Response,
     );
     expect(res.statusCode).toBe(409);
@@ -188,7 +188,7 @@ describe("password registration policy", () => {
     await User.create({ name: "Manual", email: "case@example.com", passwordHash: "original-hash", role: "USER" });
     const res = fakeRes();
     await register(
-      bodyReq({ name: "Other", email: "CASE@EXAMPLE.COM", password: "password-123", confirmPassword: "password-123" }),
+      bodyReq({ name: "Other", email: "CASE@EXAMPLE.COM", password: "Password-123@", confirmPassword: "Password-123@" }),
       res as unknown as Response,
     );
     expect(res.statusCode).toBe(409);

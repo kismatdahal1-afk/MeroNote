@@ -63,6 +63,13 @@ import { env } from "../config/env";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 128;
+/**
+ * Composition: at least one lowercase, one uppercase, one digit, and one
+ * special (non-alphanumeric, non-whitespace) character. Whitespace is
+ * rejected separately so its message stays specific.
+ */
+const PASSWORD_STRENGTH_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9\s]).+$/;
+const WHITESPACE_PATTERN = /\s/;
 
 interface SafeUser {
   id: string;
@@ -189,6 +196,20 @@ function validateRegistrationFields(
   }
   if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
     res.status(400).json({ status: "error", message: "Password must be at least 8 characters." });
+    return false;
+  }
+  // readString already trims the password, so leading/trailing whitespace
+  // cannot persist (login trims identically); this rejects interior (or any
+  // remaining) whitespace such as spaces, tabs, or newlines.
+  if (WHITESPACE_PATTERN.test(password)) {
+    res.status(400).json({ status: "error", message: "Password must not contain spaces." });
+    return false;
+  }
+  if (!PASSWORD_STRENGTH_PATTERN.test(password)) {
+    res.status(400).json({
+      status: "error",
+      message: "Password must include an uppercase letter, a lowercase letter, a number, and a special character.",
+    });
     return false;
   }
   if (password !== confirmPassword) {

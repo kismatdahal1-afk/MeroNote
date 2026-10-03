@@ -94,8 +94,8 @@ async function main(): Promise<void> {
     const reg = await req("POST", "/api/auth/register", { "content-type": "application/json" }, {
       name: "CSRF User",
       email: "csrf@example.com",
-      password: "study-hard-123",
-      confirmPassword: "study-hard-123",
+      password: "Study-hard-123@",
+      confirmPassword: "Study-hard-123@",
     });
     check("register 201 without CSRF proof (pre-session, exempt)", reg.status === 201, `status=${reg.status}`);
     const regJar = toJar(reg.setCookie);
@@ -115,7 +115,7 @@ async function main(): Promise<void> {
     // Login rotates the CSRF token.
     const login = await req("POST", "/api/auth/login", { "content-type": "application/json" }, {
       email: "csrf@example.com",
-      password: "study-hard-123",
+      password: "Study-hard-123@",
     });
     check("login 200 without CSRF proof (pre-session, exempt)", login.status === 200, `status=${login.status}`);
     const jar = toJar(login.setCookie);
@@ -220,13 +220,13 @@ async function main(): Promise<void> {
     await req("POST", "/api/auth/register", { "content-type": "application/json" }, {
       name: "CSRF Admin",
       email: "csrf-admin@example.com",
-      password: "study-hard-123",
-      confirmPassword: "study-hard-123",
+      password: "Study-hard-123@",
+      confirmPassword: "Study-hard-123@",
     });
     await User.findOneAndUpdate({ email: "csrf-admin@example.com" }, { $set: { role: "ADMIN" } }).exec();
     const adminLogin = await req("POST", "/api/auth/login", { "content-type": "application/json" }, {
       email: "csrf-admin@example.com",
-      password: "study-hard-123",
+      password: "Study-hard-123@",
     });
     const adminJar = toJar(adminLogin.setCookie);
     const noticeBody = { heading: "CSRF drill", type: "general", announcer: "library", date: new Date().toISOString() };

@@ -80,8 +80,8 @@ async function main(): Promise<void> {
     const res = await authed("POST", "/api/auth/register", null, {
       name: "Study User",
       email,
-      password: "study-password-123",
-      confirmPassword: "study-password-123",
+      password: "Study-password-123@",
+      confirmPassword: "Study-password-123@",
     });
     if (res.status !== 201) throw new Error(`fixture register failed for ${email}: ${res.status}`);
     return cookieOf(res.setCookie);
@@ -90,7 +90,7 @@ async function main(): Promise<void> {
   const cookieB = await mkUser("userb@example.com");
   const cookieAdmin = await mkUser("adminx@example.com");
   await User.findOneAndUpdate({ email: "adminx@example.com" }, { $set: { role: "ADMIN" } }).exec();
-  const adminRe = await authed("POST", "/api/auth/login", null, { email: "adminx@example.com", password: "study-password-123" });
+  const adminRe = await authed("POST", "/api/auth/login", null, { email: "adminx@example.com", password: "Study-password-123@" });
   const adminCookie = cookieOf(adminRe.setCookie);
 
   const semester = await Semester.create({ number: 1, name: "Personal Sem", order: 1, status: "published" });

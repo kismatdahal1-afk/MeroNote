@@ -75,8 +75,8 @@ async function main(): Promise<void> {
     const res = await authed("POST", "/api/auth/register", null, {
       name: "Phase19 User",
       email,
-      password: "phase19-password-123",
-      confirmPassword: "phase19-password-123",
+      password: "Phase19-password-123@",
+      confirmPassword: "Phase19-password-123@",
     });
     if (res.status !== 201) throw new Error(`fixture register failed for ${email}: ${res.status}`);
     return cookieOf(res.setCookie);
