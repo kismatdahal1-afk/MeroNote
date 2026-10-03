@@ -407,7 +407,7 @@ export function ReaderSkeleton() {
     <SkPage label="Loading document viewer">
       <div aria-hidden="true">
         {/* Compact breadcrumb row */}
-        <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background px-3 pb-2 pt-0">
+        <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background px-3 py-0">
           <SkBox className="h-3 w-16" />
           <SkBox className="h-3 w-24" />
           <SkBox className="h-3 w-32" />
