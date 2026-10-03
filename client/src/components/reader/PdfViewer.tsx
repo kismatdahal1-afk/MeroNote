@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { cx, clamp } from "../../lib/utils";
 import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
 import { MOBILE_PINCH_MAX_ZOOM, ZOOM_LEVELS, isMobileViewport, useReaderZoom } from "./useReaderZoom";
 import { ReaderControlRegion, ReaderToolbarDesktop, ReaderToolbarMobile } from "./ReaderToolbar";
 import { ReaderBreadcrumb } from "./ReaderBreadcrumb";
+import { ReaderThumbnailSidebar } from "./ReaderThumbnailSidebar";
 import { ReaderErrorState, ReaderLoadingState } from "./ReaderDocStates";
 
 interface PdfViewerProps {
@@ -49,6 +51,10 @@ export function PdfViewer({
 
   const [page, setPage] = useState(() => clamp(initialPage, 1, totalPages));
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Thumbnail sidebar: live document published by PdfCanvas (observe-only),
+  // plus local collapse state (desktop only; mobile never renders it).
+  const [sidebarDoc, setSidebarDoc] = useState<PDFDocumentProxy | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   // Single zoom source of truth (UI units); render mapping stays
   // platform-specific via zoomReference. See useReaderZoom.
   const {
@@ -171,7 +177,7 @@ export function PdfViewer({
             <ReaderToolbarMobile toolbarLeading={toolbarLeading} {...toolbarCommon} />
           </ReaderControlRegion>
 
-          <div className="flex-1 min-h-0 overflow-hidden bg-background">
+          <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
             {loadError ? (
               <ReaderErrorState message={loadError} onRetry={onRetryFile} />
             ) : urlLoading || !fileUrl ? (
@@ -179,25 +185,39 @@ export function PdfViewer({
                 message={urlLoading ? "Requesting secure access…" : "Loading PDF…"}
               />
             ) : (
-              // Full-width document lane: at 100% the page stays centered
-              // at its natural A4 size; beyond 100% PdfCanvas spans the
-              // zoomed width so the document expands toward the viewport
-              // edges and pans in both axes instead of sitting in a small
-              // inner frame.
-              <div className="w-full px-2 pb-2 pt-0 h-full">
-                <PdfCanvas
-                  url={fileUrl}
-                  page={page}
-                  onStateChange={handlePdfState}
-                  onPageChange={handlePageChange}
-                  programmaticScrollRef={programmaticScrollRef}
-                  zoom={pdfZoom * zoomReference}
-                  onZoomChange={handlePinchZoom}
-                  uiZoom={pdfZoom}
-                  minZoom={ZOOM_LEVELS[0]}
-                  maxZoom={isMobileViewport() ? MOBILE_PINCH_MAX_ZOOM : ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
-                />
-              </div>
+              // Desktop thumbnail rail + main document lane side by side.
+              // The rail owns its own scroll; the lane keeps the existing
+              // independent scroll. Sidebar width changes flow through the
+              // existing ResizeObserver geometry with no manual math.
+              <>
+                {sidebarDoc && (
+                  <ReaderThumbnailSidebar
+                    key={fileUrl}
+                    doc={sidebarDoc}
+                    docKey={fileUrl}
+                    totalPages={totalPages}
+                    activePage={page}
+                    open={sidebarOpen}
+                    onToggle={() => setSidebarOpen((o) => !o)}
+                    onSelectPage={goToPage}
+                  />
+                )}
+                <div className="h-full min-w-0 flex-1 px-2 pb-2 pt-0">
+                  <PdfCanvas
+                    url={fileUrl}
+                    page={page}
+                    onStateChange={handlePdfState}
+                    onPageChange={handlePageChange}
+                    programmaticScrollRef={programmaticScrollRef}
+                    zoom={pdfZoom * zoomReference}
+                    onZoomChange={handlePinchZoom}
+                    uiZoom={pdfZoom}
+                    minZoom={ZOOM_LEVELS[0]}
+                    maxZoom={isMobileViewport() ? MOBILE_PINCH_MAX_ZOOM : ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
+                    onDocument={setSidebarDoc}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>

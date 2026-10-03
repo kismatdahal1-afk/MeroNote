@@ -38,6 +38,12 @@ interface PdfCanvasProps {
   /** Clamp bounds for pinch zoom (defaults cover the supported range). */
   minZoom?: number;
   maxZoom?: number;
+  /** Observe-only bridge for the thumbnail sidebar: receives the live
+      PDFDocumentProxy whenever it changes (including null while loading
+      or after unload). Ownership and destroy() stay with PdfCanvas —
+      consumers must never destroy, cache beyond the current document,
+      or use the proxy after receiving null. */
+  onDocument?: (doc: PDFDocumentProxy | null) => void;
 }
 
 const MAX_DPR = 2;
@@ -142,7 +148,7 @@ const PageRenderer = memo(function PageRenderer({ pdf, pageNum, containerWidth, 
   );
 });
 
-export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1, onZoomChange, uiZoom = zoom, minZoom = 0.6, maxZoom = 2.5 }: PdfCanvasProps) {
+export function PdfCanvas({ url, page, onStateChange, onPageChange, programmaticScrollRef, zoom = 1, onZoomChange, uiZoom = zoom, minZoom = 0.6, maxZoom = 2.5, onDocument }: PdfCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const contentWrapperRef = useRef<HTMLDivElement>(null);
@@ -157,6 +163,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   const prevZoomRef = useRef(zoom);
   const uiZoomRef = useRef(uiZoom);
   const onZoomChangeRef = useRef(onZoomChange);
+  const onDocumentRef = useRef(onDocument);
   const pinchRef = useRef<{
     active: boolean;
     smooth: boolean;
@@ -183,6 +190,7 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   onPageChangeRef.current = onPageChange;
   uiZoomRef.current = uiZoom;
   onZoomChangeRef.current = onZoomChange;
+  onDocumentRef.current = onDocument;
 
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
   const [loadState, setLoadState] = useState<PdfLoadState>({ status: "loading" });
@@ -732,6 +740,13 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
       setViewportHeight(prev => (prev === h ? prev : h));
     }
   }, [doc, virtualData.numPages]);
+
+  // Thumbnail bridge: publish the live document (or null) to the optional
+  // observer. Parent state updates only; the document lifecycle above is
+  // untouched and remains authoritative.
+  useEffect(() => {
+    onDocumentRef.current?.(doc);
+  }, [doc]);
 
   useEffect(() => {
     if (!url) {
