@@ -24,7 +24,6 @@ import { resolveLocalFileUrl, revokeLocalFileUrl } from "../../lib/downloadManag
 import { getTempPdf, putTempPdf } from "../../lib/tempPdfCache";
 import { decideReadingSource, readingSourceLabel, type ReadingSource } from "../../lib/cachePolicy";
 import { BackButton } from "../common/BackButton";
-import { PageHeader } from "../common/PageHeader";
 import { PdfViewer } from "./PdfViewer";
 
 export function ReaderShell({ admin = false }: { admin?: boolean }) {
@@ -331,35 +330,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
     );
   }
 
-  // Resource-page header trail for the reader-top PageHeader. Mirrors the
-  // in-toolbar breadcrumb above (same entry/admin/semester/subject rules),
-  // expressed as PageHeader items ending at the current PDF. Placed after
-  // the early returns so resource/subject/semester are non-null here.
-  const headerCrumbs: { label: string; to?: string }[] = admin
-    ? [
-        { label: "Admin", to: "/admin" },
-        { label: adminRoot.label, to: adminRoot.to },
-        ...(adminEntry === "semesters" && semester ? [{ label: semester.name }] : []),
-        { label: resource.title },
-        { label: "PDF" },
-      ]
-    : entryRoot
-      ? [
-          { label: entryRoot.label, to: entryRoot.to },
-          ...(showsSubjectInResourceTrail(entry, fromSubject, resource.subjectId) && subject
-            ? [{ label: subject.name }]
-            : []),
-          { label: resource.title },
-          { label: "PDF" },
-        ]
-      : [
-          { label: "Semester", to: "/semesters" },
-          ...(semester ? [{ label: semester.name, to: `/semesters/${semester.id}` }] : []),
-          ...(subject ? [{ label: subject.name, to: `/subjects/${subject.id}` }] : []),
-          { label: resource.title },
-          { label: "PDF" },
-        ];
-
   return (
     <PdfViewer
       key={resource.id}
@@ -471,22 +441,6 @@ export function ReaderShell({ admin = false }: { admin?: boolean }) {
           label="Back to resource"
           className="text-foreground/75 hover:bg-surface-hover hover:text-foreground"
         />
-      }
-      header={
-        <>
-          <div className="mb-1 -ml-1 sm:-ml-1">
-            <BackButton
-              label="Back"
-              fallbackTo={entryRoot ? entryRoot.to : `${baseRoute}/${resource.id}`}
-            />
-          </div>
-          <PageHeader
-            title={resource.title}
-            subtitle={resource.description}
-            compactBreadcrumb={!admin}
-            breadcrumbs={headerCrumbs}
-          />
-        </>
       }
       onBookmark={handleBookmark}
       bookmarked={bookmarked}

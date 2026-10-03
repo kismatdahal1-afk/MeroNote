@@ -19,7 +19,6 @@ interface PdfViewerProps {
   onDownload?: () => void;
   downloadActive?: boolean;
   breadcrumbs?: ReactNode;
-  header?: ReactNode;
   className?: string;
   fileUrl?: string | null;
   urlLoading?: boolean;
@@ -39,7 +38,6 @@ export function PdfViewer({
   onDownload,
   downloadActive = false,
   breadcrumbs,
-  header,
   className,
   fileUrl = null,
   urlLoading = false,
@@ -165,25 +163,17 @@ export function PdfViewer({
       aria-label="PDF viewer"
       className={cx(
         "reader-bar mt-0 flex flex-col overflow-hidden border-0 pt-0",
-        // Full viewport height: no app header is rendered on reader routes,
-        // so the viewer touches the viewport top directly. The window never
-        // scrolls, only the PDF area does.
-        "h-screen supports-[height:100dvh]:h-[100dvh] bg-surface",
+        // Exact viewport below the app header (h-16): window never
+        // scrolls, only the PDF area does. mt-0 attaches the viewer
+        // directly at the header's bottom edge with zero gap.
+        "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface",
         className,
       )}
     >
       <main className="flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col h-full">
-          {/* Resource-page header (Back + title + trail), matching the
-              resource detail page. Fixed at the shell top; only the
-              document lane below scrolls. */}
-          {header && (
-            <div className="flex-shrink-0 px-3 pt-2 lg:px-4">
-              {header}
-            </div>
-          )}
-          {/* One fixed control region: breadcrumb + toolbar docked below
-              the page header. Only the document below scrolls. */}
+          {/* One fixed control region: breadcrumb + toolbar docked under
+              the app header. Only the document below scrolls. */}
           <ReaderControlRegion>
             {breadcrumbs && (
               <ReaderBreadcrumb>{breadcrumbs}</ReaderBreadcrumb>

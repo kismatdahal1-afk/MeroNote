@@ -53,8 +53,13 @@ export function Header({ onMenuClick }: HeaderProps) {
   // Admin (Admin Settings), everywhere else go to Student Settings.
   const settingsPath = role === "ADMIN" && pathname.startsWith("/admin") ? "/admin/settings" : "/settings";
 
+  // Reader routes attach the PDF header flush below with zero gap, so the
+  // app header's own 1px bottom border is rendered transparent there only.
+  // Every other route keeps border-border; layout/content untouched.
+  const readerBorder = /\/reader\//.test(pathname) ? "border-transparent" : "border-border";
+
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b px-4 backdrop-blur-md lg:px-6 bg-surface/80 border-border">
+    <header className={`sticky top-0 z-30 flex h-16 items-center gap-3 border-b px-4 backdrop-blur-md lg:px-6 bg-surface/80 ${readerBorder}`}>
       <IconButton
         icon={Menu}
         label="Open navigation menu"
