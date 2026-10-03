@@ -61,6 +61,10 @@ export function AuthFormFallback() {
 export function AuthLayout() {
   const { pathname } = useLocation();
   const mode: AuthMode = pathname.startsWith("/register") ? "signup" : "login";
+  // The OTP verification step shows its own back-to-registration/login
+  // links: hide the shared Google button + auth toggle links there only.
+  // Login and Register render exactly as before.
+  const isVerifyOtp = pathname === "/register/verify";
   // Guards rapid re-clicks; the page unloads once navigation begins.
   const [redirecting, setRedirecting] = useState(false);
 
@@ -143,39 +147,43 @@ export function AuthLayout() {
             >
               <Outlet />
 
-              <div className="my-5 flex items-center gap-3" aria-hidden="true">
-                <span className="h-px flex-1 bg-border" />
-                <span className="text-xs font-semibold tracking-wide text-muted-foreground">OR</span>
-                <span className="h-px flex-1 bg-border" />
-              </div>
+              {!isVerifyOtp && (
+                <>
+                  <div className="my-5 flex items-center gap-3" aria-hidden="true">
+                    <span className="h-px flex-1 bg-border" />
+                    <span className="text-xs font-semibold tracking-wide text-muted-foreground">OR</span>
+                    <span className="h-px flex-1 bg-border" />
+                  </div>
 
-              <button
-                type="button"
-                onClick={startGoogle}
-                disabled={redirecting}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <GoogleMark />
-                {mode === "login" ? "Continue with Google" : "Sign up with Google"}
-              </button>
+                  <button
+                    type="button"
+                    onClick={startGoogle}
+                    disabled={redirecting}
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-border-strong bg-surface text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <GoogleMark />
+                    {mode === "login" ? "Continue with Google" : "Sign up with Google"}
+                  </button>
 
-              <p className="mt-5 text-center text-sm font-medium text-muted-foreground">
-                {mode === "login" ? (
-                  <>
-                    Don&apos;t have an account?{" "}
-                    <Link to="/register" className="font-semibold text-primary hover:underline">
-                      Sign Up
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    Already have an account?{" "}
-                    <Link to="/login" className="font-semibold text-primary hover:underline">
-                      Login
-                    </Link>
-                  </>
-                )}
-              </p>
+                  <p className="mt-5 text-center text-sm font-medium text-muted-foreground">
+                    {mode === "login" ? (
+                      <>
+                        Don&apos;t have an account?{" "}
+                        <Link to="/register" className="font-semibold text-primary hover:underline">
+                          Sign Up
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        Already have an account?{" "}
+                        <Link to="/login" className="font-semibold text-primary hover:underline">
+                          Login
+                        </Link>
+                      </>
+                    )}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
