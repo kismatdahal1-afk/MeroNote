@@ -48,8 +48,8 @@ export function AppLayout() {
   // Reader routes render the full-bleed PDF viewer: the shell's outer
   // gutter and centered column are lifted for these routes only, so the
   // viewer spans the full content width (sidebar boundary to viewport
-  // edge) and attaches directly under the slim reader app header. The
-  // viewer itself fits the viewport exactly (100dvh minus slim header),
+  // edge) starting at the viewport top, with the slim reader app header
+  // overlaying it. The viewer itself fits the viewport exactly (100dvh),
   // so the window never scrolls and only the PDF area scrolls internally.
   const isReaderRoute = /\/reader\//.test(pathname);
 

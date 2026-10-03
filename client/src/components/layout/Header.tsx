@@ -57,12 +57,15 @@ export function Header({ onMenuClick }: HeaderProps) {
   // app header's own 1px bottom border is rendered transparent there only.
   // Every other route keeps border-border; layout/content untouched.
   // The reader also gets a slimmer app header (h-12) so the PDF keeps more
-  // vertical room; every other route keeps h-16.
+  // vertical room; every other route keeps h-16. On reader routes the
+  // header is fixed and overlays the top of the full-height viewer.
   const isReaderRoute = /\/reader\//.test(pathname);
   const readerBorder = isReaderRoute ? "border-transparent" : "border-border";
 
   return (
-    <header className={`sticky top-0 z-30 flex ${isReaderRoute ? "h-12" : "h-16"} items-center gap-3 border-b px-4 backdrop-blur-md lg:px-6 bg-surface/80 ${readerBorder}`}>
+    <header className={isReaderRoute
+      ? `fixed inset-x-0 top-0 z-30 flex h-12 items-center gap-3 border-b px-4 backdrop-blur-md lg:left-64 lg:px-6 bg-surface/80 ${readerBorder}`
+      : `sticky top-0 z-30 flex h-16 items-center gap-3 border-b px-4 backdrop-blur-md lg:px-6 bg-surface/80 ${readerBorder}`}>
       <IconButton
         icon={Menu}
         label="Open navigation menu"

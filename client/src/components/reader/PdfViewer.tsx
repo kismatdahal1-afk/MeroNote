@@ -162,11 +162,11 @@ export function PdfViewer({
     <div
       aria-label="PDF viewer"
       className={cx(
-        "reader-bar mt-0 flex flex-col overflow-hidden border-0 pt-0",
-        // Exact viewport below the slim reader app header (h-12): window
-        // never scrolls, only the PDF area does. mt-0 attaches the viewer
-        // directly at the header's bottom edge with zero gap.
-        "h-[calc(100vh-3rem)] supports-[height:100dvh]:h-[calc(100dvh-3rem)] bg-surface",
+        "reader-bar mt-0 flex flex-col overflow-hidden border-0 pt-12",
+        // Full viewport height from the very top: the slim reader app
+        // header (h-12) overlays this top padding. Content starts below
+        // the overlay; the window never scrolls, only the PDF area does.
+        "h-screen supports-[height:100dvh]:h-[100dvh] bg-surface",
         className,
       )}
     >
