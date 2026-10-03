@@ -161,6 +161,11 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
   const resizeTimerRef = useRef<number | null>(null);
   const viewportHeightRef = useRef(0);
   const prevZoomRef = useRef(zoom);
+  // Previous-commit document geometry for fractional zoom restore: the
+  // scroll offsets scale with old/new totals so the visual region holds
+  // across repeated zooms. Refreshed on every geometry commit (including
+  // plain resizes), never part of render output.
+  const geomRef = useRef({ totalHeight: 0, scrollWidth: 0, clientWidth: 0 });
   const uiZoomRef = useRef(uiZoom);
   const onZoomChangeRef = useRef(onZoomChange);
   const onDocumentRef = useRef(onDocument);
@@ -695,38 +700,72 @@ export function PdfCanvas({ url, page, onStateChange, onPageChange, programmatic
     programmaticScrollRef.current = false;
   }, [page, virtualData.offsets]);
 
-  // Zoom changes every reserved page height, so re-anchor the scroll
-  // position to the top of the current page using the fresh geometry.
-  // Guarded by prevZoomRef: plain resizes and the initial pageInfos load
-  // never scroll. During (or just after) a pinch gesture the scroll
-  // position is never moved — the counter is resynced from the live scroll
-  // offset with the fresh geometry instead, so pinch never causes a
-  // scroll-position jump. Jump/prev/next offsets remain exact.
+  // Zoom preserves the user's visual region by fractional position: the
+  // scroll offsets scale with the old/new document geometry so the content
+  // under the viewport stays approximately in place across repeated zooms
+  // (in or out). Guarded by prevZoomRef for change detection; the geometry
+  // snapshot refreshes on every commit so plain resizes and the initial
+  // pageInfos load keep it fresh without scrolling. During (or just after)
+  // a pinch gesture the scroll position is never moved — the counter is
+  // resynced from the live scroll offset with the fresh geometry instead.
+  // A pending programmatic page jump owns the scroll position: it wins over
+  // fractional restore. Jump/prev/next offsets remain exact.
   useEffect(() => {
-    if (prevZoomRef.current === zoom) return;
-    prevZoomRef.current = zoom;
+    const zoomChanged = prevZoomRef.current !== zoom;
+    if (zoomChanged) prevZoomRef.current = zoom;
     const sc = scrollContainerRef.current;
-    if (!sc || virtualData.numPages === 0) return;
-    if (pinchRef.current.active || pinchRef.current.skipAnchorOnce) {
-      pinchRef.current.skipAnchorOnce = false;
-      const h = sc.clientHeight;
-      const closest = findClosestPage(sc.scrollTop, h > 0 ? h : viewportHeightRef.current);
-      if (closest !== pageRef.current) {
-        onPageChangeRef.current?.(closest, virtualData.numPages);
+    if (sc && virtualData.numPages > 0 && zoomChanged) {
+      if (pinchRef.current.active || pinchRef.current.skipAnchorOnce) {
+        pinchRef.current.skipAnchorOnce = false;
+        const h = sc.clientHeight;
+        const closest = findClosestPage(sc.scrollTop, h > 0 ? h : viewportHeightRef.current);
+        if (closest !== pageRef.current) {
+          onPageChangeRef.current?.(closest, virtualData.numPages);
+        }
+      } else if (!programmaticScrollRef?.current) {
+        const prev = geomRef.current;
+        if (prev.totalHeight > 0 && virtualData.totalHeight > 0) {
+          const nextTop = (sc.scrollTop / prev.totalHeight) * virtualData.totalHeight;
+          const maxTop = Math.max(0, virtualData.totalHeight - sc.clientHeight);
+          const clampedTop = Math.min(Math.max(nextTop, 0), maxTop);
+          if (Math.abs(sc.scrollTop - clampedTop) > 2) {
+            sc.scrollTop = clampedTop;
+          }
+          const prevMax = Math.max(1, prev.scrollWidth - prev.clientWidth);
+          const nextMax = sc.scrollWidth - sc.clientWidth;
+          if (nextMax > 0) {
+            const nextLeft = Math.min(Math.max((sc.scrollLeft / prevMax) * nextMax, 0), nextMax);
+            if (Math.abs(sc.scrollLeft - nextLeft) > 2) {
+              sc.scrollLeft = nextLeft;
+            }
+          } else if (sc.scrollLeft !== 0) {
+            sc.scrollLeft = 0;
+          }
+        } else {
+          // First zoom before any geometry snapshot: fall back to the
+          // previous page-top anchor.
+          const clamped = Math.max(1, Math.min(virtualData.numPages, pageRef.current));
+          const targetTop = virtualData.offsets[clamped - 1] ?? 0;
+          if (Math.abs(sc.scrollTop - targetTop) > 2) {
+            sc.scrollTop = targetTop;
+          }
+        }
+        // Resync the counter from the preserved position (same pattern as
+        // the pinch path): no goToPage, no progress churn unless the
+        // visible page genuinely changed.
+        const h = sc.clientHeight;
+        const closest = findClosestPage(sc.scrollTop, h > 0 ? h : viewportHeightRef.current);
+        if (closest !== pageRef.current) {
+          onPageChangeRef.current?.(closest, virtualData.numPages);
+        }
       }
-      return;
     }
-    const clamped = Math.max(1, Math.min(virtualData.numPages, pageRef.current));
-    const targetTop = virtualData.offsets[clamped - 1] ?? 0;
-    if (Math.abs(sc.scrollTop - targetTop) > 2) {
-      sc.scrollTop = targetTop;
-    }
-    // Button-zoom path only (pinch returns early above with its own focal
-    // scrollLeft intact): center any horizontal overflow so the enlarged
-    // page presents centered and pannable instead of left-anchored.
-    const centerLeft = (renderWidth - sc.clientWidth) / 2;
-    if (centerLeft > 0 && Math.abs(sc.scrollLeft - centerLeft) > 2) {
-      sc.scrollLeft = centerLeft;
+    if (sc) {
+      geomRef.current = {
+        totalHeight: virtualData.totalHeight,
+        scrollWidth: sc.scrollWidth,
+        clientWidth: sc.clientWidth,
+      };
     }
   }, [zoom, virtualData, findClosestPage]);
 

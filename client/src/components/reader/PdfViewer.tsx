@@ -83,8 +83,14 @@ export function PdfViewer({
 
   const goToPage = useCallback((next: number) => {
     const p = clamp(next, 1, totalPages);
-    programmaticScrollRef.current = true;
-    setPage(p);
+    // Raise the programmatic flag only when navigation actually occurs: a
+    // same-page request renders nothing, so the jump effect would never
+    // consume a stale flag — and a stale flag would suppress zoom position
+    // restore in PdfCanvas.
+    setPage((prev) => {
+      if (prev !== p) programmaticScrollRef.current = true;
+      return p;
+    });
     onPageChange?.(p, totalPages);
   }, [onPageChange, totalPages]);
 
