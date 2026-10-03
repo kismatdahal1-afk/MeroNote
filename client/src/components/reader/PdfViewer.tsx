@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useToast } from "../../state/ToastProvider";
 import { cx, clamp } from "../../lib/utils";
 import { PdfCanvas, type PdfLoadState } from "./PdfCanvas";
 import { MOBILE_PINCH_MAX_ZOOM, ZOOM_LEVELS, isMobileViewport, useReaderZoom } from "./useReaderZoom";
 import { ReaderControlRegion, ReaderToolbarDesktop, ReaderToolbarMobile } from "./ReaderToolbar";
 import { ReaderBreadcrumb } from "./ReaderBreadcrumb";
-import { ReaderSearchBar } from "./ReaderSearchBar";
 import { ReaderErrorState, ReaderLoadingState } from "./ReaderDocStates";
 
 interface PdfViewerProps {
@@ -18,7 +16,6 @@ interface PdfViewerProps {
   bookmarked?: boolean;
   onDownload?: () => void;
   downloadActive?: boolean;
-  variant?: "page" | "embedded";
   breadcrumbs?: ReactNode;
   className?: string;
   fileUrl?: string | null;
@@ -38,7 +35,6 @@ export function PdfViewer({
   bookmarked = false,
   onDownload,
   downloadActive = false,
-  variant = "page",
   breadcrumbs,
   className,
   fileUrl = null,
@@ -47,14 +43,11 @@ export function PdfViewer({
   onRetryFile,
   sourceLabel = null,
 }: PdfViewerProps) {
-  const { toast } = useToast();
   const [docPages, setDocPages] = useState<number | null>(null);
   const [docError, setDocError] = useState<string | null>(null);
   const totalPages = Math.max(1, docPages ?? resource.pageCount);
 
   const [page, setPage] = useState(() => clamp(initialPage, 1, totalPages));
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Single zoom source of truth (UI units); render mapping stays
   // platform-specific via zoomReference. See useReaderZoom.
@@ -97,9 +90,6 @@ export function PdfViewer({
   const handleNextPage = useCallback(() => {
     goToPage(page + 1);
   }, [goToPage, page]);
-  const handleToggleSearch = useCallback(() => {
-    setSearchOpen((s) => !s);
-  }, []);
   const handleBookmarkPage = useCallback(() => {
     onBookmark?.(page);
   }, [onBookmark, page]);
@@ -126,16 +116,6 @@ export function PdfViewer({
     return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
 
-  const handleSearchSubmit = useCallback(() => {
-    toast(searchQuery ? `Search: "${searchQuery}" (available in Phase 6)` : "Enter a search term", "info");
-  }, [searchQuery, toast]);
-
-  const handleSearchClose = useCallback(() => {
-    setSearchQuery("");
-    setSearchOpen(false);
-  }, []);
-
-  const isPage = variant === "page";
   const toolbarCommon = useMemo(() => ({
     title: resource.title,
     subtitle,
@@ -150,8 +130,6 @@ export function PdfViewer({
     onZoomOut: zoomOut,
     canZoomIn,
     canZoomOut,
-    searchOpen,
-    onToggleSearch: handleToggleSearch,
     bookmarked,
     onBookmarkPage: onBookmark ? handleBookmarkPage : undefined,
     downloadActive,
@@ -161,7 +139,7 @@ export function PdfViewer({
   }), [
     resource.title, subtitle, sourceLabel, page, totalPages,
     handlePrevPage, handleNextPage, goToPage, zoomLabel, zoomIn, zoomOut,
-    canZoomIn, canZoomOut, searchOpen, handleToggleSearch, bookmarked,
+    canZoomIn, canZoomOut, bookmarked,
     onBookmark, handleBookmarkPage, downloadActive, onDownload,
     isFullscreen, handleFullscreen,
   ]);
@@ -173,35 +151,24 @@ export function PdfViewer({
       aria-label="PDF viewer"
       className={cx(
         "reader-bar mt-0 flex flex-col overflow-hidden border-0 pt-0",
-        isPage
-          // Exact viewport below the app header (h-16): window never
-          // scrolls, only the PDF area does. mt-0 attaches the viewer
-          // directly at the header's bottom edge with zero gap.
-          ? "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface"
-          : "card-glow overflow-hidden rounded-xl border border-border bg-surface shadow-card",
+        // Exact viewport below the app header (h-16): window never
+        // scrolls, only the PDF area does. mt-0 attaches the viewer
+        // directly at the header's bottom edge with zero gap.
+        "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface",
         className,
       )}
     >
-      <main className={cx("flex-1 min-h-0 overflow-hidden", isPage && "pb-0")}>
+      <main className="flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col h-full">
-          {/* One fixed control region: breadcrumb + toolbar (+ search)
-              docked under the app header. Only the document below scrolls. */}
-          <ReaderControlRegion variant={variant}>
-            {breadcrumbs && isPage && (
+          {/* One fixed control region: breadcrumb + toolbar docked under
+              the app header. Only the document below scrolls. */}
+          <ReaderControlRegion>
+            {breadcrumbs && (
               <ReaderBreadcrumb>{breadcrumbs}</ReaderBreadcrumb>
             )}
 
             <ReaderToolbarDesktop toolbarLeading={toolbarLeading} {...toolbarCommon} />
             <ReaderToolbarMobile toolbarLeading={toolbarLeading} {...toolbarCommon} />
-
-            {searchOpen && (
-              <ReaderSearchBar
-                query={searchQuery}
-                onQueryChange={setSearchQuery}
-                onSubmit={handleSearchSubmit}
-                onClose={handleSearchClose}
-              />
-            )}
           </ReaderControlRegion>
 
           <div className="flex-1 min-h-0 overflow-hidden bg-background">

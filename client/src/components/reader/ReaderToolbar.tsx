@@ -1,27 +1,21 @@
-import { memo, type ReactNode } from "react";
+import { memo, useRef, useState, type ReactNode } from "react";
 import {
   Bookmark, ChevronLeft, ChevronRight, Download,
-  Maximize2, Minus, Plus, Search,
+  Maximize2, Minimize2, Minus, Plus,
 } from "lucide-react";
 import { IconButton } from "../common/IconButton";
-import { cx } from "../../lib/utils";
 
-/** The single fixed reader-control region: breadcrumb + toolbar + search
- *  behave as one unit, stuck below the app header (h-16) via top-16 with
- *  zero gap. Only the document area below scrolls. */
+/** The single fixed reader-control region: breadcrumb + toolbar behave as
+ *  one unit, stuck below the app header (h-16) via top-16 with zero gap.
+ *  Only the document area below scrolls. */
 export function ReaderControlRegion({
-  variant = "page",
   children,
 }: {
-  variant?: "page" | "embedded";
   children: ReactNode;
 }) {
   return (
     <header
-      className={cx(
-        "sticky top-16 z-30 mt-0 flex flex-shrink-0 flex-col border-t-0 pt-0",
-        variant === "page" ? "bg-surface" : "bg-surface-muted/50",
-      )}
+      className="sticky top-16 z-30 mt-0 flex flex-shrink-0 flex-col border-t-0 bg-surface pt-0"
     >
       {children}
     </header>
@@ -67,8 +61,19 @@ interface PageNavProps {
 }
 
 /** Page navigation group: chevrons + counter (editable input on desktop,
- *  static counter on the compact mobile strip). */
+ *  static counter on the compact mobile strip). The desktop input keeps
+ *  keystrokes local while editing (draft state) and only navigates on
+ *  Enter/blur commit; Escape cancels without navigating. */
 const PageNavGroup = memo(function PageNavGroup({ page, totalPages, onPrev, onNext, onDirectPage, compact = false }: PageNavProps) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const cancelRef = useRef(false);
+
+  const commitDraft = (value: string) => {
+    const v = Number(value);
+    if (Number.isInteger(v) && v >= 1 && v <= totalPages && v !== page) onDirectPage?.(v);
+    setDraft(null);
+  };
+
   if (compact) {
     return (
       <div className="flex items-center gap-1 rounded-md bg-surface-muted px-1.5" role="group" aria-label="Page navigation">
@@ -84,18 +89,40 @@ const PageNavGroup = memo(function PageNavGroup({ page, totalPages, onPrev, onNe
   return (
     <div className="flex items-center gap-1" role="group" aria-label="Page navigation">
       <IconButton icon={ChevronLeft} label="Previous page" variant="bar" onClick={onPrev} disabled={page <= 1} />
-      <div className="flex h-9 items-center gap-1 rounded-lg border border-border-strong bg-surface-muted px-2">
+      <div className="flex h-10 items-center gap-1 rounded-lg border border-border-strong bg-surface-muted px-2">
         <input
           type="number"
-          value={page}
+          inputMode="numeric"
+          value={draft ?? page}
           min={1}
           max={totalPages}
+          disabled={totalPages <= 1}
+          onFocus={(e) => {
+            cancelRef.current = false;
+            setDraft(String(page));
+            e.currentTarget.select();
+          }}
           onChange={(e) => {
-            const v = Number(e.target.value);
-            if (v >= 1 && v <= totalPages) onDirectPage?.(v);
+            setDraft(e.target.value);
+          }}
+          onBlur={(e) => {
+            if (cancelRef.current) {
+              cancelRef.current = false;
+              return;
+            }
+            commitDraft(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            } else if (e.key === "Escape") {
+              cancelRef.current = true;
+              setDraft(null);
+              e.currentTarget.blur();
+            }
           }}
           aria-label="Page number"
-          className="w-12 bg-transparent text-center text-sm font-semibold text-foreground focus:outline-none"
+          className="w-12 bg-transparent text-center text-sm font-semibold text-foreground focus:outline-none disabled:opacity-40"
         />
         <span className="whitespace-nowrap text-xs font-medium text-muted-foreground">/ {totalPages}</span>
       </div>
@@ -124,15 +151,13 @@ const ZoomGroup = memo(function ZoomGroup({ zoomLabel, onZoomIn, onZoomOut, canZ
   return (
     <div className={boxClass} role="group" aria-label="PDF zoom">
       <IconButton icon={Minus} label="Zoom out PDF" variant="bar" size="sm" onClick={onZoomOut} disabled={!canZoomOut} />
-      <span className={labelClass} aria-live="polite">{zoomLabel}</span>
+      <span className={labelClass} aria-live="polite" title="PDF zoom level">{zoomLabel}</span>
       <IconButton icon={Plus} label="Zoom in PDF" variant="bar" size="sm" onClick={onZoomIn} disabled={!canZoomIn} />
     </div>
   );
 });
 
 interface ActionButtonsProps {
-  searchOpen: boolean;
-  onToggleSearch: () => void;
   bookmarked: boolean;
   onBookmarkPage?: () => void;
   downloadActive: boolean;
@@ -143,10 +168,9 @@ interface ActionButtonsProps {
   compactLabels?: boolean;
 }
 
-/** Search / bookmark / download / fullscreen actions (visual only —
- *  handlers are the existing ReaderShell/PdfViewer contracts). */
+/** Bookmark / download / fullscreen actions (handlers are the existing
+ *  ReaderShell/PdfViewer contracts). */
 const ReaderActionButtons = memo(function ReaderActionButtons({
-  searchOpen, onToggleSearch,
   bookmarked, onBookmarkPage,
   downloadActive, onDownloadPress,
   isFullscreen, onToggleFullscreen,
@@ -154,14 +178,6 @@ const ReaderActionButtons = memo(function ReaderActionButtons({
 }: ActionButtonsProps) {
   return (
     <>
-      <IconButton
-        icon={Search}
-        label={searchOpen ? "Close search" : "Search in document"}
-        variant={searchOpen ? "active" : "bar"}
-        size={size}
-        onClick={onToggleSearch}
-        aria-pressed={searchOpen}
-      />
       {onBookmarkPage && (
         <IconButton
           icon={Bookmark}
@@ -183,8 +199,8 @@ const ReaderActionButtons = memo(function ReaderActionButtons({
         />
       )}
       <IconButton
-        icon={Maximize2}
-        label={isFullscreen ? "Exit fullscreen" : "Toggle fullscreen"}
+        icon={isFullscreen ? Minimize2 : Maximize2}
+        label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         variant={isFullscreen ? "active" : "bar"}
         size={size}
         onClick={onToggleFullscreen}
@@ -209,8 +225,6 @@ export interface ReaderToolbarProps {
   onZoomOut: () => void;
   canZoomIn: boolean;
   canZoomOut: boolean;
-  searchOpen: boolean;
-  onToggleSearch: () => void;
   bookmarked: boolean;
   onBookmarkPage?: () => void;
   downloadActive: boolean;
@@ -224,7 +238,7 @@ export function ReaderToolbarDesktop({
   toolbarLeading, title, subtitle, sourceLabel,
   page, totalPages, onPrevPage, onNextPage, onDirectPage,
   zoomLabel, onZoomIn, onZoomOut, canZoomIn, canZoomOut,
-  searchOpen, onToggleSearch, bookmarked, onBookmarkPage,
+  bookmarked, onBookmarkPage,
   downloadActive, onDownloadPress, isFullscreen, onToggleFullscreen,
 }: ReaderToolbarProps) {
   return (
@@ -246,8 +260,6 @@ export function ReaderToolbarDesktop({
         canZoomOut={canZoomOut}
       />
       <ReaderActionButtons
-        searchOpen={searchOpen}
-        onToggleSearch={onToggleSearch}
         bookmarked={bookmarked}
         onBookmarkPage={onBookmarkPage}
         downloadActive={downloadActive}
@@ -265,12 +277,12 @@ export function ReaderToolbarMobile({
   toolbarLeading, title, subtitle, sourceLabel,
   page, totalPages, onPrevPage, onNextPage,
   zoomLabel, onZoomIn, onZoomOut, canZoomIn, canZoomOut,
-  searchOpen, onToggleSearch, bookmarked, onBookmarkPage,
+  bookmarked, onBookmarkPage,
   downloadActive, onDownloadPress, isFullscreen, onToggleFullscreen,
 }: ReaderToolbarProps) {
   return (
     <>
-      <div className="flex items-center gap-2 border-0 px-3 py-1 md:hidden">
+      <div className="flex items-center gap-2 border-0 px-3 py-0.5 md:hidden">
         {toolbarLeading}
         <ReaderTitle title={title} subtitle={subtitle} sourceLabel={sourceLabel} compact />
       </div>
@@ -291,15 +303,13 @@ export function ReaderToolbarMobile({
           compact
         />
         <ReaderActionButtons
-          searchOpen={searchOpen}
-          onToggleSearch={onToggleSearch}
           bookmarked={bookmarked}
           onBookmarkPage={onBookmarkPage}
           downloadActive={downloadActive}
           onDownloadPress={onDownloadPress}
           isFullscreen={isFullscreen}
           onToggleFullscreen={onToggleFullscreen}
-          size="sm"
+          size="md"
           compactLabels
         />
       </div>
