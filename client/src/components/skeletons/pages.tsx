@@ -407,13 +407,13 @@ export function ReaderSkeleton() {
     <SkPage label="Loading document viewer">
       <div aria-hidden="true">
         {/* Compact breadcrumb row */}
-        <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background px-3 py-0.5">
+        <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background px-3 py-1">
           <SkBox className="h-3 w-16" />
           <SkBox className="h-3 w-24" />
           <SkBox className="h-3 w-32" />
         </div>
         {/* Desktop toolbar */}
-        <div className="hidden items-center gap-2 border-b border-border px-3 md:flex lg:px-4 h-14">
+        <div className="hidden items-center gap-2 border-b border-border px-3 md:flex lg:px-4 h-15">
           <SkBox className="size-10 shrink-0 rounded-lg" />
           <div className="min-w-0 flex-1">
             <SkBox className="h-4 w-64 max-w-full" />
@@ -425,14 +425,14 @@ export function ReaderSkeleton() {
           <SkCircle className="size-10 shrink-0" />
         </div>
         {/* Mobile title + controls rows */}
-        <div className="flex items-center gap-2 border-b border-border px-3 py-1 md:hidden">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-3 md:hidden">
           <SkBox className="size-10 shrink-0 rounded-lg" />
           <div className="min-w-0 flex-1">
             <SkBox className="h-4 w-3/4" />
             <SkBox className="mt-1 h-3 w-1/2" />
           </div>
         </div>
-        <div className="flex items-center gap-1.5 border-b border-border px-3 py-1 md:hidden">
+        <div className="flex items-center gap-1.5 border-b border-border px-3 py-4 md:hidden">
           <SkBox className="h-7 w-28 shrink-0 rounded-md" />
           <SkBox className="h-7 w-14 shrink-0 rounded-md" />
           <SkCircle className="size-8 shrink-0" />

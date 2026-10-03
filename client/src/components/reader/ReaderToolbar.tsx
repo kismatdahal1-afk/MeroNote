@@ -242,7 +242,7 @@ export function ReaderToolbarDesktop({
   downloadActive, onDownloadPress, isFullscreen, onToggleFullscreen,
 }: ReaderToolbarProps) {
   return (
-    <div className="hidden min-h-10 items-center gap-2 border-b border-border px-3 md:flex lg:px-4">
+    <div className="hidden min-h-15 items-center gap-2 border-b border-border px-3 md:flex lg:px-4">
       {toolbarLeading}
       <ReaderTitle title={title} subtitle={subtitle} sourceLabel={sourceLabel} />
       <PageNavGroup
@@ -282,11 +282,11 @@ export function ReaderToolbarMobile({
 }: ReaderToolbarProps) {
   return (
     <>
-      <div className="flex items-center gap-2 border-0 px-3 py-0.5 md:hidden">
+      <div className="flex items-center gap-2 border-0 px-3 py-3 md:hidden">
         {toolbarLeading}
         <ReaderTitle title={title} subtitle={subtitle} sourceLabel={sourceLabel} compact />
       </div>
-      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-1 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
+      <div className="flex items-center gap-1.5 overflow-x-auto border-b border-border px-3 py-4 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
         <PageNavGroup
           page={page}
           totalPages={totalPages}
