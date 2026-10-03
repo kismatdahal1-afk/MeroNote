@@ -11,6 +11,7 @@ import {
   OTP_VALIDITY_SECONDS,
   clearOtpIssuedAt,
   clearPendingEmail,
+  distributePastedOtp,
   formatCountdownMMSS,
   isValidOtpFormat,
   maskEmail,
@@ -259,6 +260,37 @@ describe("otpFlow helpers", () => {
     // A failed code never resubmits itself; editing to a new code re-arms.
     expect(shouldAutoSubmitOtp("123456", false, "123456")).toBe(false);
     expect(shouldAutoSubmitOtp("654321", false, "123456")).toBe(true);
+  });
+
+  it("distributes pasted digits from the focused box", () => {
+    // Empty value pasted anywhere fills all boxes in order.
+    expect(distributePastedOtp("", 0, "482931").value).toBe("482931");
+    expect(distributePastedOtp("", 3, "482931").value).toBe("482931");
+    // A typed prefix is preserved when completing the code.
+    expect(distributePastedOtp("1", 1, "23456").value).toBe("123456");
+    expect(distributePastedOtp("12", 2, "3456").value).toBe("123456");
+    // Overflow is truncated to six digits.
+    expect(distributePastedOtp("", 0, "123456789").value).toBe("123456");
+    expect(distributePastedOtp("12", 2, "3456789").value).toBe("123456");
+    // Only numeric digits participate; empty paste keeps the value.
+    expect(distributePastedOtp("12", 2, "ab34cd").value).toBe("1234");
+    expect(distributePastedOtp("12", 2, "abc").value).toBe("12");
+    expect(distributePastedOtp("", 0, "").value).toBe("");
+    // A gap before the focused box falls back without losing typed digits.
+    expect(distributePastedOtp("12", 4, "345").value).toBe("12345");
+    // Out-of-range or non-numeric indices clamp safely.
+    expect(distributePastedOtp("", -2, "123456").value).toBe("123456");
+    expect(distributePastedOtp("", 99, "123456").value).toBe("123456");
+    expect(distributePastedOtp("", Number.NaN, "123456").value).toBe("123456");
+  });
+
+  it("focuses the first empty box after a paste", () => {
+    expect(distributePastedOtp("", 0, "482931").focusIndex).toBe(5);
+    expect(distributePastedOtp("", 3, "482931").focusIndex).toBe(5);
+    expect(distributePastedOtp("12", 2, "3456").focusIndex).toBe(5);
+    expect(distributePastedOtp("12", 2, "34").focusIndex).toBe(4);
+    expect(distributePastedOtp("", 0, "5").focusIndex).toBe(1);
+    expect(distributePastedOtp("12", 4, "345").focusIndex).toBe(5);
   });
 
   it("overwrites the timestamp on resend without touching anything else", () => {

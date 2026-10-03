@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ClipboardEvent, type KeyboardEvent } from "react";
-import { OTP_LENGTH } from "../../lib/otpFlow";
+import { OTP_LENGTH, distributePastedOtp } from "../../lib/otpFlow";
 
 /**
  * Step 5 six-box OTP input (presentational, no network/storage).
@@ -79,11 +79,16 @@ export function OtpInput({ id = "otp", value, onChange, disabled }: OtpInputProp
 
   const handlePaste = (e: ClipboardEvent<HTMLDivElement>): void => {
     if (disabled) return;
-    const digits = onlyDigits(e.clipboardData.getData("text")).slice(0, OTP_LENGTH);
-    if (!digits) return;
+    const raw = e.clipboardData.getData("text");
+    if (!onlyDigits(raw)) return;
     e.preventDefault();
-    onChange(digits);
-    focusBox(Math.min(digits.length, OTP_LENGTH - 1));
+    // The paste bubbles from whichever box is focused: distribute from there
+    // so completing a partially typed code preserves the typed prefix.
+    const target = e.target as HTMLElement | null;
+    const parsed = Number(target?.dataset?.index);
+    const result = distributePastedOtp(value, parsed, raw);
+    onChange(result.value);
+    focusBox(result.focusIndex);
   };
 
   return (
@@ -96,6 +101,7 @@ export function OtpInput({ id = "otp", value, onChange, disabled }: OtpInputProp
               boxesRef.current[index] = node;
             }}
             id={`${id}-digit-${index}`}
+            data-index={index}
             className={BOX_CLASS}
             type="text"
             inputMode="numeric"

@@ -115,6 +115,31 @@ export function shouldAutoSubmitOtp(otp: string, busy: boolean, lastAutoSubmitte
   return !busy && isValidOtpFormat(otp) && otp !== lastAutoSubmitted;
 }
 
+/**
+ * Distribute pasted digits across the OTP boxes starting at the focused box.
+ * Only numeric digits participate; the result stays within OTP_LENGTH. When
+ * the prefix before the focused box is intact it is preserved (so pasting
+ * completes a partially typed code); a gap before it falls back to filling
+ * from the start rather than losing typed digits. Pure and unit-testable —
+ * the component only supplies the focused index and applies the result.
+ */
+export interface DistributedPaste {
+  value: string;
+  /** First empty box after the write (clamped); the last box when full. */
+  focusIndex: number;
+}
+
+export function distributePastedOtp(current: string, startIndex: number, pasted: string): DistributedPaste {
+  const digits = pasted.replace(/\D/g, "").slice(0, OTP_LENGTH);
+  const start = Number.isFinite(startIndex)
+    ? Math.max(0, Math.min(OTP_LENGTH - 1, Math.floor(startIndex)))
+    : 0;
+  if (!digits) return { value: current, focusIndex: start };
+  const head = current.slice(0, start);
+  const value = (head + digits).slice(0, OTP_LENGTH);
+  return { value, focusIndex: Math.min(head.length + digits.length, OTP_LENGTH - 1) };
+}
+
 /** Format a countdown as MM:SS (clamped at zero; UX display only). */
 export function formatCountdownMMSS(totalSeconds: number): string {
   const clamped = Math.max(0, Math.floor(totalSeconds));
