@@ -407,7 +407,7 @@ export function ReaderSkeleton() {
     <SkPage label="Loading document viewer">
       <div aria-hidden="true">
         {/* Compact breadcrumb row */}
-        <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background px-3 py-1">
+        <div className="flex min-h-[1.5rem] flex-wrap items-center gap-0.5 border-b border-border bg-background px-3 pb-2 pt-0">
           <SkBox className="h-3 w-16" />
           <SkBox className="h-3 w-24" />
           <SkBox className="h-3 w-32" />
@@ -425,7 +425,7 @@ export function ReaderSkeleton() {
           <SkCircle className="size-10 shrink-0" />
         </div>
         {/* Mobile title + controls rows */}
-        <div className="flex items-center gap-2 border-b border-border px-3 py-3 md:hidden">
+        <div className="flex items-center gap-2 border-b border-border px-3 pb-6 pt-0 md:hidden">
           <SkBox className="size-10 shrink-0 rounded-lg" />
           <div className="min-w-0 flex-1">
             <SkBox className="h-4 w-3/4" />

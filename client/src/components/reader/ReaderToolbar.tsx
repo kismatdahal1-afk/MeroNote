@@ -282,7 +282,7 @@ export function ReaderToolbarMobile({
 }: ReaderToolbarProps) {
   return (
     <>
-      <div className="flex items-center gap-2 border-0 px-3 py-3 md:hidden">
+      <div className="flex items-center gap-2 border-0 px-3 pb-6 pt-0 md:hidden">
         {toolbarLeading}
         <ReaderTitle title={title} subtitle={subtitle} sourceLabel={sourceLabel} compact />
       </div>

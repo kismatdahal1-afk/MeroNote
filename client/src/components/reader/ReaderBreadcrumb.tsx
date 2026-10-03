@@ -10,7 +10,7 @@ import { ChevronRight } from "lucide-react";
 export function ReaderBreadcrumb({ children }: { children: ReactNode }) {
   return (
     <nav aria-label="Breadcrumb">
-      <div className="mt-0 flex min-h-0 flex-nowrap items-center gap-x-0.5 overflow-x-auto whitespace-nowrap rounded-none border-0 px-3 py-1 text-[10px] font-medium leading-none text-muted-foreground/80 [scrollbar-width:none] md:text-xs [&::-webkit-scrollbar]:hidden">
+      <div className="mt-0 flex min-h-0 flex-nowrap items-center gap-x-0.5 overflow-x-auto whitespace-nowrap rounded-none border-0 px-3 pb-2 pt-0 text-[10px] font-medium leading-none text-muted-foreground/80 [scrollbar-width:none] md:text-xs [&::-webkit-scrollbar]:hidden">
         {children}
       </div>
     </nav>
