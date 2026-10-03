@@ -5,6 +5,13 @@ import { OTP_LENGTH, distributePastedOtp } from "../../lib/otpFlow";
  * Step 5 six-box OTP input (presentational, no network/storage).
  * Digits-only, mobile-friendly (`inputMode="numeric"`), paste-aware, and
  * keyboard-navigable. Styling reuses the shared auth input tokens.
+ *
+ * Deliberately NO `maxLength` on the boxes: mobile keyboards frequently
+ * insert a pasted code as a direct input event with no `paste` event, and a
+ * native length cap would amputate it to one digit before React sees it.
+ * Length is enforced in state instead (`value[index] ?? ""` display plus
+ * `slice(0, OTP_LENGTH)` in every update path), so extra characters can
+ * neither render nor persist.
  */
 
 const BOX_CLASS =
@@ -107,7 +114,6 @@ export function OtpInput({ id = "otp", value, onChange, disabled }: OtpInputProp
             inputMode="numeric"
             autoComplete={index === 0 ? "one-time-code" : "off"}
             aria-label={`Digit ${index + 1} of ${OTP_LENGTH}`}
-            maxLength={1}
             value={value[index] ?? ""}
             disabled={disabled}
             onChange={(e) => handleBoxChange(index, e.target.value)}
