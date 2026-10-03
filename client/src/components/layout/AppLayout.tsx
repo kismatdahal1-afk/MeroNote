@@ -48,9 +48,9 @@ export function AppLayout() {
   // Reader routes render the full-bleed PDF viewer: the shell's outer
   // gutter and centered column are lifted for these routes only, so the
   // viewer spans the full content width (sidebar boundary to viewport
-  // edge) and attaches directly under the app header. The viewer itself
-  // fits the viewport exactly (100dvh minus app header), so the window
-  // never scrolls and only the PDF area scrolls internally.
+  // edge) and attaches directly under the slim reader app header. The
+  // viewer itself fits the viewport exactly (100dvh minus slim header),
+  // so the window never scrolls and only the PDF area scrolls internally.
   const isReaderRoute = /\/reader\//.test(pathname);
 
   return (
@@ -59,7 +59,7 @@ export function AppLayout() {
     <div className={isReaderRoute ? "bg-background min-h-screen" : "bg-hero-gradient min-h-screen"}>
       {/* Desktop sidebar — dark tint comes from the dark-mode sidebar tokens */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-surface dark:border-[#20242B] dark:bg-[#0D1015] lg:flex">
-        <div className="flex h-16 items-center border-b border-border px-5">
+        <div className={`flex items-center border-b border-border px-5 ${isReaderRoute ? "h-12" : "h-16"}`}>
           <BrandMark subtitle />
         </div>
         <div className="flex-1 overflow-y-auto p-3">

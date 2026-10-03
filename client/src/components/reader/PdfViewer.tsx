@@ -163,10 +163,10 @@ export function PdfViewer({
       aria-label="PDF viewer"
       className={cx(
         "reader-bar mt-0 flex flex-col overflow-hidden border-0 pt-0",
-        // Exact viewport below the app header (h-16): window never
-        // scrolls, only the PDF area does. mt-0 attaches the viewer
+        // Exact viewport below the slim reader app header (h-12): window
+        // never scrolls, only the PDF area does. mt-0 attaches the viewer
         // directly at the header's bottom edge with zero gap.
-        "h-[calc(100vh-4rem)] supports-[height:100dvh]:h-[calc(100dvh-4rem)] bg-surface",
+        "h-[calc(100vh-3rem)] supports-[height:100dvh]:h-[calc(100dvh-3rem)] bg-surface",
         className,
       )}
     >
