@@ -33,6 +33,11 @@ export const RESOURCE_TYPE_CONFIG: Record<ResourceType, ResourceTypeConfig> = {
     icon: BookOpen,
     badgeClass: "bg-primary-muted text-primary",
   },
+  notes: {
+    label: "Notes",
+    icon: Layers,
+    badgeClass: "bg-accent/15 text-accent",
+  },
   short_note: {
     label: "Short Notes",
     icon: FileText,
@@ -41,11 +46,6 @@ export const RESOURCE_TYPE_CONFIG: Record<ResourceType, ResourceTypeConfig> = {
   handwritten_note: {
     label: "Handwritten Notes",
     icon: PenLine,
-    badgeClass: "bg-accent/15 text-accent",
-  },
-  extra_note: {
-    label: "Extra Notes",
-    icon: Layers,
     badgeClass: "bg-accent/15 text-accent",
   },
   questions: {
@@ -96,9 +96,9 @@ export const RESOURCE_TYPE_CONFIG: Record<ResourceType, ResourceTypeConfig> = {
 /** Canonical display order for resource types — matches spec exactly. */
 export const ALL_RESOURCE_TYPES: ResourceType[] = [
   "book",
+  "notes",
   "short_note",
   "handwritten_note",
-  "extra_note",
   "questions",
   "important_questions",
   "hot_topic",

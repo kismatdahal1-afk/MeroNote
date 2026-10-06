@@ -1,8 +1,8 @@
 export type ResourceType =
   | "book"
+  | "notes"
   | "short_note"
   | "handwritten_note"
-  | "extra_note"
   | "questions"
   | "important_questions"
   | "hot_topic"

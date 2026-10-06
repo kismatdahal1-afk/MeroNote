@@ -185,9 +185,9 @@ function mapTopic(doc: Doc): Topic {
 
 const RESOURCE_TYPES = [
   "book",
+  "notes",
   "short_note",
   "handwritten_note",
-  "extra_note",
   "questions",
   "important_questions",
   "hot_topic",
